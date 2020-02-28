@@ -1,22 +1,22 @@
-var Rbush        = require('rbush')
-var Simplex      = require('simplex-noise')
-var Lerp         = require('lerp')
-var Random       = require('@tatumcreative/random')
-var Intersection = require('../lib/intersection')
-var Draw         = require('../lib/draw')
-var Shortcuts    = require('../lib/shortcuts')
-var TAU          = Math.PI * 2
+const Rbush        = require('rbush')
+const Simplex      = require('simplex-noise')
+const Lerp         = require('lerp')
+const Random       = require('@tatumcreative/random')
+const Intersection = require('../lib/intersection')
+const Draw         = require('../lib/draw')
+const Shortcuts    = require('../lib/shortcuts')
+const TAU          = Math.PI * 2
 
 function _cutOutIntersections( neighbors, bounds ) {
 
-	var lineEnd
-	var lastDistance = Infinity
+	let lineEnd
+	let lastDistance = Infinity
 
-	var a = bounds.line
+	const a = bounds.line
 
 	neighbors.forEach(function(neighbor) {
 
-		var b = neighbor.line
+		const b = neighbor.line
 
 		var intersection = Intersection(
 			a[0], a[1], a[2], a[3],
