@@ -1,5 +1,5 @@
-const path = require('path')
-const fs = require('fs')
+const path = require("path");
+const fs = require("fs");
 
 function findSessionFromCli() {
   const session = process.argv[2];
@@ -13,15 +13,18 @@ function findSessionFromCli() {
     if (fs.statSync(pathToSession).isDirectory()) {
       return pathToSession;
     }
-  } catch (error) {}
+  } catch (error) {
+    // Ignore the error.
+  }
 
   console.error(`Could not find the session "${session}".`);
   console.error(`Looked in: ${pathToSession}`);
   process.exit();
+  return null;
 }
 
 function getAllSessions() {
-  const dir = path.join(__dirname, '..');
+  const dir = path.join(__dirname, "..");
   const sessions = [];
 
   // Go through the root directory and get all of the projects
