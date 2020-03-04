@@ -88,23 +88,23 @@ function generateAllHtml(sessions) {
 
 async function generateThumbnail(sessions, sessionSlug) {
   const sessionPath = path.resolve(__dirname, "../", sessionSlug);
-  const screenshotPath = path.resolve(sessionPath, "screenshot.jpg");
+  const fullImagePath = path.resolve(sessionPath, "image.jpg");
   const thumbPath = path.resolve(sessionPath, "thumb.jpg");
   // Fit this nicely into GitHub's README.md display width.
   const width = 292;
   const height = 164;
 
   try {
-    fs.statSync(screenshotPath);
+    fs.statSync(fullImagePath);
   } catch (error) {
     console.error(
-      "Screenshot did not exist, no thumbnail was generated",
-      screenshotPath
+      "Full image did not exist, no thumbnail was generated",
+      fullImagePath
     );
   }
 
   console.log("Reading the screenshot");
-  const screenshot = await Jimp.read(screenshotPath);
+  const screenshot = await Jimp.read(fullImagePath);
 
   console.log(`Resizing the screenshot to the thumb size ${width}x${height}`);
   await screenshot.resize(width, height).write(thumbPath);
