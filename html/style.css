@@ -69,6 +69,14 @@ canvas {
   text-align: center;
 }
 
+.download-link {
+  color: #fff;
+  background: #000;
+  font-family: sans-serif;
+  display: inline-block;
+  padding: 10px;
+}
+
 @media (max-width:700px) {
   .title {
     right: 0;

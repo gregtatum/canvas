@@ -4,6 +4,7 @@ const fs = require("fs");
 const template = require("lodash.template");
 const browserify = require("browserify");
 const { repository } = require("../package.json");
+const Jimp = require("jimp");
 
 const { findSessionFromCli, getAllSessions } = require("./common");
 const babelify = require("babelify");
@@ -16,6 +17,7 @@ async function run() {
 
   if (sessionSlug) {
     await browserifyBundle(sessionSlug);
+    await generateThumbnail(sessions, sessionSlug);
   }
   updateReadme(sessions);
   generateAllHtml(sessions);
@@ -84,6 +86,30 @@ function generateAllHtml(sessions) {
   }
 }
 
+async function generateThumbnail(sessions, sessionSlug) {
+  const sessionPath = path.resolve(__dirname, "../", sessionSlug);
+  const screenshotPath = path.resolve(sessionPath, "screenshot.jpg");
+  const thumbPath = path.resolve(sessionPath, "thumb.jpg");
+  // Fit this nicely into GitHub's README.md display width.
+  const width = 292;
+  const height = 164;
+
+  try {
+    fs.statSync(screenshotPath);
+  } catch (error) {
+    console.error(
+      "Screenshot did not exist, no thumbnail was generated",
+      screenshotPath
+    );
+  }
+
+  console.log("Reading the screenshot");
+  const screenshot = await Jimp.read(screenshotPath);
+
+  console.log(`Resizing the screenshot to the thumb size ${width}x${height}`);
+  await screenshot.resize(width, height).write(thumbPath);
+}
+
 function generateHTML(sessions, sessionSlug) {
   const htmlTemplatePath = path.resolve(
     __dirname,
@@ -117,15 +143,15 @@ function generateHTML(sessions, sessionSlug) {
   if (!sessionNumber) {
     throw new Error("Could not find a session number.");
   }
+  const prevLink = previous ? `../${previous.fileName}` : repository;
+  const nextLink = next ? `../${next.fileName}` : repository;
 
   fs.writeFileSync(
     htmlDestination,
     htmlTemplate({
       sessionNumber,
-      previous: `<a href='${
-        previous ? `../${previous.fileName}` : repository
-      }'>&lt;</a>`,
-      next: `<a href='${next ? `../${next.fileName}` : repository}'>&gt;</a>`,
+      previous: `<a id="prev" href='${prevLink}'>&lt;</a>`,
+      next: `<a id="next" href='${nextLink}'>&gt;</a>`,
       name: packageJson.name
     })
   );
