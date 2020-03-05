@@ -3,12 +3,13 @@ const path = require("path");
 const fs = require("fs");
 const template = require("lodash.template");
 const browserify = require("browserify");
-const { repository } = require("../package.json");
 const Jimp = require("jimp");
 
 const { findSessionFromCli, getAllSessions } = require("./common");
 const babelify = require("babelify");
 const exorcist = require("exorcist");
+
+const url = "https://gregtatum.com/category/interactive/";
 
 async function run() {
   // Run the build script.
@@ -108,6 +109,7 @@ async function generateThumbnail(sessions, sessionSlug) {
 
   console.log(`Resizing the screenshot to the thumb size ${width}x${height}`);
   await screenshot.resize(width, height).write(thumbPath);
+  console.log(`Thumb outputed at: ${thumbPath}`);
 }
 
 function generateHTML(sessions, sessionSlug) {
@@ -143,8 +145,8 @@ function generateHTML(sessions, sessionSlug) {
   if (!sessionNumber) {
     throw new Error("Could not find a session number.");
   }
-  const prevLink = previous ? `../${previous.fileName}` : repository;
-  const nextLink = next ? `../${next.fileName}` : repository;
+  const prevLink = previous ? `../${previous.fileName}` : url;
+  const nextLink = next ? `../${next.fileName}` : url;
 
   fs.writeFileSync(
     htmlDestination,
