@@ -24,6 +24,14 @@ body {
   text-align: center;
   z-index: 1;
   text-shadow: 0 0 0.6em #333;
+  opacity: 1;
+  transition: opacity 300ms;
+}
+
+.hide-ui .title {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 300ms, visibility 300ms 300ms;
 }
 
 canvas {
