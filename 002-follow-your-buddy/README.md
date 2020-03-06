@@ -1,1 +1,1 @@
-This is the first in a new session series, focusing on drawing with 2d. There is something very nice and immediate about working in a 2d space. I'm guessing this series will have more simple output compared to the 3d sessions.
+This not a boids algorithm, but rather is a simple following algorithm. One entity randomly follows another entity, while a few randomly wander to help break up the uniformity.
