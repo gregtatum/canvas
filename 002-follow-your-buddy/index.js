@@ -19,7 +19,8 @@ const TAU = Math.PI * 2;
     seed,
     random,
     simplex3,
-    drag: 1,
+    lonelyRotation: 0.005,
+    breakoutCount: 10,
     entityCount: 2000,
     entitySize: 10,
     baseSpeed: 2,
@@ -47,14 +48,22 @@ const TAU = Math.PI * 2;
 
 function update(config, current) {
   const { entities, time } = current;
-  const { ctx, entitySize, drag, maxSpeed, simplex3 } = config;
+  const { ctx, entitySize, maxSpeed, simplex3, lonelyRotation } = config;
   const { width, height } = ctx.canvas;
 
   for (const entity of entities) {
-    applyBuddyForce(config, entity, entities[entity.buddy]);
+    if (entity.buddy === null) {
+      entity.theta =
+        Math.PI *
+        simplex3(
+          entity.x * lonelyRotation,
+          entity.y * lonelyRotation,
+          entity.index
+        );
+    } else {
+      applyBuddyForce(config, entity, entities[entity.buddy]);
+    }
 
-    // Apply drag.
-    entity.speed *= drag;
     entity.speed = Math.min(entity.speed, maxSpeed);
 
     // Apply the speed.
@@ -103,7 +112,7 @@ function lerpTheta(a, b, t) {
 }
 
 function generateEntities(config) {
-  const { entityCount, ctx, baseSpeed, random } = config;
+  const { entityCount, ctx, baseSpeed, random, breakoutCount } = config;
   const { width, height } = ctx.canvas;
   const entities = [];
 
@@ -115,9 +124,20 @@ function generateEntities(config) {
       theta: random(TAU),
       speed: baseSpeed,
       // Pick someone else random, but not yourself.
-      buddy: (i + random(0, entityCount - 1, true)) % entityCount,
-      buddy2: (i + random(0, entityCount - 1, true)) % entityCount
+      buddy: (i + random(0, entityCount - 1, true)) % entityCount
     });
+  }
+
+  // Create some "breakout" entities that don't follow anyone else.
+  for (let i = 0; i < breakoutCount; i++) {
+    // Pick the buddy of some other entity.
+    const { buddy } = entities[random(0, entities.length, true)];
+    if (buddy !== null) {
+      // Set the entity that this one points to to null, that way it's ensured
+      // that the lonely ones normally have at least one entity following them.
+      // This should theoretically make them more interesting.
+      entities[buddy].buddy = null;
+    }
   }
   return entities;
 }
