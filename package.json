@@ -11,10 +11,14 @@
   "author": "",
   "repository": "https://github.com/gregtatum/sessions-2d",
   "license": "(MIT AND CC-BY-NC-4.0)",
+  "prettier": {
+    "trailingComma": "es5"
+  },
   "dependencies": {
     "lerp": "^1.0.3",
-    "simplex-noise": "^2.2.0",
-    "rbush": "^1.4.2"
+    "rbush": "^1.4.2",
+    "rtree": "^1.4.2",
+    "simplex-noise": "^2.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.8.6",
