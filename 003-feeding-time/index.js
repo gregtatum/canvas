@@ -3,8 +3,8 @@ const setupRandom = require("@tatumcreative/random");
 const initializeShortcuts = require("../lib/shortcuts");
 const { setupCanvas, loop, generateSeed, lerpTheta } = require("../lib/draw");
 const createRtree = require("rtree");
+const ease = require("eases/sine-in-out");
 const TAU = Math.PI * 2;
-const lerp = require("lerp");
 
 {
   const seed = generateSeed();
@@ -20,7 +20,6 @@ const lerp = require("lerp");
     seed,
     random,
     simplex3,
-    rtree: createRtree(),
     entityRotation: 0.5,
     entityCount: 200,
     entitySize: 10,
@@ -40,12 +39,16 @@ const lerp = require("lerp");
     entitySlowDown: 0.5,
     entitySpeedUp: 0.01,
     feedRate: 0.7,
+    quantityDistribution: 500,
   };
+
+  const rtree = createRtree();
 
   // Mutable state.
   const current = {
+    rtree,
     entities: generateEntities(config),
-    foods: generateFood(config),
+    foods: generateFood(config, rtree),
     now: Date.now(),
     dt: 0,
   };
@@ -58,7 +61,14 @@ const lerp = require("lerp");
     draw(config, current);
   });
 
-  window.addEventListener("resize", () => {});
+  window.addEventListener("resize", () => {
+    current.rtree = createRtree();
+    for (const food of current.foods) {
+      food.x = random() * ctx.canvas.width;
+      food.y = random() * ctx.canvas.height;
+    }
+    addFoodsToRtree(current.foods, current.rtree);
+  });
 
   window.current = current;
   window.config = config;
@@ -71,10 +81,9 @@ function updateFoods(config, current) {
 }
 
 function updateEntities(config, current) {
-  const { entities } = current;
+  const { entities, rtree } = current;
   const {
     ctx,
-    rtree,
     entitySize,
     maxSpeed,
     simplex3,
@@ -181,7 +190,7 @@ function generateEntities(config) {
   for (let i = 0; i < entityCount; i++) {
     entities.push({
       index: i,
-      x: random(width),
+      x: ((ease(random(1, 0)) + 0.5) % 1) * width,
       y: random(height),
       food: baseEntityFood,
       theta: random(TAU),
@@ -231,15 +240,16 @@ function draw(config, current) {
   ctx.stroke();
 }
 
-function generateFood(config) {
+function generateFood(config, rtree) {
   const {
     minQuantity,
     maxQuantity,
     minGrowthRate,
     maxGrowthRate,
+    quantityDistribution,
     random,
     foodCount,
-    rtree,
+    simplex3,
     ctx: {
       canvas: { width, height },
     },
@@ -247,15 +257,27 @@ function generateFood(config) {
 
   const foods = [];
   for (let foodIndex = 0; foodIndex < foodCount; foodIndex++) {
-    const max = random(minQuantity, maxQuantity, true);
-    const food = {
+    const x = random() * width;
+    const y = random() * height;
+    const max =
+      minQuantity +
+      (maxQuantity - minQuantity) *
+        (simplex3(x / quantityDistribution, y / quantityDistribution, 0) * 0.5 +
+          0.5);
+    foods.push({
       maxQuantity: max,
-      quantity: random(max),
-      x: random() * width,
-      y: random() * height,
+      quantity: random() * max,
+      x,
+      y,
       growthRate: random(minGrowthRate, maxGrowthRate),
-    };
+    });
+  }
+  addFoodsToRtree(foods, rtree);
+  return foods;
+}
 
+function addFoodsToRtree(foods, rtree) {
+  for (const food of foods) {
     const w = 1;
     rtree.insert(
       {
@@ -266,8 +288,5 @@ function generateFood(config) {
       },
       food
     );
-
-    foods.push(food);
   }
-  return foods;
 }
