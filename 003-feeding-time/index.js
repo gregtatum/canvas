@@ -1,7 +1,8 @@
 const Simplex = require("simplex-noise");
 const setupRandom = require("@tatumcreative/random");
 const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed, lerpTheta } = require("../lib/draw");
+const { setupCanvas, loop, generateSeed } = require("../lib/draw");
+const { lerpTheta } = require("../lib/lerpTheta");
 const createRtree = require("rtree");
 const ease = require("eases/sine-in-out");
 const TAU = Math.PI * 2;

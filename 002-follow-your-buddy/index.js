@@ -2,7 +2,7 @@ const Simplex = require("simplex-noise");
 const setupRandom = require("@tatumcreative/random");
 const initializeShortcuts = require("../lib/shortcuts");
 const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const lerp = require("lerp");
+const { lerpTheta } = require("../lib/lerpTheta");
 const TAU = Math.PI * 2;
 
 {
@@ -25,12 +25,12 @@ const TAU = Math.PI * 2;
     entitySize: 10,
     baseSpeed: 2,
     maxSpeed: 5,
-    rotateToBuddy: 0.1
+    rotateToBuddy: 0.1,
   };
 
   // Mutable state.
   const current = {
-    entities: generateEntities(config)
+    entities: generateEntities(config),
   };
 
   loop(now => {
@@ -101,16 +101,6 @@ function applyBuddyForce(config, entity, buddy) {
   entity.y += Math.sin(entity.theta) * entity.speed;
 }
 
-function lerpTheta(a, b, t) {
-  a = ((a % TAU) + TAU) % TAU;
-  b = ((b % TAU) + TAU) % TAU;
-
-  if (b - a > Math.PI) {
-    a += TAU;
-  }
-  return lerp(a, b, t);
-}
-
 function generateEntities(config) {
   const { entityCount, ctx, baseSpeed, random, breakoutCount } = config;
   const { width, height } = ctx.canvas;
@@ -124,7 +114,7 @@ function generateEntities(config) {
       theta: random(TAU),
       speed: baseSpeed,
       // Pick someone else random, but not yourself.
-      buddy: (i + random(0, entityCount - 1, true)) % entityCount
+      buddy: (i + random(0, entityCount - 1, true)) % entityCount,
     });
   }
 
