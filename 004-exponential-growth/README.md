@@ -1,0 +1,1 @@
+Copy and pasting from the last 2d session, this iteration adds subdiving behavior. Entities must gather enough resources to survive and subdivide. This ends up modeling an exponential boom and bust cycle.

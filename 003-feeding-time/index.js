@@ -2,7 +2,6 @@ const Simplex = require("simplex-noise");
 const setupRandom = require("@tatumcreative/random");
 const initializeShortcuts = require("../lib/shortcuts");
 const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const { lerpTheta } = require("../lib/lerpTheta");
 const createRtree = require("rtree");
 const ease = require("eases/sine-in-out");
 const TAU = Math.PI * 2;
@@ -159,7 +158,7 @@ function updateEntities(config, current) {
           entity.index
         );
     }
-    entity.theta = lerpTheta(entity.theta, thetaTarget, 0.1);
+    entity.theta = buggyLerpTheta(entity.theta, thetaTarget, 0.1);
 
     entity.speed = Math.min(entity.speed, maxSpeed);
 
@@ -291,3 +290,26 @@ function addFoodsToRtree(foods, rtree) {
     );
   }
 }
+
+const lerp = require("lerp");
+
+/**
+ * Funny story, this is a buggy version I accidentally introduced, but liked
+ * the result in the visualization, so here it stays. I accidentally set TAU
+ * to PI.
+ */
+function buggyLerpTheta(a, b, t) {
+  // Transform a and b to be between 0 and TAU. The first modulo operation could
+  // result in a negative number, the second ensures it's positive.
+  a = ((a % Math.PI) + Math.PI) % Math.PI;
+  b = ((b % Math.PI) + Math.PI) % Math.PI;
+
+  if (b - a > Math.PI) {
+    a += Math.PI;
+  }
+  return lerp(a, b, t);
+}
+
+module.exports = {
+  buggyLerpTheta,
+};
