@@ -1,1 +1,1 @@
-This is the first in a new session series, focusing on drawing with 2d. There is something very nice and immediate about working in a 2d space. I'm guessing this series will have more simple output compared to the 3d sessions.
+I've never done verlet integration before. I didn't write on from scratch, but happened upon an old npm module, [verlet-system](https://www.mattdesl.com/) from [Matt DesLauries](https://www.mattdesl.com/). I was happy about that, and so ended up with this current session.
