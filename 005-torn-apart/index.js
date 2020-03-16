@@ -2,13 +2,11 @@ const Simplex = require("simplex-noise");
 const setupRandom = require("@tatumcreative/random");
 const initializeShortcuts = require("../lib/shortcuts");
 const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const { setupCurveDrawing, drawLineSegments } = require("../lib/curve-drawing");
+const { setupCurveDrawing } = require("../lib/curve-drawing");
 const createVerletSystem = require("verlet-system");
 const createPoint = require("verlet-point");
 const createConstraint = require("verlet-constraint");
 const ease = require("eases/cubic-in-out");
-
-const TAU = Math.PI * 2;
 
 {
   const seed = generateSeed();
@@ -26,7 +24,7 @@ const TAU = Math.PI * 2;
     simplex3,
     lineInitialSpeed: 1,
     lineShrinkage: 0.8,
-    baseExtrudeLength: 50,
+    baseExtrudeLength: 25,
     blobDiesAtAge: 50,
     textFadeInSpeed: 0.02,
     textFadeOutSpeed: 0.02,
@@ -46,7 +44,7 @@ const TAU = Math.PI * 2;
     textFadeIn: 0,
     verletSystem: createVerletSystem({
       min: [0, 0],
-      max: [ctx.canvas.width, ctx.canvas.height],
+      max: [innerWidth, innerHeight],
     }),
     curveDrawing: setupCurveDrawing({
       ctx,
@@ -65,7 +63,7 @@ const TAU = Math.PI * 2;
     updateVerlet(config, current);
     updateDestroyingGeometry(config, current);
     ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
     drawIntroText(config, current);
     drawInProgressDrawing(config, current);
     drawConstraints(config, current);
@@ -87,13 +85,9 @@ function drawIntroText(config, current) {
     const hexOpacity = Math.floor(ease(current.textFadeIn) * 15).toString(16);
 
     ctx.textAlign = "center";
-    ctx.font = "50px sans-serif";
+    ctx.font = "25px sans-serif";
     ctx.fillStyle = "#fff" + hexOpacity;
-    ctx.fillText(
-      "Draw on the screen",
-      ctx.canvas.width / 2,
-      ctx.canvas.height / 2
-    );
+    ctx.fillText("Draw on the screen", innerWidth / 2, innerHeight / 2);
   }
 }
 
@@ -223,11 +217,11 @@ function addNewCurve(config, current, curve) {
 }
 
 function updateVerlet(config, current) {
-  const { ctx, simplex3, gravitySimplexScale, gravityDistance } = config;
+  const { simplex3, gravitySimplexScale, gravityDistance } = config;
   const { verletSystem, blobs, dt, time } = current;
 
   // Update the size of the simulation.
-  verletSystem.max = [ctx.canvas.width, ctx.canvas.height];
+  verletSystem.max = [innerWidth, innerHeight];
 
   const theta = Math.PI * simplex3(1, 1, time * gravitySimplexScale);
   verletSystem.gravity = [
@@ -246,7 +240,7 @@ function updateVerlet(config, current) {
 
 function drawConstraints(config, current) {
   const { ctx } = config;
-  ctx.lineWidth = 1 * devicePixelRatio;
+  ctx.lineWidth = 1;
   ctx.strokeStyle = "#fff";
 
   ctx.beginPath();
@@ -283,7 +277,7 @@ function drawInProgressDrawing(config, current) {
   if (points.length) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.lineWidth = 30 * devicePixelRatio;
+    ctx.lineWidth = 30;
     ctx.beginPath();
     ctx.strokeStyle = "#fffa";
     ctx.moveTo(points[0].x, points[0].y);
@@ -305,7 +299,7 @@ function drawInProgressDrawing(config, current) {
 function drawPoints(config, current) {
   const { ctx } = config;
   ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 3 * devicePixelRatio;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   for (const { points } of current.blobs) {
     for (const point of points) {

@@ -82,8 +82,8 @@ const TAU = Math.PI * 2;
   window.addEventListener("resize", () => {
     current.rtree = createRtree();
     for (const food of current.foods) {
-      food.x = random() * ctx.canvas.width;
-      food.y = random() * ctx.canvas.height;
+      food.x = random() * innerWidth;
+      food.y = random() * innerHeight;
     }
     addFoodsToRtree(current.foods, current.rtree);
   });
@@ -104,7 +104,6 @@ function updateFoods(config, current) {
 function updateEntities(config, current) {
   const { livingEntities } = current;
   const { ctx, entityMaxSpeed, entityCostToMove } = config;
-  const { width, height } = ctx.canvas;
 
   for (const entity of livingEntities) {
     const food = getClosestFood(config, current, entity);
@@ -126,7 +125,7 @@ function updateEntities(config, current) {
     entity.x += Math.cos(entity.theta) * entity.speed;
     entity.y += Math.sin(entity.theta) * entity.speed;
 
-    keepEntityInRange(config, width, height, entity);
+    keepEntityInRange(config, entity);
     maybeSubdivideEntity(config, current, entity);
     maybeKillEntity(config, current, entity);
   }
@@ -228,18 +227,18 @@ function getClosestFood(config, current, entity) {
   return food;
 }
 
-function keepEntityInRange({ entitySize }, width, height, entity) {
+function keepEntityInRange({ entitySize }, entity) {
   // Keep the entities in range, but allow them to go off the screen. Using just
   // a modulo operation here means that they "jump" to the other side while still
   // on the screen.
   if (entity.x < -entitySize) {
-    entity.x = width + entitySize;
-  } else if (entity.x > width + entitySize) {
+    entity.x = innerWidth + entitySize;
+  } else if (entity.x > innerWidth + entitySize) {
     entity.x = -entitySize;
   }
   if (entity.y < -entitySize) {
-    entity.y = height + entitySize;
-  } else if (entity.y > height + entitySize) {
+    entity.y = innerHeight + entitySize;
+  } else if (entity.y > innerHeight + entitySize) {
     entity.y = -entitySize;
   }
 }
@@ -275,7 +274,7 @@ function maybeSubdivideEntity(config, current, entity) {
 
   // Jitter the positions a bit.
   entity2.theta += random(TAU);
-  entity2.x += random(-5, 5) * devicePixelRatio;
+  entity2.x += random(-5, 5);
 }
 
 function maybeKillEntity(config, current, entity) {
@@ -309,13 +308,11 @@ function generateEntities(config) {
   const {
     maxEntityCount,
     entityLiveCount,
-    ctx,
     entityBaseSpeed,
     random,
     entitySubdivideEnergyLevel,
     entityThetaJitterRange,
   } = config;
-  const { width, height } = ctx.canvas;
   const entities = [];
   const livingEntities = new Set();
   const deadEntities = new Set();
@@ -323,8 +320,8 @@ function generateEntities(config) {
   for (let i = 0; i < maxEntityCount; i++) {
     const entity = {
       index: i,
-      x: ((ease(random(1, 0)) + 0.5) % 1) * width,
-      y: random(height),
+      x: ((ease(random(1, 0)) + 0.5) % 1) * innerWidth,
+      y: random(innerHeight),
       energy: random(
         entitySubdivideEnergyLevel / 2,
         entitySubdivideEnergyLevel
@@ -349,7 +346,7 @@ function draw(config, current) {
   const { ctx } = config;
   // Clear out background.
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
   drawFoods(config, current);
   ctx.strokeStyle = "#fff";
@@ -364,12 +361,9 @@ function drawFoods(config, current) {
   // Draw the foods
   ctx.fillStyle = "#07f6";
   for (const { quantity, x, y } of foods) {
-    const width = Math.max(
-      2 * devicePixelRatio,
-      Math.sqrt(quantity) * foodDrawnSize
-    );
+    const foodWidth = Math.max(2, Math.sqrt(quantity) * foodDrawnSize);
     for (let i = 1; i <= foodDrawnSteps; i++) {
-      const widthStepped = width * Math.pow(i / foodDrawnSteps, 2);
+      const widthStepped = foodWidth * Math.pow(i / foodDrawnSteps, 2);
       ctx.fillRect(
         x - widthStepped * 0.5,
         y - widthStepped * 0.5,
@@ -383,20 +377,18 @@ function drawFoods(config, current) {
 function drawEnties(config, entities) {
   const { ctx, entitySubdivideEnergyLevel, entitySize } = config;
 
-  ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.lineWidth = 2;
 
   // Draw each entity
   ctx.beginPath();
   for (const { x, y, theta, energy } of entities) {
     const energyRatio = energy / entitySubdivideEnergyLevel;
-    const size =
-      devicePixelRatio *
-      lerp(
-        entitySize / 4,
-        entitySize,
-        // Square the energy ratio to make it more dramatic
-        energyRatio * energyRatio
-      );
+    const size = lerp(
+      entitySize / 4,
+      entitySize,
+      // Square the energy ratio to make it more dramatic
+      energyRatio * energyRatio
+    );
     const dx = Math.cos(theta) * size;
     const dy = Math.sin(theta) * size;
 
@@ -416,15 +408,12 @@ function generateFood(config, rtree) {
     random,
     foodCount,
     simplex3,
-    ctx: {
-      canvas: { width, height },
-    },
   } = config;
 
   const foods = [];
   for (let foodIndex = 0; foodIndex < foodCount; foodIndex++) {
-    const x = random() * width;
-    const y = random() * height;
+    const x = random() * innerWidth;
+    const y = random() * innerHeight;
     const max =
       minFoodQuantity +
       (maxFoodQuantity - minFoodQuantity) *

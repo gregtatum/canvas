@@ -47,9 +47,8 @@ const TAU = Math.PI * 2;
 }
 
 function update(config, current) {
-  const { entities, time } = current;
-  const { ctx, entitySize, maxSpeed, simplex3, lonelyRotation } = config;
-  const { width, height } = ctx.canvas;
+  const { entities } = current;
+  const { entitySize, maxSpeed, simplex3, lonelyRotation } = config;
 
   for (const entity of entities) {
     if (entity.buddy === null) {
@@ -74,13 +73,13 @@ function update(config, current) {
     // a modulo operation here means that they "jump" to the other side while still
     // on the screen.
     if (entity.x < -entitySize) {
-      entity.x = width + entitySize;
-    } else if (entity.x > width + entitySize) {
+      entity.x = innerWidth + entitySize;
+    } else if (entity.x > innerWidth + entitySize) {
       entity.x = -entitySize;
     }
     if (entity.y < -entitySize) {
-      entity.y = height + entitySize;
-    } else if (entity.y > height + entitySize) {
+      entity.y = innerHeight + entitySize;
+    } else if (entity.y > innerHeight + entitySize) {
       entity.y = -entitySize;
     }
   }
@@ -103,14 +102,13 @@ function applyBuddyForce(config, entity, buddy) {
 
 function generateEntities(config) {
   const { entityCount, ctx, baseSpeed, random, breakoutCount } = config;
-  const { width, height } = ctx.canvas;
   const entities = [];
 
   for (let i = 0; i < entityCount; i++) {
     entities.push({
       index: i,
-      x: random(width),
-      y: random(height),
+      x: random(innerWidth),
+      y: random(innerHeight),
       theta: random(TAU),
       speed: baseSpeed,
       // Pick someone else random, but not yourself.
@@ -134,18 +132,18 @@ function generateEntities(config) {
 
 function draw(config, current) {
   const { ctx, entitySize } = config;
-  const { entities, time } = current;
+  const { entities } = current;
 
   // Clear out background.
   ctx.fillStyle = "#0003";
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-  ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
 
   // Draw each entity
   ctx.beginPath();
-  const halfSize = (entitySize * devicePixelRatio) / 2;
+  const halfSize = entitySize / 2;
   for (const { x, y, theta } of entities) {
     const dx = Math.cos(theta) * halfSize;
     const dy = Math.sin(theta) * halfSize;

@@ -17,16 +17,16 @@ const TAU = Math.PI * 2;
   const config = {
     ctx,
     seed,
-    lineSpacing: 100,
+    lineSpacing: 50,
     rotationSpeed: 0.05,
     circleLineWidth: 2,
     simplex3,
-    armLineWidth: 5
+    armLineWidth: 5,
   };
 
   // Mutable state.
   const current = {
-    lines: generateLines(config)
+    lines: generateLines(config),
   };
 
   loop(now => {
@@ -47,18 +47,17 @@ const TAU = Math.PI * 2;
   if (title) {
     Object.assign(title.style, {
       backgroundColor: "#444a",
-      boxShadow: "0 0 10px 20px #444a"
+      boxShadow: "0 0 10px 20px #444a",
     });
   }
 }
 
 function generateLines(config) {
-  const { lineSpacing, ctx, simplex3 } = config;
-  const { width, height } = ctx.canvas;
+  const { lineSpacing, simplex3 } = config;
   const lines = [];
 
-  const lineCountX = Math.floor(width / lineSpacing) + 1;
-  const lineCountY = Math.floor(height / lineSpacing) + 1;
+  const lineCountX = Math.floor(innerWidth / lineSpacing) + 1;
+  const lineCountY = Math.floor(innerHeight / lineSpacing) + 1;
   for (let i = 0; i < lineCountX; i++) {
     for (let j = 0; j < lineCountY; j++) {
       lines.push({
@@ -66,7 +65,7 @@ function generateLines(config) {
         y: j * lineSpacing,
         theta: simplex3(i * 0.05, j * 0.05, 0),
         r: lineSpacing * 0.5,
-        rotationTimeOffset: Math.abs(simplex3(i * 0.05, j * 0.05, 0))
+        rotationTimeOffset: Math.abs(simplex3(i * 0.05, j * 0.05, 0)),
       });
     }
   }
@@ -79,18 +78,18 @@ function draw(config, current) {
     armLineWidth,
     circleLineWidth,
     rotationSpeed,
-    lineSpacing
+    lineSpacing,
   } = config;
   const { lines, time } = current;
   // Clear out background.
   ctx.fillStyle = "#33333305";
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
   // Draw lines
   ctx.strokeStyle = "#ffffff05";
 
   // Draw circles
-  ctx.lineWidth = circleLineWidth * devicePixelRatio;
+  ctx.lineWidth = circleLineWidth;
   ctx.beginPath();
   for (const line of lines) {
     const { x, y } = line;
@@ -101,13 +100,13 @@ function draw(config, current) {
 
   ctx.strokeStyle = "#fff";
   ctx.lineCap = "round";
-  ctx.lineWidth = armLineWidth * devicePixelRatio;
+  ctx.lineWidth = armLineWidth;
   ctx.beginPath();
   for (const line of lines) {
     const { x, y, theta, r, rotationTimeOffset } = line;
 
     // The radius of the arm needs to take into account the
-    const radius = r - (armLineWidth * devicePixelRatio) / 2;
+    const radius = r - armLineWidth / 2;
     ctx.moveTo(x, y);
     const easedTime =
       theta + elasticOut((time * rotationSpeed + rotationTimeOffset) % 1) * TAU;

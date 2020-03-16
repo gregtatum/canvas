@@ -64,8 +64,8 @@ const TAU = Math.PI * 2;
   window.addEventListener("resize", () => {
     current.rtree = createRtree();
     for (const food of current.foods) {
-      food.x = random() * ctx.canvas.width;
-      food.y = random() * ctx.canvas.height;
+      food.x = random() * innerWidth;
+      food.y = random() * innerHeight;
     }
     addFoodsToRtree(current.foods, current.rtree);
   });
@@ -95,7 +95,6 @@ function updateEntities(config, current) {
     feedRate,
     minSpeed,
   } = config;
-  const { width, height } = ctx.canvas;
 
   for (const entity of entities) {
     const { x, y } = entity;
@@ -170,28 +169,27 @@ function updateEntities(config, current) {
     // a modulo operation here means that they "jump" to the other side while still
     // on the screen.
     if (entity.x < -entitySize) {
-      entity.x = width + entitySize;
-    } else if (entity.x > width + entitySize) {
+      entity.x = innerWidth + entitySize;
+    } else if (entity.x > innerWidth + entitySize) {
       entity.x = -entitySize;
     }
     if (entity.y < -entitySize) {
-      entity.y = height + entitySize;
-    } else if (entity.y > height + entitySize) {
+      entity.y = innerHeight + entitySize;
+    } else if (entity.y > innerHeight + entitySize) {
       entity.y = -entitySize;
     }
   }
 }
 
 function generateEntities(config) {
-  const { entityCount, ctx, baseEntitySpeed, baseEntityFood, random } = config;
-  const { width, height } = ctx.canvas;
+  const { entityCount, baseEntitySpeed, baseEntityFood, random } = config;
   const entities = [];
 
   for (let i = 0; i < entityCount; i++) {
     entities.push({
       index: i,
-      x: ((ease(random(1, 0)) + 0.5) % 1) * width,
-      y: random(height),
+      x: ((ease(random(1, 0)) + 0.5) % 1) * innerWidth,
+      y: random(innerHeight),
       food: baseEntityFood,
       theta: random(TAU),
       speed: baseEntitySpeed,
@@ -207,14 +205,14 @@ function draw(config, current) {
 
   // Clear out background.
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
   // Draw the foods
   ctx.fillStyle = "#07f6";
   for (const { quantity, x, y } of foods) {
-    const width = quantity * foodSize;
+    const foodWidth = quantity * foodSize;
     for (let i = 1; i <= foodSteps; i++) {
-      const widthStepped = width * Math.pow(i / foodSteps, 2);
+      const widthStepped = foodWidth * Math.pow(i / foodSteps, 2);
       ctx.fillRect(
         x - widthStepped * 0.5,
         y - widthStepped * 0.5,
@@ -224,12 +222,12 @@ function draw(config, current) {
     }
   }
 
-  ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
 
   // Draw each entity
   ctx.beginPath();
-  const size = entitySize * devicePixelRatio;
+  const size = entitySize;
   for (const { x, y, theta } of entities) {
     const dx = Math.cos(theta) * size;
     const dy = Math.sin(theta) * size;
@@ -250,15 +248,12 @@ function generateFood(config, rtree) {
     random,
     foodCount,
     simplex3,
-    ctx: {
-      canvas: { width, height },
-    },
   } = config;
 
   const foods = [];
   for (let foodIndex = 0; foodIndex < foodCount; foodIndex++) {
-    const x = random() * width;
-    const y = random() * height;
+    const x = random() * innerWidth;
+    const y = random() * innerHeight;
     const max =
       minQuantity +
       (maxQuantity - minQuantity) *
