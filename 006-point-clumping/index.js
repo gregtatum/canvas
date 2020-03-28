@@ -30,13 +30,15 @@ const TAU = Math.PI * 2;
     simplex3,
     textFadeInSpeed: 0.02,
     textFadeOutSpeed: 0.02,
-    delaunayChance: 1 / 50,
-    gridCellSize: 25,
+    delaunayChance: 1 / 10,
+    gridCellSize: 75,
     mouseLinesCount: 17,
     mouseLinesLength: 30,
     mouseLinesSpeed: 0.3,
     mouseLinesDiamondWidth: 1,
     maxConstraintsPerPoint: 5,
+    minimumRemainingPoints: 20,
+    breakingForce: 0.05,
     constraintConfig: { stiffness: 0.1 / 10, restingDistance: 15 },
   };
 
@@ -52,7 +54,6 @@ const TAU = Math.PI * 2;
     rtree: createRtree(),
     points: [],
     constraints: [],
-    debugConstraints: [],
     grid: createGrid(config),
     pointToConstraints: new Map(),
     verletSystem: createVerletSystem({
@@ -114,7 +115,7 @@ function updateDelaunay(config, current) {
     return;
   }
 
-  const points = new Set();
+  const pointsToDelaunay = new Set();
   const connected = new Set();
   // Pick a random constraint:
   const firstConstraint =
@@ -126,7 +127,7 @@ function updateDelaunay(config, current) {
     const constraint = constraintsToWalk.pop();
     for (const point of constraint.points) {
       // Keep track of this point.
-      points.add(point);
+      pointsToDelaunay.add(point);
 
       // Now go through all of the connected constraints for this point.
       const nextConstraints = pointToConstraints.get(point);
@@ -140,27 +141,30 @@ function updateDelaunay(config, current) {
       }
     }
   }
+  for (const point of pointsToDelaunay) {
+    if (!current.points.includes(point)) {
+      throw new Error("Woops");
+    }
+  }
 
   if (connected.size < 12) {
     // Not enough to form a triangle.
     return;
   }
-
-  for (const point of points) {
+  for (const point of pointsToDelaunay) {
     // Forget everything connected to this point.
     pointToConstraints.delete(point);
   }
-
   // Remove the old constraints.
   current.constraints = current.constraints.filter(c => !connected.has(c));
-
-  const indexedPoints = [...points];
+  const indexedPoints = [...pointsToDelaunay];
 
   const triangles = triangulate(indexedPoints.map(p => p.position));
   for (const indexes of triangles) {
     const pointA = indexedPoints[indexes[0]];
     const pointB = indexedPoints[indexes[1]];
     const pointC = indexedPoints[indexes[2]];
+
     addConstraintToSystem(current, config, pointA, pointB);
     addConstraintToSystem(current, config, pointB, pointC);
     addConstraintToSystem(current, config, pointC, pointA);
@@ -168,7 +172,7 @@ function updateDelaunay(config, current) {
 }
 
 function updateUnravel(config, current) {
-  const { random } = config;
+  const { random, minimumRemainingPoints } = config;
   const {
     constraints,
     points,
@@ -202,8 +206,8 @@ function updateUnravel(config, current) {
   }
 
   // The strategy here is to unravel when this thing takes too long.
-  if (dt > current.medianDt * 1.5) {
-    current.lastTickUnravelCount++;
+  if (dt > current.medianDt * 2) {
+    current.lastTickUnravelCount += 2;
   } else {
     current.lastTickUnravelCount = Math.floor(
       (current.lastTickUnravelCount - 1) / 2
@@ -211,12 +215,17 @@ function updateUnravel(config, current) {
     current.lastTickUnravelCount = Math.max(0, current.lastTickUnravelCount);
   }
 
-  const unravelCount = Math.min(points.length, current.lastTickUnravelCount);
+  const unravelCount = Math.min(
+    points.length - minimumRemainingPoints,
+    current.lastTickUnravelCount
+  );
 
   for (let i = 0; i < unravelCount; i++) {
     const pointIndex = random(0, points.length - 1, true);
     const point = points[pointIndex];
     fastRemove(points, pointIndex);
+    current.grid.removeItem(point);
+
     const constraintsToRemove = pointToConstraints.get(point);
     pointToConstraints.delete(point);
 
@@ -226,6 +235,13 @@ function updateUnravel(config, current) {
         const constraintIndex = constraints.indexOf(constraint);
         if (constraintIndex !== -1) {
           fastRemove(constraints, constraintIndex);
+          for (const p of constraint.points) {
+            // Update this cache
+            const list = pointToConstraints.get(p);
+            if (list) {
+              fastRemove(list, list.indexOf(constraint));
+            }
+          }
         }
       }
     }
@@ -233,7 +249,7 @@ function updateUnravel(config, current) {
 }
 
 function impartForceOnConnectedConstraints(config, current, constraint) {
-  const { random } = config;
+  const { random, breakingForce } = config;
   const { pointToConstraints } = current;
   for (const point of constraint.points) {
     const otherConstraints = pointToConstraints.get(point);
@@ -243,7 +259,7 @@ function impartForceOnConnectedConstraints(config, current, constraint) {
     for (const otherConstraint of otherConstraints) {
       for (const otherPoint of otherConstraint.points) {
         const theta = random(TAU);
-        const distance = random(2);
+        const distance = random(breakingForce);
         otherPoint.addForce([
           //
           Math.cos(theta) * distance,
@@ -256,6 +272,9 @@ function impartForceOnConnectedConstraints(config, current, constraint) {
 
 // Quickly removes an item from a list by swapping out the last item.
 function fastRemove(list, index) {
+  if (index === -1) {
+    return;
+  }
   if (list.length === 0) {
     return;
   }
@@ -284,7 +303,9 @@ function updateRandomConnection(config, current) {
     return;
   }
 
-  for (let i = 0; i < 5; i++) {
+  const count = Math.max(5, points.length / 10);
+
+  for (let i = 0; i < count; i++) {
     const point = points[random(0, points.length, true)];
     if (point.connectionCount >= maxConstraintsPerPoint) {
       return;
@@ -363,6 +384,14 @@ function createGrid(config) {
     }
   }
 
+  function removeItem(item) {
+    const coord = itemToCoordinate.get(item);
+    if (!coord) {
+      throw new Error("Could not find that item in the grid");
+    }
+    grid[coord.x][coord.y].delete(item);
+  }
+
   function updateItem(item, pixelX, pixelY) {
     if (Number.isNaN(pixelX) || Number.isNaN(pixelY)) {
       throw new Error("gride.updateItem, pixels were NaN");
@@ -420,6 +449,7 @@ function createGrid(config) {
   }
   return {
     update,
+    removeItem,
     getNeighbors,
     getNearestNeighbor,
   };
