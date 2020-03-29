@@ -1,71 +1,25 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const createVerletSystem = require("verlet-system");
-const createPoint = require("verlet-point");
-const createConstraint = require("verlet-constraint");
-const lerp = require("lerp");
-const createRtree = require("rtree");
-const triangulate = require("delaunay-triangulate");
-const ease = require("eases/cubic-in-out");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import createVerletSystem from "verlet-system";
+import createPoint, { VerletPoint } from "verlet-point";
+import createConstraint, { VerletConstraint } from "verlet-constraint";
+import lerp from "lerp";
+import createRtree from "rtree";
+import triangulate from "delaunay-triangulate";
+import ease from "eases/cubic-in-out";
+
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
 
 const TAU = Math.PI * 2;
 
 {
-  const seed = generateSeed();
-  const random = setupRandom(seed);
-  const simplex = new Simplex(random);
-  const simplex3 = simplex.noise3D.bind(simplex);
-  const ctx = setupCanvas();
+  const config = getConfig();
+  const current = getCurrent(config);
 
-  document.body.style.cursor = "none";
-
-  initializeShortcuts(seed);
-
-  const config = {
-    ctx,
-    seed,
-    random,
-    simplex3,
-    textFadeInSpeed: 0.02,
-    textFadeOutSpeed: 0.02,
-    delaunayChance: 1 / 10,
-    gridCellSize: 75,
-    mouseLinesCount: 17,
-    mouseLinesLength: 30,
-    mouseLinesSpeed: 0.3,
-    mouseLinesDiamondWidth: 1,
-    maxConstraintsPerPoint: 5,
-    minimumRemainingPoints: 20,
-    breakingForce: 0.05,
-    constraintConfig: { stiffness: 0.1 / 10, restingDistance: 15 },
-  };
-
-  // Mutable state.
-  const current = {
-    now: Date.now() / 1000,
-    dt: 0,
-    textFadeIn: 0,
-    firstFewDts: [],
-    medianDt: 0,
-    lastTickUnravelCount: 0,
-    tick: 0,
-    rtree: createRtree(),
-    points: [],
-    constraints: [],
-    grid: createGrid(config),
-    pointToConstraints: new Map(),
-    verletSystem: createVerletSystem({
-      min: [0, 0],
-      max: [innerWidth, innerHeight],
-    }),
-    mouseX: 100,
-    mouseY: 100,
-    isMouseDown: false,
-  };
-
-  window.current = current;
+  (window as any).current = current;
 
   setupMouseMove(config, current);
 
@@ -103,7 +57,66 @@ const TAU = Math.PI * 2;
   });
 }
 
-function updateDelaunay(config, current) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
+  const seed = generateSeed();
+  const random = setupRandom(seed);
+  const simplex = new Simplex(random);
+  const simplex3 = simplex.noise3D.bind(simplex);
+  const ctx = setupCanvas();
+
+  document.body.style.cursor = "none";
+
+  initializeShortcuts(seed);
+
+  return {
+    ctx,
+    seed,
+    random,
+    simplex3,
+    textFadeInSpeed: 0.02,
+    textFadeOutSpeed: 0.02,
+    delaunayChance: 1 / 10,
+    gridCellSize: 75,
+    mouseLinesCount: 17,
+    mouseLinesLength: 30,
+    mouseLinesSpeed: 0.3,
+    mouseLinesDiamondWidth: 1,
+    maxConstraintsPerPoint: 5,
+    minimumRemainingPoints: 20,
+    breakingForce: 0.05,
+    constraintConfig: { stiffness: 0.1 / 10, restingDistance: 15 },
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  // Mutable state.
+  return {
+    time: (Date.now() / 1000) as Seconds,
+    dt: 0,
+    textFadeIn: 0,
+    firstFewDts: [] as Seconds[],
+    medianDt: 0,
+    lastTickUnravelCount: 0,
+    tick: 0,
+    rtree: createRtree(),
+    points: [] as VerletPoint[],
+    constraints: [] as VerletConstraint[],
+    grid: createGrid(config),
+    pointToConstraints: new Map(),
+    verletSystem: createVerletSystem({
+      min: [0, 0],
+      max: [innerWidth, innerHeight],
+    }),
+    mouseX: null as CssPixels | null,
+    mouseY: null as CssPixels | null,
+    isMouseDown: false,
+    pointToConnectionCount: new Map() as Map<VerletPoint, Integer>,
+  };
+}
+
+function updateDelaunay(config: Config, current: Current): void {
   const { random, delaunayChance } = config;
   const { pointToConstraints } = current;
 
@@ -115,8 +128,9 @@ function updateDelaunay(config, current) {
     return;
   }
 
-  const pointsToDelaunay = new Set();
-  const connected = new Set();
+  const pointsToDelaunay: Set<VerletPoint> = new Set();
+  const connected: Set<VerletConstraint> = new Set();
+
   // Pick a random constraint:
   const firstConstraint =
     current.constraints[random(0, current.constraints.length - 1, true)];
@@ -125,6 +139,9 @@ function updateDelaunay(config, current) {
 
   while (constraintsToWalk.length > 0) {
     const constraint = constraintsToWalk.pop();
+    if (!constraint) {
+      throw new Error("Could not find constraint.");
+    }
     for (const point of constraint.points) {
       // Keep track of this point.
       pointsToDelaunay.add(point);
@@ -171,7 +188,7 @@ function updateDelaunay(config, current) {
   }
 }
 
-function updateUnravel(config, current) {
+function updateUnravel(config: Config, current: Current): void {
   const { random, minimumRemainingPoints } = config;
   const {
     constraints,
@@ -248,7 +265,11 @@ function updateUnravel(config, current) {
   }
 }
 
-function impartForceOnConnectedConstraints(config, current, constraint) {
+function impartForceOnConnectedConstraints(
+  config: Config,
+  current: Current,
+  constraint: VerletConstraint
+): void {
   const { random, breakingForce } = config;
   const { pointToConstraints } = current;
   for (const point of constraint.points) {
@@ -271,7 +292,7 @@ function impartForceOnConnectedConstraints(config, current, constraint) {
 }
 
 // Quickly removes an item from a list by swapping out the last item.
-function fastRemove(list, index) {
+function fastRemove<T>(list: T[], index: Index): void {
   if (index === -1) {
     return;
   }
@@ -282,11 +303,17 @@ function fastRemove(list, index) {
   if (index === list.length - 1) {
     list.pop();
   } else {
-    list[index] = list.pop();
+    // We know that this item exists through our real-time check.
+    list[index] = (list.pop() as T | undefined) as T;
   }
 }
 
-function addConstraintToSystem(current, config, pointA, pointB) {
+function addConstraintToSystem(
+  current: Current,
+  config: Config,
+  pointA: VerletPoint,
+  pointB: VerletPoint
+): void {
   const { constraintConfig } = config;
   const { pointToConstraints } = current;
   const constraint = createConstraint([pointA, pointB], constraintConfig);
@@ -295,9 +322,9 @@ function addConstraintToSystem(current, config, pointA, pointB) {
   current.constraints.push(constraint);
 }
 
-function updateRandomConnection(config, current) {
+function updateRandomConnection(config: Config, current: Current): void {
   const { random, maxConstraintsPerPoint } = config;
-  const { points, constraints } = current;
+  const { points, constraints, pointToConnectionCount } = current;
 
   if (points.length < 5) {
     return;
@@ -307,33 +334,37 @@ function updateRandomConnection(config, current) {
 
   for (let i = 0; i < count; i++) {
     const point = points[random(0, points.length, true)];
-    if (point.connectionCount >= maxConstraintsPerPoint) {
+    const connectionCount = pointToConnectionCount.get(point) || 0;
+    if (connectionCount >= maxConstraintsPerPoint) {
       return;
     }
     const neighbor = current.grid.getNearestNeighbor(point);
-    if (neighbor && !(neighbor.connectionCount >= maxConstraintsPerPoint)) {
-      // Check if it's already connected somewhere.
-      let areConnected = false;
-      for (const { points } of constraints) {
-        const [a, b] = points;
-        if (
-          (a === point || a === neighbor) &&
-          (b === point || b === neighbor)
-        ) {
-          areConnected = true;
-          break;
+    if (neighbor) {
+      const neighborConnectionCount = pointToConnectionCount.get(neighbor) || 0;
+      if (!(neighborConnectionCount >= maxConstraintsPerPoint)) {
+        // Check if it's already connected somewhere.
+        let areConnected = false;
+        for (const { points } of constraints) {
+          const [a, b] = points;
+          if (
+            (a === point || a === neighbor) &&
+            (b === point || b === neighbor)
+          ) {
+            areConnected = true;
+            break;
+          }
         }
-      }
-      if (!areConnected) {
-        point.connectionCount = (point.connectionCount || 0) + 1;
-        neighbor.connectionCount = (neighbor.connectionCount || 0) + 1;
-        addConstraintToSystem(current, config, point, neighbor);
+        if (!areConnected) {
+          pointToConnectionCount.set(point, connectionCount + 1);
+          pointToConnectionCount.set(neighbor, neighborConnectionCount + 1);
+          addConstraintToSystem(current, config, point, neighbor);
+        }
       }
     }
   }
 }
 
-function insertIntoList(map, key, value) {
+function insertIntoList<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   let list = map.get(key);
   if (!list) {
     list = [];
@@ -342,9 +373,9 @@ function insertIntoList(map, key, value) {
   list.push(value);
 }
 
-function setupMouseMove(config, current) {
+function setupMouseMove(config: Config, current: Current): void {
   window.addEventListener("touchmove", event => {
-    const [{ pageX, pageY }] = event.touches[0];
+    const { pageX, pageY } = event.touches[0];
     current.mouseX = pageX;
     current.mouseY = pageY;
   });
@@ -365,12 +396,16 @@ function setupMouseMove(config, current) {
   });
 }
 
-function createGrid(config) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function createGrid(config: Config) {
   const { gridCellSize } = config;
   const w = Math.max(1, Math.floor(innerWidth / gridCellSize));
   const h = Math.max(1, Math.floor(innerHeight / gridCellSize));
   const itemToCoordinate = new Map();
-  const grid = [];
+
+  type Grid = Set<VerletPoint>[][];
+
+  const grid: Grid = [];
   for (let i = 0; i < w; i++) {
     grid.push([]);
     for (let j = 0; j < h; j++) {
@@ -378,13 +413,13 @@ function createGrid(config) {
     }
   }
 
-  function update(current) {
+  function update(current: Current): void {
     for (const point of current.points) {
       updateItem(point, point.position[0], point.position[1]);
     }
   }
 
-  function removeItem(item) {
+  function removeItem(item: VerletPoint): void {
     const coord = itemToCoordinate.get(item);
     if (!coord) {
       throw new Error("Could not find that item in the grid");
@@ -392,7 +427,11 @@ function createGrid(config) {
     grid[coord.x][coord.y].delete(item);
   }
 
-  function updateItem(item, pixelX, pixelY) {
+  function updateItem(
+    item: VerletPoint,
+    pixelX: CssPixels,
+    pixelY: CssPixels
+  ): void {
     if (Number.isNaN(pixelX) || Number.isNaN(pixelY)) {
       throw new Error("gride.updateItem, pixels were NaN");
     }
@@ -413,7 +452,7 @@ function createGrid(config) {
     grid[coord.x][coord.y].add(item);
   }
 
-  function getNeighbors(item) {
+  function getNeighbors(item: VerletPoint): Set<VerletPoint> {
     const coord = itemToCoordinate.get(item);
     if (!coord) {
       throw new Error("Could not find the item's coordinate. Was it updated?");
@@ -421,15 +460,15 @@ function createGrid(config) {
     return grid[coord.x][coord.y];
   }
 
-  function getDistSq(a, b) {
+  function getDistSq(a: VerletPoint, b: VerletPoint): number {
     const dx = a.position[0] - b.position[0];
     const dy = a.position[1] - b.position[1];
     return dx * dx + dy * dy;
   }
 
-  function getNearestNeighbor(item) {
+  function getNearestNeighbor(item: VerletPoint): VerletPoint | undefined {
     let closest;
-    let distSq;
+    let distSq = Infinity;
     for (const neighbor of getNeighbors(item)) {
       if (neighbor === item) {
         continue;
@@ -455,12 +494,12 @@ function createGrid(config) {
   };
 }
 
-function drawClearScreen({ ctx }) {
+function drawClearScreen({ ctx }: Config): void {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, innerWidth, innerHeight);
 }
 
-function updateVerlet(config, current) {
+function updateVerlet(config: Config, current: Current): void {
   const { verletSystem, points, constraints, dt } = current;
 
   // Update the size of the simulation.
@@ -473,7 +512,7 @@ function updateVerlet(config, current) {
   }
 }
 
-function drawMouse(config, current) {
+function drawMouse(config: Config, current: Current): void {
   const {
     ctx,
     mouseLinesCount,
@@ -484,7 +523,7 @@ function drawMouse(config, current) {
   const { mouseX, mouseY, time } = current;
   ctx.fillStyle = "#fff";
   ctx.beginPath();
-  if (mouseX !== null) {
+  if (mouseX !== null && mouseY !== null) {
     const rotation = time * mouseLinesSpeed;
     for (let i = 0; i < mouseLinesCount; i++) {
       const thetaOffset = (TAU * i) / mouseLinesCount;
@@ -516,7 +555,7 @@ function drawMouse(config, current) {
   ctx.fill();
 }
 
-function drawConstraints(config, current) {
+function drawConstraints(config: Config, current: Current): void {
   const { constraints } = current;
   const { ctx } = config;
   ctx.lineWidth = 1;
@@ -531,7 +570,7 @@ function drawConstraints(config, current) {
   ctx.stroke();
 }
 
-function drawPoints(config, current) {
+function drawPoints(config: Config, current: Current): void {
   const { ctx } = config;
   const { points, pointToConstraints } = current;
   ctx.fillStyle = "#fff";
@@ -545,14 +584,19 @@ function drawPoints(config, current) {
   }
 }
 
-function getPerpendicularUnitVector(aX, aY, bX, bY) {
+function getPerpendicularUnitVector(
+  aX: number,
+  aY: number,
+  bX: number,
+  bY: number
+): Vec2 {
   const dx = aX - bX;
   const dy = aY - bY;
   const length = Math.sqrt(dx * dx + dy * dy);
   return { x: dy / length, y: -dx / length };
 }
 
-function updatePointGeneraton(config, current) {
+function updatePointGeneraton(config: Config, current: Current): void {
   const { random } = config;
   const { mouseX, mouseY, points, isMouseDown } = current;
   if (!isMouseDown || mouseX === null || mouseY === null) {
@@ -577,11 +621,11 @@ function updatePointGeneraton(config, current) {
   }
 }
 
-function clamp(min, max, value) {
+function clamp(min: number, max: number, value: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function drawIntroText(config, current) {
+function drawIntroText(config: Config, current: Current): void {
   const { ctx } = config;
   const { points } = current;
   if (points.length === 0) {

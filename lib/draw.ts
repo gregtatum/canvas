@@ -1,11 +1,15 @@
-const lerp = require("lerp");
+import lerp from "lerp";
 
-function setupCanvas() {
+export function setupCanvas(): CanvasRenderingContext2D {
   const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d", { alpha: false });
+  const maybeCtx = canvas.getContext("2d", { alpha: false });
+  if (!maybeCtx) {
+    throw new Error("Could not get a 2d context.");
+  }
+  const ctx = maybeCtx;
   document.body.appendChild(canvas);
 
-  function resize() {
+  function resize(): void {
     canvas.width = window.innerWidth * devicePixelRatio;
     canvas.height = window.innerHeight * devicePixelRatio;
     ctx.scale(devicePixelRatio, devicePixelRatio);
@@ -17,29 +21,32 @@ function setupCanvas() {
   return ctx;
 }
 
-function loop(callback) {
+type Seconds = number;
+type LoopCallback = (time: Seconds) => void;
+
+export function loop(callback: LoopCallback): void {
   const startTime = Date.now();
-  function innerLoop() {
+  function innerLoop(): void {
     callback((Date.now() - startTime) / 1000);
     requestAnimationFrame(innerLoop);
   }
   requestAnimationFrame(innerLoop);
 }
 
-function generateSeed() {
+export function generateSeed(): string {
   const seed =
     window.location.hash.substr(1) || String(Math.random()).split(".")[1];
   console.log("current seed", seed);
 
   // Reload the page on hash change.
-  window.onhashchange = function() {
+  window.addEventListener("hashchange", () => {
     location.reload();
-  };
+  });
   return seed;
 }
 
 const TAU = Math.PI;
-function lerpTheta(a, b, t) {
+export function lerpTheta(a: number, b: number, t: number): number {
   a = ((a % TAU) + TAU) % TAU;
   b = ((b % TAU) + TAU) % TAU;
 
@@ -48,10 +55,3 @@ function lerpTheta(a, b, t) {
   }
   return lerp(a, b, t);
 }
-
-module.exports = {
-  setupCanvas,
-  loop,
-  generateSeed,
-  lerpTheta,
-};

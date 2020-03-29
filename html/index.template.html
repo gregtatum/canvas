@@ -13,6 +13,7 @@
 	<meta name="twitter:image" content="image.jpg">
 	<meta name="twitter:title" content="Session <%- sessionNumber %> - <%- name %>">
 	<meta name="twitter:description" content="A 2d creative coding session by Greg Tatum.">
+	<base href="./" />
 
 	<title>Session <%- sessionNumber %> - <%- name %> | Greg Tatum</title>
 
@@ -39,6 +40,6 @@
 		<%= next %>
 	</div>
 	<!-- Source available: github.com/gregtatum/sessions-2d/ -->
-	<script src='bundle.js'></script>
+	<%= htmlWebpackPlugin.tags.bodyTags %>
 </body>
 </html>

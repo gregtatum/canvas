@@ -2,7 +2,16 @@
 // Paul Salaets <psalaets@gmail.com>
 // MIT License
 
-module.exports = function checkIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+export default function checkIntersection(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  x4: number,
+  y4: number
+): boolean | [number, number] {
   if (
     (x1 === x3 && y1 === y3) ||
     (x1 === x4 && y1 === y4) ||
@@ -27,4 +36,4 @@ module.exports = function checkIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
     return [uA * (x2 - x1) + x1, uA * (y2 - y1) + y1];
   }
   return false;
-};
+}

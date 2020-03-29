@@ -1,9 +1,9 @@
-function _click(selector) {
-  const el = document.querySelector(selector);
+function _click(selector: string): void {
+  const el: HTMLElement | null = document.querySelector(selector);
   if (el) el.click();
 }
 
-module.exports = function shortcuts(seed, restart) {
+export default function shortcuts(seed: string, restart?: () => void): void {
   console.log(
     [
       "Available shortcuts:",
@@ -32,7 +32,9 @@ module.exports = function shortcuts(seed, restart) {
             console.log("Could not find a canvas element to screenshot");
             break;
           }
-          let a = document.querySelector(".download-link");
+          let a: HTMLAnchorElement | null = document.querySelector(
+            ".download-link"
+          );
           if (!a) {
             a = document.createElement("a");
             a.className = "download-link";
@@ -40,7 +42,9 @@ module.exports = function shortcuts(seed, restart) {
             a.innerHTML = "Download Screenshot";
             a.target = "_blank";
             a.addEventListener("click", () => {
-              a.style.display = "none";
+              if (a) {
+                a.style.display = "none";
+              }
             });
           }
           a.href = canvas.toDataURL();
@@ -59,6 +63,11 @@ module.exports = function shortcuts(seed, restart) {
             document.exitFullscreen ? document.exitFullscreen() : null;
           } else {
             const canvas = document.querySelector("canvas");
+            if (!canvas) {
+              throw new Error(
+                "Could not find the canvas while entering fullscreen."
+              );
+            }
             canvas.requestFullscreen ? canvas.requestFullscreen() : null;
           }
           if (restart) {
@@ -77,4 +86,4 @@ module.exports = function shortcuts(seed, restart) {
     },
     false
   );
-};
+}

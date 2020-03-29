@@ -1,14 +1,45 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const { setupCurveDrawing } = require("../lib/curve-drawing");
-const createVerletSystem = require("verlet-system");
-const createPoint = require("verlet-point");
-const createConstraint = require("verlet-constraint");
-const ease = require("eases/cubic-in-out");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import { setupCurveDrawing, Curve } from "../lib/curve-drawing";
+import createVerletSystem from "verlet-system";
+import createPoint, { VerletPoint } from "verlet-point";
+import createConstraint, { VerletConstraint } from "verlet-constraint";
+import ease from "eases/cubic-in-out";
+
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
+
+interface Blob {
+  points: VerletPoint[];
+  constraints: VerletConstraint[];
+  age: Integer;
+}
 
 {
+  const config = getConfig();
+  const current = getCurrent(config);
+
+  (window as any).current = current;
+
+  loop(now => {
+    current.dt = Math.min(now - current.time, 100);
+    current.time = now;
+
+    updateVerlet(config, current);
+    updateDestroyingGeometry(config, current);
+    config.ctx.fillStyle = "#000";
+    config.ctx.fillRect(0, 0, innerWidth, innerHeight);
+    drawIntroText(config, current);
+    drawInProgressDrawing(config, current);
+    drawConstraints(config, current);
+    drawPoints(config, current);
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
   const seed = generateSeed();
   const random = setupRandom(seed);
   const simplex = new Simplex(random);
@@ -17,7 +48,7 @@ const ease = require("eases/cubic-in-out");
 
   initializeShortcuts(seed);
 
-  const config = {
+  return {
     ctx,
     seed,
     random,
@@ -35,43 +66,33 @@ const ease = require("eases/cubic-in-out");
     inProgressSimplexSpeed: 1,
     inProgressSimplexScale: 5,
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  const curveDrawing: ReturnType<typeof setupCurveDrawing> = setupCurveDrawing({
+    pointsPerDistance: config.pointsPerDistance,
+    drawingTarget: document.body,
+    onCurveDrawn: curve => addNewCurve(config, current, curve),
+  });
 
   // Mutable state.
   const current = {
-    now: Date.now() / 1000,
+    time: Date.now() / 1000,
     dt: 0,
-    blobs: new Set(),
+    blobs: new Set() as Set<Blob>,
     textFadeIn: 0,
     verletSystem: createVerletSystem({
       min: [0, 0],
       max: [innerWidth, innerHeight],
     }),
-    curveDrawing: setupCurveDrawing({
-      ctx,
-      pointsPerDistance: config.pointsPerDistance,
-      drawingTarget: document.body,
-      onCurveDrawn: curve => addNewCurve(config, current, curve),
-    }),
+    curveDrawing,
   };
 
-  window.current = current;
-
-  loop(now => {
-    current.dt = Math.min(now - current.time, 100);
-    current.time = now;
-
-    updateVerlet(config, current);
-    updateDestroyingGeometry(config, current);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, innerWidth, innerHeight);
-    drawIntroText(config, current);
-    drawInProgressDrawing(config, current);
-    drawConstraints(config, current);
-    drawPoints(config, current);
-  });
+  return current;
 }
 
-function drawIntroText(config, current) {
+function drawIntroText(config: Config, current: Current): void {
   const { ctx } = config;
   const { blobs, curveDrawing } = current;
   if (blobs.size === 0 && curveDrawing.points.length === 0) {
@@ -91,7 +112,7 @@ function drawIntroText(config, current) {
   }
 }
 
-function updateDestroyingGeometry(config, current) {
+function updateDestroyingGeometry(config: Config, current: Current): void {
   const { random, blobDiesAtAge } = config;
   for (const blob of current.blobs) {
     const { constraints, points } = blob;
@@ -131,7 +152,7 @@ function updateDestroyingGeometry(config, current) {
   }
 }
 
-function addNewCurve(config, current, curve) {
+function addNewCurve(config: Config, current: Current, curve: Curve): void {
   const { constraintConfig, baseExtrudeLength } = config;
   const line = [curve.line[0]];
   const points = [];
@@ -196,6 +217,10 @@ function addNewCurve(config, current, curve) {
       ],
     });
 
+    if (!a || !b) {
+      throw new Error("Expected an A or B point.");
+    }
+
     // Connect the 4 sides of the square.
     constraints.push(createConstraint([a, b], constraintConfig));
     constraints.push(createConstraint([b, c], constraintConfig));
@@ -216,7 +241,7 @@ function addNewCurve(config, current, curve) {
   current.blobs.add({ points, constraints, age: 0 });
 }
 
-function updateVerlet(config, current) {
+function updateVerlet(config: Config, current: Current): void {
   const { simplex3, gravitySimplexScale, gravityDistance } = config;
   const { verletSystem, blobs, dt, time } = current;
 
@@ -238,7 +263,7 @@ function updateVerlet(config, current) {
   }
 }
 
-function drawConstraints(config, current) {
+function drawConstraints(config: Config, current: Current): void {
   const { ctx } = config;
   ctx.lineWidth = 1;
   ctx.strokeStyle = "#fff";
@@ -255,14 +280,14 @@ function drawConstraints(config, current) {
   ctx.stroke();
 }
 
-function getPerpendicularUnitVector(pointA, pointB) {
+function getPerpendicularUnitVector(pointA: Vec2, pointB: Vec2): Vec2 {
   const dx = pointA.x - pointB.x;
   const dy = pointA.y - pointB.y;
   const length = Math.sqrt(dx * dx + dy * dy);
   return { x: dy / length, y: -dx / length };
 }
 
-function drawInProgressDrawing(config, current) {
+function drawInProgressDrawing(config: Config, current: Current): void {
   const {
     ctx,
     simplex3,
@@ -296,7 +321,7 @@ function drawInProgressDrawing(config, current) {
   }
 }
 
-function drawPoints(config, current) {
+function drawPoints(config: Config, current: Current): void {
   const { ctx } = config;
   ctx.strokeStyle = "#fff";
   ctx.lineWidth = 3;

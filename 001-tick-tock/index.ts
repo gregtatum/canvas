@@ -1,40 +1,31 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const elasticOut = require("eases/elastic-out");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import elasticOut from "eases/elastic-out";
 const TAU = Math.PI * 2;
 
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
+
+type Line = {
+  x: CssPixels;
+  y: CssPixels;
+  theta: Radian;
+  r: CssPixels;
+  rotationTimeOffset: number;
+};
+
 {
-  const seed = generateSeed();
-  const random = setupRandom(seed);
-  const simplex = new Simplex(random);
-  const simplex3 = simplex.noise3D.bind(simplex);
-  const ctx = setupCanvas();
-
-  initializeShortcuts(seed);
-
-  const config = {
-    ctx,
-    seed,
-    lineSpacing: 50,
-    rotationSpeed: 0.05,
-    circleLineWidth: 2,
-    simplex3,
-    armLineWidth: 5,
-  };
-
-  // Mutable state.
-  const current = {
-    lines: generateLines(config),
-  };
+  const config = getConfig();
+  const current = getCurrent(config);
 
   loop(now => {
     current.time = now;
     draw(config, current);
   });
 
-  window.onhashchange = function() {
+  window.onhashchange = (): void => {
     location.reload();
   };
 
@@ -43,7 +34,7 @@ const TAU = Math.PI * 2;
   });
 
   // The titles are hard to read, give them a background.
-  const title = document.querySelector(".title");
+  const title: HTMLElement | null = document.querySelector(".title");
   if (title) {
     Object.assign(title.style, {
       backgroundColor: "#444a",
@@ -52,7 +43,36 @@ const TAU = Math.PI * 2;
   }
 }
 
-function generateLines(config) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
+  const ctx = setupCanvas();
+  const seed = generateSeed();
+  const random = setupRandom(seed);
+  const simplex = new Simplex(random);
+  const simplex3 = simplex.noise3D.bind(simplex);
+
+  initializeShortcuts(seed);
+
+  return {
+    ctx,
+    seed,
+    lineSpacing: 50,
+    rotationSpeed: 0.05,
+    circleLineWidth: 2,
+    simplex3,
+    armLineWidth: 5,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  return {
+    lines: generateLines(config),
+    time: 0,
+  };
+}
+
+function generateLines(config: Config): Line[] {
   const { lineSpacing, simplex3 } = config;
   const lines = [];
 
@@ -72,7 +92,7 @@ function generateLines(config) {
   return lines;
 }
 
-function draw(config, current) {
+function draw(config: Config, current: Current): void {
   const {
     ctx,
     armLineWidth,

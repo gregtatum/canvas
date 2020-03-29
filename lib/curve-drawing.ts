@@ -1,5 +1,27 @@
-function setupCurveDrawing(config) {
-  const current = {
+export type Curve = {
+  line: Vec2[];
+  cpLeft: Vec2[];
+  cpRight: Vec2[];
+  smoothness: number;
+  distance: number;
+};
+
+type Config = {
+  drawingTarget: HTMLElement;
+  onCurveDrawn: (curve: Curve) => void;
+  pointsPerDistance: number;
+};
+
+type Current = {
+  points: Vec2[];
+  distancePerPoint: number[];
+  isDrawingCurve: boolean;
+  totalLineDistance: number;
+};
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export function setupCurveDrawing(config: Config) {
+  const current: Current = {
     points: [],
     distancePerPoint: [],
     isDrawingCurve: false,
@@ -13,7 +35,7 @@ function setupCurveDrawing(config) {
   drawingTarget.addEventListener("touchstart", onTouchStart);
   drawingTarget.style.touchAction = "none";
 
-  function onTouchStart(event) {
+  function onTouchStart(event: TouchEvent): void {
     event.preventDefault();
 
     if (current.isDrawingCurve === false) {
@@ -27,12 +49,12 @@ function setupCurveDrawing(config) {
       current.distancePerPoint = [];
       current.totalLineDistance = 0;
 
-      const [{ pageX, pageY }] = event.touches[0];
+      const { pageX, pageY } = event.touches[0];
       addPoint(config, current, pageX, pageY);
     }
   }
 
-  function onMouseDown(event) {
+  function onMouseDown(event: MouseEvent): void {
     if (current.isDrawingCurve === false) {
       drawingTarget.addEventListener("mousemove", onMouseMove);
       drawingTarget.addEventListener("mouseout", onMouseMoveDone);
@@ -49,23 +71,23 @@ function setupCurveDrawing(config) {
     }
   }
 
-  function onMouseMove(event) {
+  function onMouseMove(event: MouseEvent): void {
     event.preventDefault();
     addPoint(config, current, event.pageX, event.pageY);
   }
 
-  function onTouchMove(event) {
+  function onTouchMove(event: TouchEvent): void {
     event.preventDefault();
     addPoint(config, current, event.touches[0].pageX, event.touches[0].pageY);
   }
 
-  function onTouchEnd() {
+  function onTouchEnd(): void {
     drawingTarget.removeEventListener("touchend", onTouchEnd);
 
     completeCurve(config, current);
   }
 
-  function onMouseMoveDone(event) {
+  function onMouseMoveDone(event: MouseEvent): void {
     drawingTarget.removeEventListener("mousemove", onMouseMove);
     drawingTarget.removeEventListener("mouseout", onMouseMoveDone);
     drawingTarget.removeEventListener("mouseup", onMouseMoveDone);
@@ -78,7 +100,7 @@ function setupCurveDrawing(config) {
   return current;
 }
 
-function completeCurve(config, current) {
+function completeCurve(config: Config, current: Current): void {
   showUI();
   current.isDrawingCurve = false;
 
@@ -91,7 +113,12 @@ function completeCurve(config, current) {
 /**
  * Add point to to the current line.
  */
-function addPoint(config, current, x, y) {
+function addPoint(
+  config: Config,
+  current: Current,
+  x: number,
+  y: number
+): void {
   const curr = { x, y };
 
   let prev;
@@ -110,7 +137,7 @@ function addPoint(config, current, x, y) {
   current.distancePerPoint.push(distance);
 }
 
-function smoothLine(config, current) {
+function smoothLine(config: Config, current: Current): Vec2[] {
   const { pointsPerDistance } = config;
   const { totalLineDistance, points, distancePerPoint } = current;
   const smoothPoints = [];
@@ -157,11 +184,12 @@ function smoothLine(config, current) {
   return smoothPoints;
 }
 
-function generateSmoothedBezierCurve(line, smoothness) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function generateSmoothedBezierCurve(line: Vec2[], smoothness: number) {
   let distance = 0;
   const distances = [];
-  const cpLeft = [];
-  const cpRight = [];
+  const cpLeft: Vec2[] = [];
+  const cpRight: Vec2[] = [];
 
   // Generate distances
   for (let i = 1; i < line.length; i++) {
@@ -174,7 +202,7 @@ function generateSmoothedBezierCurve(line, smoothness) {
   }
 
   // Add a beginning control point.
-  const firstPoint = line.x;
+  const firstPoint = line[0];
   cpLeft.push({ ...firstPoint });
   cpRight.push({ ...firstPoint });
 
@@ -214,7 +242,10 @@ function generateSmoothedBezierCurve(line, smoothness) {
   };
 }
 
-function drawLineSegments(ctx, line) {
+export function drawLineSegments(
+  ctx: CanvasRenderingContext2D,
+  line: Vec2[]
+): void {
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.strokeStyle = hslToFillStyle(0, 0, 0, 0.3);
@@ -228,14 +259,14 @@ function drawLineSegments(ctx, line) {
   ctx.stroke();
 }
 
-function drawCurve(ctx, curve) {
+export function drawCurve(ctx: CanvasRenderingContext2D, curve: Curve): void {
   ctx.lineWidth = 3;
   ctx.strokeStyle = "#fff";
   ctx.beginPath();
   ctx.lineCap = "round";
 
   const { line, cpRight, cpLeft } = curve;
-  const firstPoint = line.x;
+  const firstPoint = line[0];
   ctx.moveTo(firstPoint.x, firstPoint.y);
 
   for (let i = 1; i < line.length; i++) {
@@ -252,7 +283,10 @@ function drawCurve(ctx, curve) {
   ctx.stroke();
 }
 
-function drawControlPoints(ctx, curve) {
+export function drawControlPoints(
+  ctx: CanvasRenderingContext2D,
+  curve: Curve
+): void {
   ctx.lineCap = "round";
 
   const { cpLeft, cpRight } = curve;
@@ -279,26 +313,19 @@ function drawControlPoints(ctx, curve) {
   }
 }
 
-function hslToFillStyle(h, s, l, a) {
+function hslToFillStyle(h: number, s: number, l: number, a: number): string {
   if (a === undefined) {
     return ["hsl(", h, ",", s, "%,", l, "%)"].join("");
   }
   return ["hsla(", h, ",", s, "%,", l, "%,", a, ")"].join("");
 }
 
-function hideUI() {
+function hideUI(): void {
   document.body.classList.add("hide-ui");
 }
 
-function showUI() {
-  if (!window.fullScreen) {
+function showUI(): void {
+  if (!(window as any).fullScreen) {
     document.body.classList.remove("hide-ui");
   }
 }
-
-module.exports = {
-  setupCurveDrawing,
-  drawControlPoints,
-  drawCurve,
-  drawLineSegments,
-};

@@ -4,19 +4,34 @@ module.exports = {
     es6: true,
     node: true,
   },
-  parser: 'babel-eslint',
+  parser: '@typescript-eslint/parser',
   extends: [
+    'plugin:@typescript-eslint/recommended',
     'eslint:recommended',
     'prettier',
   ],
   parserOptions: {
-    ecmaVersion: '2017',
+    ecmaVersion: '2018',
     ecmaFeatures: {
       experimentalObjectRestSpread: true,
       jsx: true,
     },
   },
   plugins: ['babel', 'prettier'],
+  ignorePatterns: [
+    "node_modules",
+    "dist",
+    "@types/modules.d.ts"
+  ],
+  overrides: [
+    {
+      files: ["bin/*"],
+      rules: {
+        "@typescript-eslint/no-var-requires": 0,
+        "@typescript-eslint/explicit-function-return-type": 0,
+      }
+    }
+  ],
   rules: {
     // Plugin rules:
     'prettier/prettier': 'error',
@@ -25,6 +40,12 @@ module.exports = {
     'no-constant-condition': ['error', { checkLoops: false }],
     'no-console': ['error', { allow: ['log', 'warn', 'error'] }],
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-use-before-define': 0,
+    '@typescript-eslint/no-explicit-any': 0,
+    // Use typescript's
+    'no-unused-vars': 0,
+    '@typescript-eslint/no-unused-vars': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'error',
 
     // possible errors
     'array-callback-return': 'error',

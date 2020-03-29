@@ -1,14 +1,72 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const { lerpTheta } = require("../lib/lerpTheta");
-const lerp = require("lerp");
-const createRtree = require("rtree");
-const ease = require("eases/sine-in-out");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import { lerpTheta } from "../lib/lerpTheta";
+import lerp from "lerp";
+import createRtree, { RTree } from "rtree";
+import ease from "eases/sine-in-out";
 const TAU = Math.PI * 2;
 
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
+
+type Food = {
+  maxFoodQuantity: number;
+  quantity: number;
+  x: number;
+  y: number;
+  growthRate: number;
+};
+
+type Entity = {
+  index: number;
+  x: number;
+  y: number;
+  energy: number;
+  theta: number;
+  speed: number;
+  thetaJitter: number;
+};
+
+type RecentlyDead = {
+  x: number;
+  y: number;
+  theta: number;
+  speed: number;
+  energy: number;
+  energyAtDeath: number;
+  age: number;
+};
+
 {
+  const config = getConfig();
+  const current = getCurrent(config);
+
+  loop(now => {
+    current.dt = now - current.time;
+    current.time = now;
+    updateFoods(config, current);
+    updateEntities(config, current);
+    updateRecentlyDead(config, current);
+    draw(config, current);
+  });
+
+  window.addEventListener("resize", () => {
+    current.rtree = createRtree();
+    for (const food of current.foods) {
+      food.x = config.random() * innerWidth;
+      food.y = config.random() * innerHeight;
+    }
+    addFoodsToRtree(current.foods, current.rtree);
+  });
+
+  (window as any).current = current;
+  (window as any).config = config;
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
   const seed = generateSeed();
   const random = setupRandom(seed);
   const simplex = new Simplex(random);
@@ -17,7 +75,7 @@ const TAU = Math.PI * 2;
 
   initializeShortcuts(seed);
 
-  const config = {
+  return {
     ctx,
     seed,
     random,
@@ -54,45 +112,27 @@ const TAU = Math.PI * 2;
     minFeedQuantity: 5,
     foodSimplexDistribution: 500,
   };
+}
 
-  const rtree = createRtree();
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  const rtree: RTree<Food> = createRtree();
   const { entities, livingEntities, deadEntities } = generateEntities(config);
 
   // Mutable state.
-  const current = {
+  return {
     rtree,
     entities,
     livingEntities,
     deadEntities,
-    recentlyDead: new Set(),
+    recentlyDead: new Set() as Set<RecentlyDead>,
     foods: generateFood(config, rtree),
-    now: Date.now(),
+    time: Date.now(),
     dt: 0,
   };
-
-  loop(now => {
-    current.dt = now - current.time;
-    current.time = now;
-    updateFoods(config, current);
-    updateEntities(config, current);
-    updateRecentlyDead(config, current);
-    draw(config, current);
-  });
-
-  window.addEventListener("resize", () => {
-    current.rtree = createRtree();
-    for (const food of current.foods) {
-      food.x = random() * innerWidth;
-      food.y = random() * innerHeight;
-    }
-    addFoodsToRtree(current.foods, current.rtree);
-  });
-
-  window.current = current;
-  window.config = config;
 }
 
-function updateFoods(config, current) {
+function updateFoods(config: Config, current: Current): void {
   for (const food of current.foods) {
     food.quantity = Math.min(
       (food.quantity = Math.pow(food.quantity, food.growthRate)),
@@ -101,9 +141,9 @@ function updateFoods(config, current) {
   }
 }
 
-function updateEntities(config, current) {
+function updateEntities(config: Config, current: Current): void {
   const { livingEntities } = current;
-  const { ctx, entityMaxSpeed, entityCostToMove } = config;
+  const { entityMaxSpeed, entityCostToMove } = config;
 
   for (const entity of livingEntities) {
     const food = getClosestFood(config, current, entity);
@@ -131,7 +171,7 @@ function updateEntities(config, current) {
   }
 }
 
-function updateRecentlyDead(config, current) {
+function updateRecentlyDead(config: Config, current: Current): void {
   const { deadSpeedSlowdown, deadTimeDecomposing } = config;
   const { recentlyDead, dt } = current;
   for (const dead of recentlyDead) {
@@ -146,7 +186,7 @@ function updateRecentlyDead(config, current) {
   }
 }
 
-function wander(config, entity) {
+function wander(config: Config, entity: Entity): void {
   const {
     entityLerpThetaT,
     entitySpeedUp,
@@ -170,7 +210,7 @@ function wander(config, entity) {
     lerpTheta(entity.theta, thetaTarget, entityLerpThetaT) + entity.thetaJitter;
 }
 
-function moveToFood(config, entity, food) {
+function moveToFood(config: Config, entity: Entity, food: Food): void {
   const { entitySlowDown, entityLerpThetaT, entityFeedRate } = config;
 
   const dx = entity.x - food.x;
@@ -184,7 +224,11 @@ function moveToFood(config, entity, food) {
   entity.theta = lerpTheta(entity.theta, thetaTarget, entityLerpThetaT);
 }
 
-function getClosestFood(config, current, entity) {
+function getClosestFood(
+  config: Config,
+  current: Current,
+  entity: Entity
+): Food | null | undefined {
   const { x, y } = entity;
   const { rtree } = current;
   const { entitySearchRadius, minFeedQuantity } = config;
@@ -200,7 +244,7 @@ function getClosestFood(config, current, entity) {
   }
   // Look for the closest food with the most quantity.
   let food;
-  let distSq;
+  let distSq = 0;
   for (const newFood of nearbyFoods) {
     if (newFood.quantity < minFeedQuantity) {
       // There's not enough food here to eat, leave it.
@@ -227,7 +271,7 @@ function getClosestFood(config, current, entity) {
   return food;
 }
 
-function keepEntityInRange({ entitySize }, entity) {
+function keepEntityInRange({ entitySize }: Config, entity: Entity): void {
   // Keep the entities in range, but allow them to go off the screen. Using just
   // a modulo operation here means that they "jump" to the other side while still
   // on the screen.
@@ -243,7 +287,11 @@ function keepEntityInRange({ entitySize }, entity) {
   }
 }
 
-function maybeSubdivideEntity(config, current, entity) {
+function maybeSubdivideEntity(
+  config: Config,
+  current: Current,
+  entity: Entity
+): void {
   const { entitySubdivideEnergyLevel, random } = config;
   const { deadEntities, livingEntities } = current;
 
@@ -277,14 +325,13 @@ function maybeSubdivideEntity(config, current, entity) {
   entity2.x += random(-5, 5);
 }
 
-function maybeKillEntity(config, current, entity) {
-  const { deadTimeDecomposing } = config;
-  const {
-    livingEntities,
-    deadEntities,
-    entityMinLiving,
-    recentlyDead,
-  } = current;
+function maybeKillEntity(
+  config: Config,
+  current: Current,
+  entity: Entity
+): void {
+  const { deadTimeDecomposing, entityMinLiving } = config;
+  const { livingEntities, deadEntities, recentlyDead } = current;
   if (livingEntities.size <= entityMinLiving) {
     // Don't kill the last entities.
     return;
@@ -304,7 +351,8 @@ function maybeKillEntity(config, current, entity) {
   }
 }
 
-function generateEntities(config) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function generateEntities(config: Config) {
   const {
     maxEntityCount,
     entityLiveCount,
@@ -313,9 +361,9 @@ function generateEntities(config) {
     entitySubdivideEnergyLevel,
     entityThetaJitterRange,
   } = config;
-  const entities = [];
-  const livingEntities = new Set();
-  const deadEntities = new Set();
+  const entities: Entity[] = [];
+  const livingEntities: Set<Entity> = new Set();
+  const deadEntities: Set<Entity> = new Set();
 
   for (let i = 0; i < maxEntityCount; i++) {
     const entity = {
@@ -342,7 +390,7 @@ function generateEntities(config) {
   return { entities, livingEntities, deadEntities };
 }
 
-function draw(config, current) {
+function draw(config: Config, current: Current): void {
   const { ctx } = config;
   // Clear out background.
   ctx.fillStyle = "#000";
@@ -355,7 +403,7 @@ function draw(config, current) {
   drawEnties(config, current.recentlyDead);
 }
 
-function drawFoods(config, current) {
+function drawFoods(config: Config, current: Current): void {
   const { ctx, foodDrawnSize, foodDrawnSteps } = config;
   const { foods } = current;
   // Draw the foods
@@ -374,7 +422,10 @@ function drawFoods(config, current) {
   }
 }
 
-function drawEnties(config, entities) {
+function drawEnties(
+  config: Config,
+  entities: Iterable<Entity | RecentlyDead>
+): void {
   const { ctx, entitySubdivideEnergyLevel, entitySize } = config;
 
   ctx.lineWidth = 2;
@@ -398,7 +449,7 @@ function drawEnties(config, entities) {
   ctx.stroke();
 }
 
-function generateFood(config, rtree) {
+function generateFood(config: Config, rtree: RTree<Food>): Food[] {
   const {
     minFoodQuantity,
     maxFoodQuantity,
@@ -432,7 +483,7 @@ function generateFood(config, rtree) {
   return foods;
 }
 
-function addFoodsToRtree(foods, rtree) {
+function addFoodsToRtree(foods: Food[], rtree: RTree<Food>): void {
   for (const food of foods) {
     const w = 1;
     rtree.insert(

@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 const inquirer = require("inquirer");
-const budo = require("budo");
-const { findSessionFromCli, getAllSessions } = require("./common");
+const {
+  findSessionFromCli,
+  getAllSessions,
+  getWebpackConfig,
+} = require("./common");
+const path = require("path");
+const webpack = require("webpack");
+const WebpackDevServer = require("webpack-dev-server");
 
 (async () => {
   let pathToSession = findSessionFromCli();
@@ -13,8 +19,8 @@ const { findSessionFromCli, getAllSessions } = require("./common");
         type: "list",
         name: "fileName",
         message: "Which session do you want to run?",
-        choices: sessions.map(session => session.fileName)
-      }
+        choices: sessions.map(session => session.fileName),
+      },
     ]);
 
     pathToSession = sessions.find(
@@ -28,10 +34,33 @@ const { findSessionFromCli, getAllSessions } = require("./common");
     );
   }
 
-  budo(pathToSession, {
-    live: true,
-    stream: process.stdout,
-    port: 9966,
-    css: "html/style.css"
+  const sessionSlug = path.basename(pathToSession);
+
+  const config = getWebpackConfig({
+    title: sessionSlug,
+    entry: path.join(pathToSession, "index.ts"),
+    isDevelopment: true,
+    template: "dev.template.html",
+    templateParameters: {},
+    outputPath: path.resolve(__dirname, "../"),
+    outputPublicPath: "/",
   });
+
+  const serverConfig = {
+    contentBase: config.output.path,
+    publicPath: config.output.publicPath,
+    hot: process.env.NODE_ENV === "development" ? true : false,
+    stats: { colors: true },
+  };
+
+  new WebpackDevServer(webpack(config), serverConfig).listen(
+    9966,
+    "localhost",
+    function(err) {
+      if (err) {
+        console.log(err);
+      }
+      console.log("Happy creative coding!");
+    }
+  );
 })();

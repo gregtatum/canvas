@@ -1,11 +1,41 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const { lerpTheta } = require("../lib/lerpTheta");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import { lerpTheta } from "../lib/lerpTheta";
+
 const TAU = Math.PI * 2;
 
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
+
+type Entity = {
+  index: number;
+  x: number;
+  y: number;
+  theta: number;
+  speed: number;
+  buddy: number | null;
+};
+
 {
+  const config = getConfig();
+  // Mutable state.
+  const current = getCurrent(config);
+
+  loop(now => {
+    current.time = now;
+    update(config, current);
+    draw(config, current);
+  });
+
+  window.onhashchange = function(): void {
+    location.reload();
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
   const seed = generateSeed();
   const random = setupRandom(seed);
   const simplex = new Simplex(random);
@@ -14,7 +44,7 @@ const TAU = Math.PI * 2;
 
   initializeShortcuts(seed);
 
-  const config = {
+  return {
     ctx,
     seed,
     random,
@@ -27,26 +57,17 @@ const TAU = Math.PI * 2;
     maxSpeed: 5,
     rotateToBuddy: 0.1,
   };
-
-  // Mutable state.
-  const current = {
-    entities: generateEntities(config),
-  };
-
-  loop(now => {
-    current.time = now;
-    update(config, current);
-    draw(config, current);
-  });
-
-  window.onhashchange = function() {
-    location.reload();
-  };
-
-  window.addEventListener("resize", () => {});
 }
 
-function update(config, current) {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  return {
+    time: 0,
+    entities: generateEntities(config),
+  };
+}
+
+function update(config: Config, current: Current): void {
   const { entities } = current;
   const { entitySize, maxSpeed, simplex3, lonelyRotation } = config;
 
@@ -85,7 +106,7 @@ function update(config, current) {
   }
 }
 
-function applyBuddyForce(config, entity, buddy) {
+function applyBuddyForce(config: Config, entity: Entity, buddy: Entity): void {
   const { rotateToBuddy } = config;
   const dx = buddy.x - entity.x;
   const dy = buddy.y - entity.y;
@@ -100,9 +121,9 @@ function applyBuddyForce(config, entity, buddy) {
   entity.y += Math.sin(entity.theta) * entity.speed;
 }
 
-function generateEntities(config) {
-  const { entityCount, ctx, baseSpeed, random, breakoutCount } = config;
-  const entities = [];
+function generateEntities(config: Config): Entity[] {
+  const { entityCount, baseSpeed, random, breakoutCount } = config;
+  const entities: Entity[] = [];
 
   for (let i = 0; i < entityCount; i++) {
     entities.push({
@@ -130,7 +151,7 @@ function generateEntities(config) {
   return entities;
 }
 
-function draw(config, current) {
+function draw(config: Config, current: Current): void {
   const { ctx, entitySize } = config;
   const { entities } = current;
 

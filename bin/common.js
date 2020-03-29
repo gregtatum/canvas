@@ -45,4 +45,53 @@ function getAllSessions() {
   return sessions;
 }
 
-module.exports = { findSessionFromCli, getAllSessions };
+function getWebpackConfig({
+  title,
+  entry,
+  isDevelopment,
+  template,
+  templateParameters,
+  outputPath,
+  outputPublicPath,
+}) {
+  const HtmlWebpackPlugin = require("html-webpack-plugin");
+
+  return {
+    entry,
+    devtool: isDevelopment ? "inline-source-map" : "source-map",
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          use: "ts-loader",
+          exclude: /node_modules/,
+        },
+        {
+          test: /\.css$/i,
+          use: ["css-loader"],
+        },
+      ],
+    },
+    plugins: [
+      new HtmlWebpackPlugin({
+        title,
+        template: path.resolve(__dirname, "../html/", template),
+        templateParameters,
+        minify: false,
+        inject: false,
+      }),
+    ],
+    resolve: {
+      extensions: [".ts", ".js"],
+    },
+    output: {
+      path: outputPath,
+      publicPath: outputPublicPath,
+      filename: "[hash].bundle.js",
+      chunkFilename: "[id].[hash].bundle.js",
+    },
+    mode: isDevelopment ? "development" : "production",
+  };
+}
+
+module.exports = { findSessionFromCli, getAllSessions, getWebpackConfig };

@@ -1,12 +1,58 @@
-const Simplex = require("simplex-noise");
-const setupRandom = require("@tatumcreative/random");
-const initializeShortcuts = require("../lib/shortcuts");
-const { setupCanvas, loop, generateSeed } = require("../lib/draw");
-const createRtree = require("rtree");
-const ease = require("eases/sine-in-out");
+import Simplex from "simplex-noise";
+import setupRandom from "@tatumcreative/random";
+import initializeShortcuts from "../lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import createRtree, { RTree } from "rtree";
+import ease from "eases/sine-in-out";
 const TAU = Math.PI * 2;
 
+type Config = ReturnType<typeof getConfig>;
+type Current = ReturnType<typeof getCurrent>;
+
+type Food = {
+  maxQuantity: number;
+  quantity: number;
+  x: number;
+  y: number;
+  growthRate: number;
+};
+
+type Entity = {
+  index: Index;
+  x: CssPixels;
+  y: CssPixels;
+  food: Scalar;
+  theta: Radian;
+  speed: number;
+};
+
 {
+  const config = getConfig();
+  const current = getCurrent(config);
+
+  loop(now => {
+    current.dt = now - current.time;
+    current.time = now;
+    updateFoods(config, current);
+    updateEntities(config, current);
+    draw(config, current);
+  });
+
+  window.addEventListener("resize", () => {
+    current.rtree = createRtree();
+    for (const food of current.foods) {
+      food.x = config.random() * innerWidth;
+      food.y = config.random() * innerHeight;
+    }
+    addFoodsToRtree(current.foods, current.rtree);
+  });
+
+  (window as any).current = current;
+  (window as any).config = config;
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getConfig() {
   const seed = generateSeed();
   const random = setupRandom(seed);
   const simplex = new Simplex(random);
@@ -15,7 +61,7 @@ const TAU = Math.PI * 2;
 
   initializeShortcuts(seed);
 
-  const config = {
+  return {
     ctx,
     seed,
     random,
@@ -41,49 +87,31 @@ const TAU = Math.PI * 2;
     feedRate: 0.7,
     quantityDistribution: 500,
   };
+}
 
-  const rtree = createRtree();
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function getCurrent(config: Config) {
+  const rtree: RTree<Food> = createRtree();
 
   // Mutable state.
-  const current = {
+  return {
     rtree,
     entities: generateEntities(config),
     foods: generateFood(config, rtree),
-    now: Date.now(),
+    time: Date.now(),
     dt: 0,
   };
-
-  loop(now => {
-    current.dt = now - current.time;
-    current.time = now;
-    updateFoods(config, current);
-    updateEntities(config, current);
-    draw(config, current);
-  });
-
-  window.addEventListener("resize", () => {
-    current.rtree = createRtree();
-    for (const food of current.foods) {
-      food.x = random() * innerWidth;
-      food.y = random() * innerHeight;
-    }
-    addFoodsToRtree(current.foods, current.rtree);
-  });
-
-  window.current = current;
-  window.config = config;
 }
 
-function updateFoods(config, current) {
+function updateFoods(config: Config, current: Current): void {
   for (const food of current.foods) {
     food.quantity = Math.min(food.quantity + food.growthRate, food.maxQuantity);
   }
 }
 
-function updateEntities(config, current) {
+function updateEntities(config: Config, current: Current): void {
   const { entities, rtree } = current;
   const {
-    ctx,
     entitySize,
     maxSpeed,
     simplex3,
@@ -107,11 +135,11 @@ function updateEntities(config, current) {
     );
 
     let food;
-    let distSq;
+    let distSq = 0;
     if (nearbyFoods.length > 0) {
       // Look for the closest food with the most quantity.
       let oldFood;
-      let oldDistSq;
+      let oldDistSq = 0;
 
       for (const newFood of nearbyFoods) {
         if (newFood.quantity < minFeedQuantity) {
@@ -181,7 +209,7 @@ function updateEntities(config, current) {
   }
 }
 
-function generateEntities(config) {
+function generateEntities(config: Config): Entity[] {
   const { entityCount, baseEntitySpeed, baseEntityFood, random } = config;
   const entities = [];
 
@@ -199,7 +227,7 @@ function generateEntities(config) {
   return entities;
 }
 
-function draw(config, current) {
+function draw(config: Config, current: Current): void {
   const { ctx, entitySize, foodSize, foodSteps } = config;
   const { entities, foods } = current;
 
@@ -238,7 +266,7 @@ function draw(config, current) {
   ctx.stroke();
 }
 
-function generateFood(config, rtree) {
+function generateFood(config: Config, rtree: RTree<Food>): Food[] {
   const {
     minQuantity,
     maxQuantity,
@@ -271,7 +299,7 @@ function generateFood(config, rtree) {
   return foods;
 }
 
-function addFoodsToRtree(foods, rtree) {
+function addFoodsToRtree(foods: Food[], rtree: RTree<Food>): void {
   for (const food of foods) {
     const w = 1;
     rtree.insert(
@@ -286,14 +314,14 @@ function addFoodsToRtree(foods, rtree) {
   }
 }
 
-const lerp = require("lerp");
+import lerp from "lerp";
 
 /**
  * Funny story, this is a buggy version I accidentally introduced, but liked
  * the result in the visualization, so here it stays. I accidentally set TAU
  * to PI.
  */
-function buggyLerpTheta(a, b, t) {
+function buggyLerpTheta(a: number, b: number, t: number): number {
   // Transform a and b to be between 0 and TAU. The first modulo operation could
   // result in a negative number, the second ensures it's positive.
   a = ((a % Math.PI) + Math.PI) % Math.PI;
