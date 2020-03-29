@@ -1,1 +1,0 @@
-I've never done verlet integration before. I didn't write on from scratch, but happened upon an old npm module, [verlet-system](https://www.mattdesl.com/) from [Matt DesLauries](https://www.mattdesl.com/). I was happy about that, and so ended up with this current session.
