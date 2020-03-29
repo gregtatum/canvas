@@ -6,6 +6,7 @@ const webpack = require("webpack");
 const Jimp = require("jimp");
 const rimraf = require("rimraf");
 const { ncp } = require("ncp");
+const touch = require("touch");
 
 const {
   findSessionFromCli,
@@ -21,6 +22,9 @@ async function run() {
   const sessionPath = findSessionFromCli();
 
   copyHtmlFolder();
+
+  // Used for redirects in S3:
+  touch(path.join(__dirname, "../dist/index.html"));
 
   if (sessionPath) {
     const sessionSlug = path.basename(sessionPath);
