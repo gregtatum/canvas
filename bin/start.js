@@ -19,7 +19,7 @@ const WebpackDevServer = require("webpack-dev-server");
         type: "list",
         name: "fileName",
         message: "Which session do you want to run?",
-        choices: sessions.map(session => session.fileName),
+        choices: sessions.map(session => session.fileName).reverse(),
       },
     ]);
 
