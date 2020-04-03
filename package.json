@@ -12,7 +12,7 @@
     "lint-ts": "tsc --noEmit"
   },
   "author": "",
-  "repository": "https://github.com/gregtatum/sessions-2d",
+  "repository": "https://github.com/gregtatum/canvas",
   "license": "(MIT AND CC-BY-NC-4.0)",
   "prettier": {
     "trailingComma": "es5"
@@ -53,6 +53,7 @@
     "lodash.template": "^4.5.0",
     "ncp": "^2.0.0",
     "prettier": "^1.19.1",
+    "remove-markdown": "^0.3.0",
     "rimraf": "^3.0.2",
     "touch": "^3.1.0",
     "ts-loader": "^6.2.2",

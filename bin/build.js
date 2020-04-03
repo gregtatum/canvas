@@ -7,6 +7,8 @@ const Jimp = require("jimp");
 const rimraf = require("rimraf");
 const { ncp } = require("ncp");
 const touch = require("touch");
+const removeMarkdown = require("remove-markdown");
+const { spawn } = require("child_process");
 
 const {
   findSessionFromCli,
@@ -33,6 +35,7 @@ async function run() {
     await webpackBundleNeighboringSessions(sessions, sessionSlug);
     await generateThumbnail(sessions, sessionSlug);
     copyProjectFiles(sessionSlug);
+    buildGregTatumDotCom(sessionSlug);
     reportBundleSize(sessionSlug);
   } else {
     // Build e'rything.
@@ -41,6 +44,7 @@ async function run() {
       await webpackBundle(sessions, sessionSlug);
       await generateThumbnail(sessions, sessionSlug);
       copyProjectFiles(sessionSlug);
+      buildGregTatumDotCom(sessionSlug);
       reportBundleSize(sessionSlug);
     }
   }
@@ -48,6 +52,29 @@ async function run() {
 }
 
 run();
+
+function buildGregTatumDotCom(sessionSlug) {
+  const cwd = path.join(__dirname, "../../greg");
+  const command = spawn("npm", ["run", "add-session-2d", sessionSlug], { cwd });
+
+  command.stdout.on("data", function(data) {
+    console.log(data.toString());
+  });
+
+  command.stderr.on("data", function(data) {
+    console.error(data.toString());
+  });
+
+  return new Promise((resolve, reject) => {
+    command.on("exit", code => {
+      if (code.toString() === "0") {
+        resolve();
+      } else {
+        reject(new Error(`Exiting with a non-zero exit code`));
+      }
+    });
+  });
+}
 
 /**
  * The neighboring HTML needs to be rebuilt.
@@ -118,7 +145,7 @@ function updateReadme(sessions) {
         .reverse()
         .map(
           ({ fileName }) =>
-            `[![Session ${fileName}](./${fileName}/thumb.jpg)](http://sessions-2d.gregtatum.com/${fileName})`
+            `[![Session ${fileName}](./${fileName}/thumb.jpg)](https://gregtatum.com/canvas/${fileName})`
         )
         .join("\n"),
     })
@@ -139,6 +166,16 @@ function getSessionTitle(sessionSlug) {
   );
   const packageJson = require(packageDestination);
   packageJson.name;
+}
+
+function getSessionReadmeDescription(sessionSlug) {
+  const sessionPath = path.join(__dirname, "..", sessionSlug);
+  const markdown = fs.readFileSync(path.join(sessionPath, "README.md"), "utf8");
+  if (!markdown) {
+    throw new Error("No REAMDE.md was written for the session.");
+  }
+  const text = removeMarkdown(markdown);
+  return text.split("\n")[0];
 }
 
 async function webpackBundle(sessions, sessionSlug) {
@@ -245,8 +282,9 @@ function getTemplateParameters(sessions, sessionSlug) {
 
   return {
     sessionNumber,
-    previous: `<a id="prev" href='${prevLink}'>&lt;</a>`,
-    next: `<a id="next" href='${nextLink}'>&gt;</a>`,
+    previous: `<a id="prev" href='${prevLink}'>⬅</a>`,
+    next: `<a id="next" href='${nextLink}'>➡</a>`,
     name: packageJson.name,
+    description: getSessionReadmeDescription(sessionSlug),
   };
 }
