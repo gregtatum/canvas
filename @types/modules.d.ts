@@ -3,17 +3,6 @@ declare module "lerp" {
   export default lerp;
 }
 
-declare module "simplex-noise" {
-  class Simplex {
-    constructor(random?: () => number);
-    noise2D(x: number, y: number): number;
-    noise3D(x: number, y: number, z: number): number;
-    noise4D(x: number, y: number, z: number, w: number): number;
-  }
-
-  export default Simplex;
-}
-
 type RandomFn =
   (() => number) &
   ((max: number) => number) &

@@ -2,6 +2,10 @@ export function create(): Vec2 {
   return { x: 0, y: 0 };
 }
 
+export function clone(p: Vec2): Vec2 {
+  return { x: p.x, y: p.y };
+}
+
 export function dot(a: Vec2, b: Vec2): number {
   return a.x * b.x + a.y * b.y;
 }

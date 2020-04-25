@@ -86,7 +86,7 @@ describe("intersect", () => {
     function checkIntersections(entities: Array<Physics.Entity>) {
       const world = Physics.create.world();
       for (const entity of entities) {
-        world.add(entity);
+        world.addToAllGroup(entity);
       }
       const results = [];
       for (const [a, b] of world.gcHeavyCheckAllIntersections()) {
@@ -358,8 +358,8 @@ describe("collisions between point and sphere", function() {
 
     const world = Physics.create.world();
     world.ticksPerSecond = 1;
-    world.add(point);
-    world.add(sphere);
+    world.addToAllGroup(point);
+    world.addToAllGroup(sphere);
 
     expect(draw()).toMatchInlineSnapshot(`
       Array [
@@ -472,8 +472,8 @@ describe("collisions between point and sphere", function() {
 
     const world = Physics.create.world();
     world.ticksPerSecond = 1;
-    world.add(point);
-    world.add(sphere);
+    world.addToAllGroup(point);
+    world.addToAllGroup(sphere);
 
     expect(draw()).toMatchInlineSnapshot(`
       Array [
@@ -544,6 +544,158 @@ describe("collisions between point and sphere", function() {
         "                                    ",
         "                                    ",
         "                ↓                   ",
+        "                                    ",
+      ]
+    `);
+  });
+
+  it("handles points that are inside of spheres on their way in", function() {
+    const stage = new Stage(12);
+    const point = Physics.create.point({ x: 1, y: 1 });
+    const sphere = Physics.create.sphere({ x: 0, y: 0 }, 4);
+
+    point.velocity.x = -1;
+    point.velocity.y = -1;
+
+    function draw(): string[] {
+      stage.clear();
+      stage.drawSphere(".", sphere);
+      stage.drawPoint(getArrow(point.velocity), point);
+      return stage.output();
+    }
+
+    const world = Physics.create.world();
+    world.ticksPerSecond = 1;
+    world.addToAllGroup(point);
+    world.addToAllGroup(sphere);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  ↖  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "             .  .  .  .  .          ",
+        "                   .                ",
+        "                                    ",
+      ]
+    `);
+
+    world.integrate(1);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "             .  .  .  .  .  ↘       ",
+        "                   .                ",
+        "                                    ",
+      ]
+    `);
+
+    world.integrate(1);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "             .  .  .  .  .          ",
+        "                   .           ↘    ",
+        "                                    ",
+      ]
+    `);
+  });
+
+  it("handles points that are inside of spheres on their way out", function() {
+    const stage = new Stage(12);
+    const point = Physics.create.point({ x: 2, y: 2 });
+    const sphere = Physics.create.sphere({ x: 0, y: 0 }, 4);
+
+    point.velocity.x = 1;
+    point.velocity.y = 1;
+
+    function draw(): string[] {
+      stage.clear();
+      stage.drawSphere(".", sphere);
+      stage.drawPoint(getArrow(point.velocity), point);
+      return stage.output();
+    }
+
+    const world = Physics.create.world();
+    world.ticksPerSecond = 1;
+    world.addToAllGroup(point);
+    world.addToAllGroup(sphere);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  ↘  .       ",
+        "             .  .  .  .  .          ",
+        "                   .                ",
+        "                                    ",
+      ]
+    `);
+
+    world.integrate(1);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "             .  .  .  .  .  ↘       ",
+        "                   .                ",
+        "                                    ",
+      ]
+    `);
+
+    world.integrate(1);
+
+    expect(draw()).toMatchInlineSnapshot(`
+      Array [
+        "                                    ",
+        "                                    ",
+        "                   .                ",
+        "             .  .  .  .  .          ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "       .  .  .  .  .  .  .  .  .    ",
+        "          .  .  .  .  .  .  .       ",
+        "          .  .  .  .  .  .  .       ",
+        "             .  .  .  .  .          ",
+        "                   .           ↘    ",
         "                                    ",
       ]
     `);
