@@ -3,6 +3,7 @@ module.exports = {
     browser: true,
     es6: true,
     node: true,
+    jest: true,
   },
   parser: '@typescript-eslint/parser',
   extends: [
@@ -42,6 +43,7 @@ module.exports = {
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-use-before-define': 0,
     '@typescript-eslint/no-explicit-any': 0,
+
     // Use typescript's
     'no-unused-vars': 0,
     '@typescript-eslint/no-unused-vars': 'error',

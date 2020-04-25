@@ -22,14 +22,27 @@ export function setupCanvas(): CanvasRenderingContext2D {
 }
 
 type Seconds = number;
-type LoopCallback = (time: Seconds) => void;
+type LoopCallback = (time: Seconds, dt: Seconds) => void;
 
 export function loop(callback: LoopCallback): void {
-  const startTime = Date.now();
+  let startTime: null | number = null;
+  let lastTime = 0;
+
   function innerLoop(): void {
-    callback((Date.now() - startTime) / 1000);
+    let now = 0;
+    let dt;
+    if (startTime === null) {
+      startTime = Date.now() / 1000;
+      dt = 1 / 60;
+    } else {
+      now = Date.now() / 1000 - startTime;
+      dt = Math.min(now - lastTime, 1 / 30);
+      lastTime = now;
+    }
+    callback(now, dt);
     requestAnimationFrame(innerLoop);
   }
+
   requestAnimationFrame(innerLoop);
 }
 
