@@ -1,9 +1,11 @@
-export function create(): Vec2 {
-  return { x: 0, y: 0 };
+export function create(x = 0, y = 0): Vec2 {
+  return { x, y };
 }
 
-export function clone(p: Vec2): Vec2 {
-  return { x: p.x, y: p.y };
+export function clone(p: Vec2, target: Vec2 = create()): Vec2 {
+  target.x = p.x;
+  target.y = p.y;
+  return target;
 }
 
 export function dot(a: Vec2, b: Vec2): number {
@@ -64,6 +66,12 @@ export function normalize(position: Vec2, output: Vec2 = position): Vec2 {
   }
   output.x /= d;
   output.y /= d;
+  return output;
+}
+
+export function flip(position: Vec2, output: Vec2 = position): Vec2 {
+  output.x = -position.x;
+  output.y = -position.y;
   return output;
 }
 

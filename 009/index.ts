@@ -2,7 +2,6 @@ import initializeShortcuts from "../lib/shortcuts";
 import { setupCanvas, loop, generateSeed } from "../lib/draw";
 import * as Physics from "../lib/physics";
 import setupRandom from "@tatumcreative/random";
-import lerp from "lerp";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = ReturnType<typeof getCurrent>;
@@ -19,31 +18,26 @@ function getConfig() {
     ctx,
     seed,
     random,
-    debugDrawSpheres: false,
-    gravity: { x: 100, y: 0 },
-    pointGenerationPerSecond: 200,
-    sphereCount: 60,
+    baseSphereSpeed: 30,
+    baseSphereAngularVelocity: 0.1,
     ticksPerSecond: 60,
-    sphereSize: [innerWidth * 0.01, innerWidth * 0.1],
+    sphereCount: 500,
+    sphereSizes: [2, 100],
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function getCurrent(config: Config) {
   const world = Physics.create.world({
-    gravity: config.gravity,
     ticksPerSecond: config.ticksPerSecond,
   });
-
-  addSpheres(config, world);
 
   return {
     time: 0,
     dt: 0,
     tick: 0,
     world,
-    timeElapsedSinceLastPointGeneration: 0,
-    points: new Set() as Set<Physics.Point>,
+    spheres: createSpheres(config, world),
   };
 }
 
@@ -57,71 +51,81 @@ function getCurrent(config: Config) {
     current.time = time;
     current.tick++;
 
-    generateNewPoints(config, current);
-    killPointsOffscreen(current);
-
     current.world.integrate(dt);
+
+    for (const { body } of current.spheres) {
+      const keepInBoundsForce = 0.1;
+      if (body.position.x < 0) {
+        Physics.vec2.reflect(body.velocity, Physics.vec2.create(1, 0));
+        body.velocity.x += keepInBoundsForce;
+      } else if (body.position.y < 0) {
+        Physics.vec2.reflect(body.velocity, Physics.vec2.create(0, 1));
+        body.velocity.y += keepInBoundsForce;
+      } else if (body.position.y > innerHeight) {
+        Physics.vec2.reflect(body.velocity, Physics.vec2.create(0, -1));
+        body.velocity.y -= keepInBoundsForce;
+      } else if (body.position.x > innerWidth) {
+        Physics.vec2.reflect(body.velocity, Physics.vec2.create(-1, 0));
+        body.velocity.x -= keepInBoundsForce;
+      }
+      // Add some energy to the system
+      if (Math.random() < 0.5) {
+        Physics.vec2.multiplyScalar(body.velocity, 2);
+      }
+    }
 
     clearScreen(config);
     drawWorld(config, current);
-    config.ctx.font = "20px sans-serif";
-    config.ctx.fillText(String(current.world.entities.size), 10, 30);
   });
 }
 
-function addSpheres(config: Config, world: Physics.World): void {
-  const { random, sphereCount, sphereSize } = config;
+function createSpheres(
+  config: Config,
+  world: Physics.World
+): Set<Physics.Sphere> {
+  const {
+    random,
+    sphereCount,
+    sphereSizes,
+    baseSphereSpeed,
+    baseSphereAngularVelocity,
+  } = config;
   const spheres: Set<Physics.Sphere> = new Set();
   for (let i = 0; i < sphereCount; i++) {
     let sphere, intersection;
+
     do {
-      const xFactor = 1 - Math.pow(random(), 2);
-      const radius =
-        random(sphereSize[0], sphereSize[1]) * lerp(0.3, 1, xFactor);
       const position = {
-        x: innerWidth - xFactor * innerWidth * 0.6,
+        x: random(innerWidth),
         y: random(innerHeight),
       };
+      const [min, max] = sphereSizes;
+      const radius = Math.pow(random(), 4) * (max - min) + min;
       sphere = Physics.create.sphere(position, radius);
+      sphere.body.mass = Math.PI * radius * radius;
       intersection = Physics.findSingleIntersection(sphere, spheres);
     } while (intersection);
-    sphere.fixed = true;
-    sphere.friction = 0.9;
+    const { body } = sphere;
+
+    body.fixedPosition = true;
+    body.friction = 0.9;
+    body.velocity.x = random(-baseSphereSpeed, baseSphereSpeed);
+    body.velocity.y = random(-baseSphereSpeed, baseSphereSpeed);
+    body.rotation = random(-Math.PI, Math.PI);
+    body.angularVelocity = random(baseSphereAngularVelocity);
+    body.restitution = 1;
     spheres.add(sphere);
-    world.addToOneWayGroup(sphere, "to");
+    world.addToAllGroup(sphere);
   }
+  return spheres;
 }
 
 function clearScreen(config: Config): void {
   const { ctx } = config;
-  ctx.fillStyle = "#0000000f";
+  ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, innerWidth, innerHeight);
 }
 
-function generateNewPoints(config: Config, current: Current): void {
-  const { pointGenerationPerSecond } = config;
-  const { dt, points, world } = current;
-
-  current.timeElapsedSinceLastPointGeneration += dt;
-  const pointsToGenerateFloat =
-    current.timeElapsedSinceLastPointGeneration * pointGenerationPerSecond;
-  const pointsToGenerate = Math.floor(pointsToGenerateFloat);
-
-  current.timeElapsedSinceLastPointGeneration =
-    (pointsToGenerateFloat - pointsToGenerate) / pointGenerationPerSecond;
-
-  for (let i = 0; i < pointsToGenerate; i++) {
-    const point = Physics.create.point({
-      x: 0,
-      // https://www.desmos.com/calculator/a9gd372lfw
-      y: Math.abs(((current.time * 0.001 + 0.25) % 2) - 1) * innerHeight,
-    });
-    world.addToOneWayGroup(point, "from");
-    points.add(point);
-  }
-}
-
-const prevPositionMap: Map<Physics.Entity, Vec2> = new Map();
 function drawWorld(config: Config, current: Current): void {
   const { world } = current;
   const { ctx } = config;
@@ -130,47 +134,20 @@ function drawWorld(config: Config, current: Current): void {
   ctx.lineWidth = 2;
   ctx.lineCap = "square";
   for (const entity of world.entities) {
-    if (entity.type === "point") {
-      const { position } = entity;
-      let prevPosition = prevPositionMap.get(entity);
-      if (!prevPosition) {
-        prevPosition = Physics.vec2.clone(position);
-        prevPositionMap.set(entity, prevPosition);
-      }
-      ctx.moveTo(prevPosition.x, prevPosition.y);
-      ctx.lineTo(position.x, position.y);
-      prevPosition.x = position.x;
-      prevPosition.y = position.y;
+    if (entity.type === "sphere") {
+      const {
+        radius,
+        body: { position, rotation },
+      } = entity;
+      ctx.moveTo(position.x, position.y);
+      ctx.arc(
+        position.x,
+        position.y,
+        radius,
+        rotation,
+        rotation + Math.PI * 1.8
+      );
     }
   }
   ctx.stroke();
-
-  if (config.debugDrawSpheres) {
-    ctx.fillStyle = "#333";
-    ctx.beginPath();
-    for (const entity of world.entities) {
-      if (entity.type === "sphere") {
-        const { position, radius } = entity;
-        ctx.moveTo(position.x + radius, position.y);
-        ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
-      }
-    }
-    ctx.fill();
-  }
-}
-
-function killPointsOffscreen(current: Current): void {
-  const { points, world } = current;
-  for (const point of points) {
-    const { position } = point;
-    if (
-      position.x < 0 ||
-      position.x > innerWidth ||
-      position.y < 0 ||
-      position.y > innerHeight
-    ) {
-      points.delete(point);
-      world.delete(point);
-    }
-  }
 }

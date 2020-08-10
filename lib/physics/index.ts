@@ -1,31 +1,49 @@
 import * as _vec2 from "./vec2";
 export const vec2 = _vec2;
 
-interface BaseEntity {
+/**
+ * Every entity in the physics system shares these values.
+ */
+interface Body {
   position: Vec2<number>;
   prevPosition: Vec2<number>;
+  /** The current rotation in radians. */
+  rotation: Scalar;
   velocity: Vec2<number>;
-  // A generational id for this entity, used for optimizations.
-  id: Integer;
-  // Set fixed to true to stop gravity from affecting this object.
-  fixed: boolean;
+  /** The friction on the position, where 1 means none, and 0 means full. */
   friction: Scalar;
+  /** The velocity of rotation, in radians */
+  angularVelocity: Scalar;
+  /** The friction on the angular velocity, where 1 means none, and 0 means full. */
+  angularFriction: Scalar;
+  /** A generational id for this entity, used for optimizations. */
+  id: Integer;
+  /** Set this to true to stop gravity from affecting this object. */
+  fixedPosition: boolean;
+  /** Set this to true to stop the entity from rotating */
+  fixedRotation: boolean;
+  /** This values is how much bounce an object has, where 1 is full bounce, and 0 is none. */
+  restitution: Scalar;
+  mass: Scalar;
 }
 
-export interface Point extends BaseEntity {
+export interface Point {
   type: "point";
+  body: Body;
 }
 
-export interface Sphere extends BaseEntity {
+export interface Sphere {
   type: "sphere";
   radius: number;
   radiusSq: number;
+  body: Body;
 }
 
-export interface Box extends BaseEntity {
+export interface Box {
   type: "box";
   width: number;
   height: number;
+  body: Body;
 }
 
 export interface Bounds {
@@ -64,7 +82,7 @@ export class World {
    * anything else.
    */
   addNonInteracting(entity: Entity): void {
-    entity.id = this.entityGeneration++;
+    entity.body.id = this.entityGeneration++;
     this.entities.add(entity);
   }
 
@@ -129,9 +147,9 @@ export class World {
         }
         // Compute an intersection index based on both entities' generational ids.
         const intersectionIndex =
-          a.id < b.id
-            ? a.id * entityGeneration + b.id
-            : b.id * entityGeneration + a.id;
+          a.body.id < b.body.id
+            ? a.body.id * entityGeneration + b.body.id
+            : b.body.id * entityGeneration + a.body.id;
 
         if (intersectionFoundAtTick[intersectionIndex] === tick) {
           // This match was already found, don't double report.
@@ -159,17 +177,24 @@ export class World {
 
   handlePhysicsStep(entity: Entity, tickScale: number): void {
     const { gravity } = this;
-    const { velocity, position, prevPosition, fixed } = entity;
+    const {
+      velocity,
+      position,
+      prevPosition,
+      angularVelocity,
+      fixedPosition,
+    } = entity.body;
     prevPosition.x = position.x;
     prevPosition.y = position.y;
     // Apply gravity
-    if (!fixed) {
+    if (!fixedPosition) {
       velocity.x += gravity.x * tickScale;
       velocity.y += gravity.y * tickScale;
     }
     // Conservation of motion.
     position.x += velocity.x * tickScale;
     position.y += velocity.y * tickScale;
+    entity.body.rotation += angularVelocity * tickScale;
   }
 
   handleCollisionStep(entity: Entity, collisionGroup: Set<Entity>): void {
@@ -183,6 +208,20 @@ export class World {
           return;
         }
         const handleCollision = collide.point[
+          intersectingEntity.type
+        ] as CollidesFunction;
+        handleCollision(entity, intersectingEntity);
+        break;
+      }
+      case "sphere": {
+        const intersectingEntity = findSingleIntersection(
+          entity,
+          collisionGroup
+        );
+        if (!intersectingEntity) {
+          return;
+        }
+        const handleCollision = collide.sphere[
           intersectingEntity.type
         ] as CollidesFunction;
         handleCollision(entity, intersectingEntity);
@@ -248,30 +287,37 @@ export function findSingleIntersection(
   return null;
 }
 
+function createBody(position?: Vec2, velocity?: Vec2): Body {
+  return {
+    position: position || vec2.create(),
+    prevPosition: position ? vec2.clone(position) : vec2.create(),
+    rotation: 0,
+    velocity: velocity || vec2.create(),
+    angularVelocity: 0,
+    id: 0,
+    fixedPosition: false,
+    fixedRotation: false,
+    friction: 1,
+    angularFriction: 1,
+    restitution: 0.5,
+    mass: 1,
+  };
+}
+
 export const create = {
   point(position?: Vec2, velocity?: Vec2): Point {
     return {
       type: "point",
-      position: position || vec2.create(),
-      prevPosition: position ? vec2.clone(position) : vec2.create(),
-      velocity: velocity || vec2.create(),
-      id: 0,
-      fixed: false,
-      friction: 1,
+      body: createBody(position, velocity),
     };
   },
   sphere(position?: Vec2, radius?: number, velocity?: Vec2): Sphere {
     const r = radius || 1;
     return {
       type: "sphere",
-      position: position || vec2.create(),
-      prevPosition: position ? vec2.clone(position) : vec2.create(),
-      velocity: velocity || vec2.create(),
       radius: r,
       radiusSq: r * r,
-      fixed: false,
-      id: 0,
-      friction: 1,
+      body: createBody(position, velocity),
     };
   },
   box(
@@ -282,14 +328,9 @@ export const create = {
   ): Box {
     return {
       type: "box",
-      position,
       width,
       height,
-      prevPosition: vec2.clone(position),
-      velocity,
-      fixed: false,
-      id: 0,
-      friction: 1,
+      body: createBody(position, velocity),
     };
   },
   world(options?: Partial<World>): World {
@@ -312,7 +353,9 @@ export function updatePoints(
 ): void {
   const { gravity } = world;
   for (const tickScale of integrate(world, dt)) {
-    for (const { position, velocity } of points) {
+    for (const {
+      body: { position, velocity },
+    } of points) {
       velocity.x += gravity.x * tickScale;
       velocity.y += gravity.y * tickScale;
       // Conservation of motion.
@@ -388,8 +431,8 @@ function sphereIntersectsPoint(sphere: Sphere, point: Point): boolean {
 }
 
 function sphereIntersectsSphere(a: Sphere, b: Sphere): boolean {
-  const dx = a.position.x - b.position.x;
-  const dy = a.position.y - b.position.y;
+  const dx = a.body.position.x - b.body.position.x;
+  const dy = a.body.position.y - b.body.position.y;
   const distSq = dx * dx + dy * dy;
   const radii = a.radius + b.radius;
   return distSq < radii * radii;
@@ -399,8 +442,8 @@ function sphereIntersectsSphere(a: Sphere, b: Sphere): boolean {
 
 function boxIntersectsBox(a: Box, b: Box): boolean {
   return (
-    Math.abs(a.position.x - b.position.x) * 2 < a.width + b.width &&
-    Math.abs(a.position.y - b.position.y) * 2 < a.height + b.height
+    Math.abs(a.body.position.x - b.body.position.x) * 2 < a.width + b.width &&
+    Math.abs(a.body.position.y - b.body.position.y) * 2 < a.height + b.height
   );
 }
 
@@ -410,25 +453,27 @@ function boxIntersectsPoint(box: Box, point: Point): boolean {
 
 function boxIntersectsSphere(box: Box, sphere: Sphere): boolean {
   let d = 0;
+  const boxPosition = box.body.position;
+  const spherePosition = sphere.body.position;
   const halfW = box.width / 2;
   const halfH = box.height / 2;
-  const left = box.position.x - halfW;
-  const right = box.position.x + halfW;
-  const bottom = box.position.y - halfH;
-  const top = box.position.y + halfH;
+  const left = boxPosition.x - halfW;
+  const right = boxPosition.x + halfW;
+  const bottom = boxPosition.y - halfH;
+  const top = boxPosition.y + halfH;
 
-  if (sphere.position.x < left) {
-    const s = sphere.position.x - left;
+  if (spherePosition.x < left) {
+    const s = spherePosition.x - left;
     d += s * s;
-  } else if (sphere.position.x > right) {
-    const s = sphere.position.x - right;
+  } else if (spherePosition.x > right) {
+    const s = spherePosition.x - right;
     d += s * s;
   }
-  if (sphere.position.y < bottom) {
-    const s = sphere.position.y - bottom;
+  if (spherePosition.y < bottom) {
+    const s = spherePosition.y - bottom;
     d += s * s;
-  } else if (sphere.position.y > top) {
-    const s = sphere.position.y - top;
+  } else if (spherePosition.y > top) {
+    const s = spherePosition.y - top;
     d += s * s;
   }
 
@@ -438,7 +483,7 @@ function boxIntersectsSphere(box: Box, sphere: Sphere): boolean {
 /** Point **/
 
 function pointIntersectsBox(point: Point, box: Box): boolean {
-  return vecIntersectsBox(point.position, box);
+  return vecIntersectsBox(point.body.position, box);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -448,12 +493,14 @@ function pointIntersectsPoint(a: Point, b: Point): boolean {
 }
 
 function pointIntersectsSphere(point: Point, sphere: Sphere): boolean {
-  return vecIntersectsSphere(point.position, sphere);
+  return vecIntersectsSphere(point.body.position, sphere);
 }
 
 function vecIntersectsBox(v: Vec2, box: Box): boolean {
   const {
-    position: { x, y },
+    body: {
+      position: { x, y },
+    },
     width,
     height,
   } = box;
@@ -467,8 +514,8 @@ function vecIntersectsBox(v: Vec2, box: Box): boolean {
 }
 
 function vecIntersectsSphere(position: Vec2, sphere: Sphere): boolean {
-  const dx = position.x - sphere.position.x;
-  const dy = position.y - sphere.position.y;
+  const dx = position.x - sphere.body.position.x;
+  const dy = position.y - sphere.body.position.y;
   return dx * dx + dy * dy <= sphere.radiusSq;
 }
 
@@ -495,20 +542,27 @@ export const intersect = {
 
 type CollidesFunction = (entityA: Entity, entityB: Entity) => void;
 
-const pointCollidesSphereCache = {
+/**
+ * These vectors can be used only in collision functions, and are used
+ * to cache some short lived values to avoid any GC.
+ */
+const collisionCache = {
   intersection: vec2.create(),
   intersection2: vec2.create(),
   inRay: vec2.create(),
   inRay2: vec2.create(),
   outRay: vec2.create(),
   sphereSurfaceNormal: vec2.create(),
+  normalA: vec2.create(),
+  collisionNormal: vec2.create(),
+  offsetAmount: vec2.create(),
 };
 
 // TODO - Optimize the instructions here. See if vector reflection can be used
 // to remove the distance calculations with expensive sqrt operations.
 function pointCollidesSphere(point: Point, sphere: Sphere): void {
-  const { inRay, inRay2 } = pointCollidesSphereCache;
-  const { position, prevPosition, velocity } = point;
+  const { inRay, inRay2 } = collisionCache;
+  const { position, prevPosition, velocity } = point.body;
   // Assign to the caches so there is no dynamic allocation.
   inRay.x = position.x - prevPosition.x;
   inRay.y = position.y - prevPosition.y;
@@ -518,10 +572,10 @@ function pointCollidesSphere(point: Point, sphere: Sphere): void {
     prevPosition,
     inRay,
     sphere,
-    pointCollidesSphereCache.intersection
+    collisionCache.intersection
   );
 
-  const friction = Math.min(point.friction, sphere.friction);
+  const friction = Math.min(point.body.friction, sphere.body.friction);
   velocity.x *= friction;
   velocity.y *= friction;
 
@@ -534,7 +588,7 @@ function pointCollidesSphere(point: Point, sphere: Sphere): void {
       prevPosition,
       inRay2,
       sphere,
-      pointCollidesSphereCache.intersection2
+      collisionCache.intersection2
     );
     if (intersection2.t > intersection.t) {
       // This point is already mostly through the sphere. Use the other intersection
@@ -549,19 +603,19 @@ function pointCollidesSphere(point: Point, sphere: Sphere): void {
   const sphereSurfaceNormal = vec2.normalize(
     vec2.subtract(
       intersection,
-      sphere.position,
-      pointCollidesSphereCache.sphereSurfaceNormal
+      sphere.body.position,
+      collisionCache.sphereSurfaceNormal
     )
   );
 
   const outRay = vec2.reflect(
     inRay,
     sphereSurfaceNormal,
-    pointCollidesSphereCache.outRay
+    collisionCache.outRay
   );
 
   // Reflect the velocity vector so it follows its new path.
-  vec2.reflect(point.velocity, sphereSurfaceNormal);
+  vec2.reflect(point.body.velocity, sphereSurfaceNormal);
 
   // Adjust the point to its new position.
   if (intersection.t < 0) {
@@ -578,30 +632,62 @@ function pointCollidesSphere(point: Point, sphere: Sphere): void {
   }
 }
 
-function sphereCollidesBox(sphere: Sphere, box: Box): void {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function sphereCollidesBox(sphere: Sphere, box: Box): void {
+  throw new Error("TODO");
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function sphereCollidesPoint(sphere: Sphere, point: Point): void {
   throw new Error("TODO");
 }
 
+/**
+ * TODO - This gets called twice, once for each sphere, it would be better
+ * to figure out a solution where it only gets called once.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function sphereCollidesSphere(a: Sphere, b: Sphere): void {
-  throw new Error("TODO");
+  const distanceBetweenCenters = vec2.distance(
+    a.body.position,
+    b.body.position
+  );
+  const overlap = a.radius + b.radius - distanceBetweenCenters;
+
+  const { collisionNormal } = collisionCache;
+
+  // Compute the sphere surface normals.
+  vec2.subtract(b.body.position, a.body.position, collisionNormal);
+  vec2.normalize(collisionNormal);
+
+  updateCollisionVelocity(a.body, b.body, collisionNormal);
+  updateOverlap(a.body, b.body, collisionNormal, overlap);
 }
 
-function pointCollidesBox(point: Point, box: Box): void {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function pointCollidesBox(point: Point, box: Box): void {
+  throw new Error("TODO");
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function pointCollidesPoint(a: Point, b: Point): void {
   throw new Error("This collision type does not happen.");
 }
 
-function boxCollidesBox(a: Box, b: Box): void {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function boxCollidesBox(a: Box, b: Box): void {
+  throw new Error("TODO");
+}
 
-function boxCollidesPoint(box: Box, point: Point): void {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function boxCollidesPoint(box: Box, point: Point): void {
+  throw new Error("TODO");
+}
 
-function boxCollidesSphere(box: Box, sphere: Sphere): void {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function boxCollidesSphere(box: Box, sphere: Sphere): void {
+  throw new Error("TODO");
+}
 
 export const collide = {
   box: {
@@ -628,8 +714,8 @@ export function intersectRaySphere(
   output: Vec2 & { t?: number } = vec2.create()
 ): Vec2 & { t: number } {
   const pointToSphere: Vec2 = {
-    x: position.x - sphere.position.x,
-    y: position.y - sphere.position.y,
+    x: position.x - sphere.body.position.x,
+    y: position.y - sphere.body.position.y,
   };
   const b: number = vec2.dot(pointToSphere, ray);
   const c: number = vec2.dot(pointToSphere, pointToSphere) - sphere.radiusSq;
@@ -659,3 +745,130 @@ export function intersectRaySphere(
   output.t = t;
   return output as Vec2 & { t: number };
 }
+
+/**
+ * Terms:
+ * 𝝉 - Tau, torque (similar to force)
+ * I - moment of inertia (similar to mass)
+ * ⍺ - alpha, angular acceleration
+ * r - The ray from the center of mass to the place where the force is being applied.
+ *
+ * Formula: 𝝉 = I⍺
+ *
+ * Torque can be computed as the cross product of r and f:
+ * 𝝉 = r x f
+ *
+ * In 2d this simplifies to:
+ * 𝝉 = rx * fy - ry * fx;
+ */
+function updateAngularVelocity(
+  body: Body,
+  momentOfInertia: Scalar,
+  pointOfForce: Vec2,
+  force: Vec2
+): void {
+  const rx = pointOfForce.x - body.position.x;
+  const ry = pointOfForce.y - body.position.y;
+  const torque = rx * force.y - ry * force.x;
+  const angularAcceleration = momentOfInertia / torque;
+  body.angularVelocity += angularAcceleration;
+}
+
+/**
+ * Compute the impulsive collision response.
+ *
+ * p := Linear momentum
+ * p̂ := Δp, impulse, an infinitesimal collision force.
+ * p̂ˢ:= The scalar value of the impulse, projected onto the normal
+ * n := collision surface normal of body A.
+ * m := mass
+ * v := velocity
+ * ε := Co-efficient of restitution - Scalar value representing the loss of energy in
+ *      the collision, based on the relative velocities.
+ *      ε = 1; perfectly elastic, no energy lost.
+ *      ε = 0; perfectly in-elastic, both objects continue in the same direction.
+ *
+ * Given:
+ *
+ * 1: p = mv
+ * 2: p̂ = p̂ˢn
+ * 3: (v'₂ - v'₁) = ε(v₂ - v₁)
+ * 4: p'₁ = p₁ + p̂;
+ *    p'₂ = p₂ + p̂;
+ *
+ * Solve equation 4 in terms of the next velocity, which is what we are interested
+ * in computing. At this point, we have formulae for all the terms except p̂ˢ.
+ *
+ * 5: m₁v'₁ = m₁v₁ + p̂;          m₂v'₂ = m₂v₂ + p̂;
+ * 6:   v'₁ =   v₁ + (p̂ˢ/m₁)n;    v'₂  =   v₂ + (p̂ˢ/m₂)n;
+ *
+ * Now substitute in equations 6 into equation 3, and solve for p̂ˢ. This formula has
+ * all the terms we need to compute impulse.
+ *
+ * 7: p̂ˢ = (ε + 1)(v₂•n - v₁•n)
+ *         --------------------
+ *            (1/m₁ + 1/m₂)
+ *
+ * TODO - Research how to apply angular forces as well.
+ * https://www.chrishecker.com/images/e/e7/Gdmphys3.pdf
+ */
+function updateCollisionVelocity(a: Body, b: Body, normal: Vec2): void {
+  const collisionVelocity = vec2.subtract(b.velocity, a.velocity, _ucv1);
+  const collisionVelocityMagnitude = vec2.dot(collisionVelocity, normal);
+
+  if (collisionVelocityMagnitude > 0) {
+    // The objects are moving away from each other.
+    return;
+  }
+  const aInvMass = 1 / a.mass;
+  const bInvMass = 1 / b.mass;
+
+  const restitution = Math.min(b.restitution, a.restitution);
+
+  // Apply formula 7.
+  // p̂ˢ = (ε + 1)(v₂•n - v₁•n)
+  //      --------------------
+  //         (1/m₁ + 1/m₂)
+  const impulseScalar =
+    // prettier-ignore
+    (
+      (restitution + 1) *
+      (vec2.dot(b.velocity, normal) - vec2.dot(a.velocity, normal))
+    )
+    / (aInvMass + bInvMass);
+
+  // Apply formula 2.
+  // p̂ = p̂ˢn
+  const impulse = vec2.multiplyScalar(normal, impulseScalar, _ucv2);
+
+  // Apply formula 6.
+  // v'₁ = v₁ + (p̂/m₁)n
+  vec2.add(
+    a.velocity,
+    vec2.multiplyScalar(impulse, aInvMass, _ucv3),
+    a.velocity
+  );
+
+  // Apply formula 6.
+  // v'₂ = v₂ + (p̂/m₂)n
+  vec2.subtract(
+    b.velocity,
+    vec2.multiplyScalar(impulse, bInvMass, _ucv4),
+    b.velocity
+  );
+}
+// Temporary vecs, pre-allocated.
+const _ucv1 = vec2.create();
+const _ucv2 = vec2.create();
+const _ucv3 = vec2.create();
+const _ucv4 = vec2.create();
+
+function updateOverlap(a: Body, b: Body, normal: Vec2, overlap: Scalar): void {
+  const ratio = b.mass / (a.mass + b.mass);
+  const aOverlap = overlap * ratio;
+  const bOverlap = overlap * (1 - ratio);
+  // Adjust the overlap based on a ratio of each mass.
+  vec2.add(a.position, vec2.multiplyScalar(normal, aOverlap, _uo), a.position);
+  vec2.add(b.position, vec2.multiplyScalar(normal, bOverlap, _uo), b.position);
+}
+const _uo = vec2.create();

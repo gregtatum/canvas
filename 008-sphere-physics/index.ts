@@ -85,8 +85,8 @@ function addSpheres(config: Config, world: Physics.World): void {
       sphere = Physics.create.sphere(position, radius);
       intersection = Physics.findSingleIntersection(sphere, spheres);
     } while (intersection);
-    sphere.fixed = true;
-    sphere.friction = 0.9;
+    sphere.body.fixedPosition = true;
+    sphere.body.friction = 0.9;
     spheres.add(sphere);
     world.addToOneWayGroup(sphere, "to");
   }
@@ -130,7 +130,7 @@ function drawWorld(config: Config, current: Current): void {
   ctx.lineCap = "round";
   for (const entity of world.entities) {
     if (entity.type === "point") {
-      const { position } = entity;
+      const { position } = entity.body;
       let prevPosition = prevPositionMap.get(entity);
       if (!prevPosition) {
         prevPosition = Physics.vec2.clone(position);
@@ -149,7 +149,10 @@ function drawWorld(config: Config, current: Current): void {
     ctx.beginPath();
     for (const entity of world.entities) {
       if (entity.type === "sphere") {
-        const { position, radius } = entity;
+        const {
+          body: { position },
+          radius,
+        } = entity;
         ctx.moveTo(position.x + radius, position.y);
         ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
       }
@@ -161,7 +164,7 @@ function drawWorld(config: Config, current: Current): void {
 function killPointsOffscreen(current: Current): void {
   const { points, world } = current;
   for (const point of points) {
-    const { position } = point;
+    const { position } = point.body;
     if (
       position.x < 0 ||
       position.x > innerWidth ||

@@ -167,7 +167,9 @@ describe("intersect", () => {
       }
       const results = [];
       for (const [a, b] of world.gcHeavyCheckAllIntersections()) {
-        results.push(`${a.type}(id:${a.id}) intersects ${b.type}(id:${b.id})`);
+        results.push(
+          `${a.type}(id:${a.body.id}) intersects ${b.type}(id:${b.body.id})`
+        );
       }
       return results;
     }
@@ -232,7 +234,7 @@ describe("intersectRaySphere", () => {
       y: -1,
     });
     const intersection = Physics.intersectRaySphere(
-      point.position,
+      point.body.position,
       ray,
       sphere
     );
@@ -267,7 +269,7 @@ describe("intersectRaySphere", () => {
       y: -0.25,
     });
     const intersection = Physics.intersectRaySphere(
-      point.position,
+      point.body.position,
       ray,
       sphere
     );
@@ -302,7 +304,7 @@ describe("intersectRaySphere", () => {
       y: -1,
     });
     const intersection = Physics.intersectRaySphere(
-      point.position,
+      point.body.position,
       ray,
       sphere
     );
@@ -357,7 +359,7 @@ describe("intersectRaySphere", () => {
     `);
 
     expect(() => {
-      Physics.intersectRaySphere(point.position, ray, sphere);
+      Physics.intersectRaySphere(point.body.position, ray, sphere);
     }).toThrow();
   });
 });
@@ -382,8 +384,8 @@ class Stage {
     const point = Physics.create.point({ x: 0, y: 0 });
     for (let i = 0; i < this.size; i++) {
       for (let j = 0; j < this.size; j++) {
-        point.position.x = i - this.size / 2;
-        point.position.y = j - this.size / 2;
+        point.body.position.x = i - this.size / 2;
+        point.body.position.y = j - this.size / 2;
         if (Physics.intersect.sphere.point(sphere, point)) {
           this.data[j][i] = ` ${character} `;
         }
@@ -395,8 +397,8 @@ class Stage {
     const point = Physics.create.point({ x: 0, y: 0 });
     for (let i = 0; i < this.size; i++) {
       for (let j = 0; j < this.size; j++) {
-        point.position.x = i - this.size / 2;
-        point.position.y = j - this.size / 2;
+        point.body.position.x = i - this.size / 2;
+        point.body.position.y = j - this.size / 2;
         if (Physics.intersect.box.point(box, point)) {
           this.data[j][i] = ` ${character} `;
         }
@@ -405,8 +407,8 @@ class Stage {
   }
 
   drawPoint(character: string, point: Physics.Point): void {
-    const x = Math.round(point.position.x + this.size / 2);
-    const y = Math.round(point.position.y + this.size / 2);
+    const x = Math.round(point.body.position.x + this.size / 2);
+    const y = Math.round(point.body.position.y + this.size / 2);
     if (x < 0 || x >= this.size || y < 0 || y >= this.size) {
       console.error(this.output(), point);
       throw new Error(
@@ -436,13 +438,13 @@ describe("collisions between point and sphere", function() {
     const point = Physics.create.point({ x: 5, y: 5 });
     const sphere = Physics.create.sphere({ x: 0, y: 0 }, 4);
 
-    point.velocity.x = -1;
-    point.velocity.y = -1;
+    point.body.velocity.x = -1;
+    point.body.velocity.y = -1;
 
     function draw(): string[] {
       stage.clear();
       stage.drawSphere(".", sphere);
-      stage.drawPoint(getArrow(point.velocity), point);
+      stage.drawPoint(getArrow(point.body.velocity), point);
       return stage.output();
     }
 
@@ -550,13 +552,13 @@ describe("collisions between point and sphere", function() {
     const point = Physics.create.point({ x: 5, y: 5 });
     const sphere = Physics.create.sphere({ x: 0, y: -3 }, 4);
 
-    point.velocity.x = -1;
-    point.velocity.y = -1;
+    point.body.velocity.x = -1;
+    point.body.velocity.y = -1;
 
     function draw(): string[] {
       stage.clear();
       stage.drawSphere(".", sphere);
-      stage.drawPoint(getArrow(point.velocity), point);
+      stage.drawPoint(getArrow(point.body.velocity), point);
       return stage.output();
     }
 
@@ -644,13 +646,13 @@ describe("collisions between point and sphere", function() {
     const point = Physics.create.point({ x: 1, y: 1 });
     const sphere = Physics.create.sphere({ x: 0, y: 0 }, 4);
 
-    point.velocity.x = -1;
-    point.velocity.y = -1;
+    point.body.velocity.x = -1;
+    point.body.velocity.y = -1;
 
     function draw(): string[] {
       stage.clear();
       stage.drawSphere(".", sphere);
-      stage.drawPoint(getArrow(point.velocity), point);
+      stage.drawPoint(getArrow(point.body.velocity), point);
       return stage.output();
     }
 
@@ -720,13 +722,13 @@ describe("collisions between point and sphere", function() {
     const point = Physics.create.point({ x: 2, y: 2 });
     const sphere = Physics.create.sphere({ x: 0, y: 0 }, 4);
 
-    point.velocity.x = 1;
-    point.velocity.y = 1;
+    point.body.velocity.x = 1;
+    point.body.velocity.y = 1;
 
     function draw(): string[] {
       stage.clear();
       stage.drawSphere(".", sphere);
-      stage.drawPoint(getArrow(point.velocity), point);
+      stage.drawPoint(getArrow(point.body.velocity), point);
       return stage.output();
     }
 
