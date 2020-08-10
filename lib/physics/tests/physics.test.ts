@@ -81,6 +81,83 @@ describe("intersect", () => {
     });
   });
 
+  describe("box to sphere", () => {
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    function setup(box: Physics.Box, sphere: Physics.Sphere) {
+      const stage = new Stage(10);
+      function draw(): string[] {
+        stage.clear();
+        stage.drawBox("X", box);
+        stage.drawSphere(".", sphere);
+        return stage.output();
+      }
+      return { draw };
+    }
+
+    it("does not intersect", function() {
+      const box = Physics.create.box({ x: -3, y: 0 }, 3, 4);
+      const sphere = Physics.create.sphere({ x: 2, y: 0 }, 2);
+      const { draw } = setup(box, sphere);
+      expect(draw()).toMatchInlineSnapshot(`
+        Array [
+          "                              ",
+          "                              ",
+          "                              ",
+          "    X  X  X           .       ",
+          "    X  X  X        .  .  .    ",
+          "    X  X  X     .  .  .  .  . ",
+          "    X  X  X        .  .  .    ",
+          "    X  X  X           .       ",
+          "                              ",
+          "                              ",
+        ]
+      `);
+      expect(Physics.intersect.box.sphere(box, sphere)).toEqual(false);
+    });
+
+    it("intersects when the sphere is over the box", function() {
+      const box = Physics.create.box({ x: -3, y: 0 }, 3, 4);
+      const sphere = Physics.create.sphere({ x: 0, y: 0 }, 2);
+      const { draw } = setup(box, sphere);
+      expect(draw()).toMatchInlineSnapshot(`
+        Array [
+          "                              ",
+          "                              ",
+          "                              ",
+          "    X  X  X     .             ",
+          "    X  X  X  .  .  .          ",
+          "    X  X  .  .  .  .  .       ",
+          "    X  X  X  .  .  .          ",
+          "    X  X  X     .             ",
+          "                              ",
+          "                              ",
+        ]
+      `);
+      expect(Physics.intersect.box.sphere(box, sphere)).toEqual(true);
+    });
+
+    it("does not intersect even when the bounding boxes do", function() {
+      const box = Physics.create.box({ x: -3, y: -2 }, 3, 4);
+      const sphere = Physics.create.sphere({ x: 0, y: 2 }, 2);
+      const { draw } = setup(box, sphere);
+      expect(draw()).toMatchInlineSnapshot(`
+        Array [
+          "                              ",
+          "    X  X  X                   ",
+          "    X  X  X                   ",
+          "    X  X  X                   ",
+          "    X  X  X                   ",
+          "    X  X  X     .             ",
+          "             .  .  .          ",
+          "          .  .  .  .  .       ",
+          "             .  .  .          ",
+          "                .             ",
+        ]
+      `);
+      expect(Physics.intersect.box.sphere(box, sphere)).toEqual(false);
+    });
+  });
+
   describe("check intersections", () => {
     // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
     function checkIntersections(entities: Array<Physics.Entity>) {
@@ -308,6 +385,19 @@ class Stage {
         point.position.x = i - this.size / 2;
         point.position.y = j - this.size / 2;
         if (Physics.intersect.sphere.point(sphere, point)) {
+          this.data[j][i] = ` ${character} `;
+        }
+      }
+    }
+  }
+
+  drawBox(character: string, box: Physics.Box): void {
+    const point = Physics.create.point({ x: 0, y: 0 });
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        point.position.x = i - this.size / 2;
+        point.position.y = j - this.size / 2;
+        if (Physics.intersect.box.point(box, point)) {
           this.data[j][i] = ` ${character} `;
         }
       }

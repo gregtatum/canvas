@@ -6,7 +6,7 @@ interface BaseEntity {
   prevPosition: Vec2<number>;
   velocity: Vec2<number>;
   // A generational id for this entity, used for optimizations.
-  id: number;
+  id: Integer;
   // Set fixed to true to stop gravity from affecting this object.
   fixed: boolean;
   friction: Scalar;
@@ -22,7 +22,20 @@ export interface Sphere extends BaseEntity {
   radiusSq: number;
 }
 
-export type Entity = Sphere | Point;
+export interface Box extends BaseEntity {
+  type: "box";
+  width: number;
+  height: number;
+}
+
+export interface Bounds {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+export type Entity = Sphere | Point | Box;
 export type IntersectionTuple = [Entity, Entity];
 type IntersectionChecker = (a: Entity, b: Entity) => boolean;
 type AllInteractionGroup = { entities: Set<Entity> };
@@ -261,6 +274,24 @@ export const create = {
       friction: 1,
     };
   },
+  box(
+    position: Vec2 = vec2.create(),
+    width = 1,
+    height = 1,
+    velocity: Vec2 = vec2.create()
+  ): Box {
+    return {
+      type: "box",
+      position,
+      width,
+      height,
+      prevPosition: vec2.clone(position),
+      velocity,
+      fixed: false,
+      id: 0,
+      friction: 1,
+    };
+  },
   world(options?: Partial<World>): World {
     const world = new World();
     if (!options) {
@@ -346,14 +377,10 @@ export class IntegrationIterator {
 
 type IntersectionHandler = (a: Entity, b: Entity) => void;
 
-function pointIntersectsSphere(point: Point, sphere: Sphere): boolean {
-  return vecIntersectsSphere(point.position, sphere);
-}
+/** Sphere */
 
-function vecIntersectsSphere(position: Vec2, sphere: Sphere): boolean {
-  const dx = position.x - sphere.position.x;
-  const dy = position.y - sphere.position.y;
-  return dx * dx + dy * dy <= sphere.radiusSq;
+function sphereIntersectsBox(sphere: Sphere, box: Box): boolean {
+  return boxIntersectsSphere(box, sphere);
 }
 
 function sphereIntersectsPoint(sphere: Sphere, point: Point): boolean {
@@ -368,21 +395,99 @@ function sphereIntersectsSphere(a: Sphere, b: Sphere): boolean {
   return distSq < radii * radii;
 }
 
+/** Box */
+
+function boxIntersectsBox(a: Box, b: Box): boolean {
+  return (
+    Math.abs(a.position.x - b.position.x) * 2 < a.width + b.width &&
+    Math.abs(a.position.y - b.position.y) * 2 < a.height + b.height
+  );
+}
+
+function boxIntersectsPoint(box: Box, point: Point): boolean {
+  return pointIntersectsBox(point, box);
+}
+
+function boxIntersectsSphere(box: Box, sphere: Sphere): boolean {
+  let d = 0;
+  const halfW = box.width / 2;
+  const halfH = box.height / 2;
+  const left = box.position.x - halfW;
+  const right = box.position.x + halfW;
+  const bottom = box.position.y - halfH;
+  const top = box.position.y + halfH;
+
+  if (sphere.position.x < left) {
+    const s = sphere.position.x - left;
+    d += s * s;
+  } else if (sphere.position.x > right) {
+    const s = sphere.position.x - right;
+    d += s * s;
+  }
+  if (sphere.position.y < bottom) {
+    const s = sphere.position.y - bottom;
+    d += s * s;
+  } else if (sphere.position.y > top) {
+    const s = sphere.position.y - top;
+    d += s * s;
+  }
+
+  return d <= sphere.radiusSq;
+}
+
+/** Point **/
+
+function pointIntersectsBox(point: Point, box: Box): boolean {
+  return vecIntersectsBox(point.position, box);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function pointIntersectsPoint(a: Point, b: Point): boolean {
   // Points have 0 radius and cannot collide together.
   return false;
 }
 
+function pointIntersectsSphere(point: Point, sphere: Sphere): boolean {
+  return vecIntersectsSphere(point.position, sphere);
+}
+
+function vecIntersectsBox(v: Vec2, box: Box): boolean {
+  const {
+    position: { x, y },
+    width,
+    height,
+  } = box;
+  const halfW = width / 2;
+  const halfH = height / 2;
+  const left = x - halfW;
+  const right = x + halfW;
+  const bottom = y - halfH;
+  const top = y + halfH;
+  return v.x >= left && v.x <= right && v.y >= bottom && v.y <= top;
+}
+
+function vecIntersectsSphere(position: Vec2, sphere: Sphere): boolean {
+  const dx = position.x - sphere.position.x;
+  const dy = position.y - sphere.position.y;
+  return dx * dx + dy * dy <= sphere.radiusSq;
+}
+
 /**
  * Wire together the intersection checks.
  */
 export const intersect = {
+  box: {
+    box: boxIntersectsBox,
+    point: boxIntersectsPoint,
+    sphere: boxIntersectsSphere,
+  },
   point: {
-    sphere: pointIntersectsSphere,
+    box: pointIntersectsBox,
     point: pointIntersectsPoint,
+    sphere: pointIntersectsSphere,
   },
   sphere: {
+    box: sphereIntersectsBox,
     point: sphereIntersectsPoint,
     sphere: sphereIntersectsSphere,
   },
@@ -473,6 +578,8 @@ function pointCollidesSphere(point: Point, sphere: Sphere): void {
   }
 }
 
+function sphereCollidesBox(sphere: Sphere, box: Box): void {}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function sphereCollidesPoint(sphere: Sphere, point: Point): void {
   throw new Error("TODO");
@@ -483,17 +590,32 @@ function sphereCollidesSphere(a: Sphere, b: Sphere): void {
   throw new Error("TODO");
 }
 
+function pointCollidesBox(point: Point, box: Box): void {}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function pointCollidesPoint(a: Point, b: Point): void {
   throw new Error("This collision type does not happen.");
 }
 
+function boxCollidesBox(a: Box, b: Box): void {}
+
+function boxCollidesPoint(box: Box, point: Point): void {}
+
+function boxCollidesSphere(box: Box, sphere: Sphere): void {}
+
 export const collide = {
+  box: {
+    box: boxCollidesBox,
+    point: boxCollidesPoint,
+    sphere: boxCollidesSphere,
+  },
   point: {
-    sphere: pointCollidesSphere,
+    box: pointCollidesBox,
     point: pointCollidesPoint,
+    sphere: pointCollidesSphere,
   },
   sphere: {
+    box: sphereCollidesBox,
     point: sphereCollidesPoint,
     sphere: sphereCollidesSphere,
   },
