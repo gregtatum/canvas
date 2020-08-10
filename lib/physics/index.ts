@@ -777,8 +777,8 @@ function updateAngularVelocity(
 /**
  * Compute the impulsive collision response.
  *
- * p := Linear momentum
- * p̂ := Δp, impulse, an infinitesimal collision force.
+ * p := Linear momentum, p = mv
+ * p̂ := Δp, impulse, a collision force over an infinitesimal time period.
  * p̂ˢ:= The scalar value of the impulse, projected onto the normal
  * n := collision surface normal of body A.
  * m := mass
@@ -799,7 +799,7 @@ function updateAngularVelocity(
  * Solve equation 4 in terms of the next velocity, which is what we are interested
  * in computing. At this point, we have formulae for all the terms except p̂ˢ.
  *
- * 5: m₁v'₁ = m₁v₁ + p̂;          m₂v'₂ = m₂v₂ + p̂;
+ * 5: m₁v'₁ = m₁v₁ + p̂;          m₂v'₂ = m₂v₂ - p̂;
  * 6:   v'₁ =   v₁ + (p̂ˢ/m₁)n;    v'₂  =   v₂ + (p̂ˢ/m₂)n;
  *
  * Now substitute in equations 6 into equation 3, and solve for p̂ˢ. This formula has
@@ -809,8 +809,12 @@ function updateAngularVelocity(
  *         --------------------
  *            (1/m₁ + 1/m₂)
  *
- * TODO - Research how to apply angular forces as well.
- * https://www.chrishecker.com/images/e/e7/Gdmphys3.pdf
+ * Documentation:
+ *  - This is the best one so far: Game Engine Architecture, 1st Edition, pg. 650
+ *  - Kind of terse and technical, doesn't necessarily show the work: https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/physicstutorials/5collisionresponse/Physics%20-%20Collision%20Response.pdf
+ *  - I'm highly skeptical this implementation is correct, but it shows lots of the work,
+ *    and explains a bunch: https://gamedevelopment.tutsplus.com/tutorials/how-to-create-a-custom-2d-physics-engine-the-basics-and-impulse-resolution--gamedev-6331
+ *  - TODO - Research how to apply angular forces as well: https://www.chrishecker.com/images/e/e7/Gdmphys3.pdf
  */
 function updateCollisionVelocity(a: Body, b: Body, normal: Vec2): void {
   const collisionVelocity = vec2.subtract(b.velocity, a.velocity, _ucv1);
@@ -849,8 +853,9 @@ function updateCollisionVelocity(a: Body, b: Body, normal: Vec2): void {
     a.velocity
   );
 
-  // Apply formula 6.
-  // v'₂ = v₂ + (p̂/m₂)n
+  // Apply formula 6. Note this is a subtract instead of add, as we're using the surface
+  // normal of object a, so subtracting flips the normal.
+  // v'₂ = v₂ - (p̂/m₂)n
   vec2.subtract(
     b.velocity,
     vec2.multiplyScalar(impulse, bInvMass, _ucv4),
@@ -868,7 +873,7 @@ function updateOverlap(a: Body, b: Body, normal: Vec2, overlap: Scalar): void {
   const aOverlap = overlap * ratio;
   const bOverlap = overlap * (1 - ratio);
   // Adjust the overlap based on a ratio of each mass.
-  vec2.add(a.position, vec2.multiplyScalar(normal, aOverlap, _uo), a.position);
+  vec2.add(a.position, vec2.multiplyScalar(normal, -aOverlap, _uo), a.position);
   vec2.add(b.position, vec2.multiplyScalar(normal, bOverlap, _uo), b.position);
 }
 const _uo = vec2.create();
