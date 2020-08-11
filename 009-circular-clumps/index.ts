@@ -60,7 +60,7 @@ function setupMouseHandlers(current: Current): void {
 
   window.addEventListener("mousemove", event => {
     current.mouseX = event.pageX;
-    current.mouseY = event.pasgeY;
+    current.mouseY = event.pageY;
   });
 }
 
