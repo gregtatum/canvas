@@ -25,7 +25,7 @@ function getConfig() {
     gravity: 3,
     sphereDistributionPower: 5,
     keepInBoundsImpulse: 2,
-    ticksPerSecond: 60,
+    ticksPerSecond: 30,
     sphereCount: 500,
     restitution: 0.7,
     /** Create spheres sized according to a ratio of the diagonal of the screen */
@@ -35,7 +35,7 @@ function getConfig() {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function getCurrent(config: Config) {
-  const world = Physics.create.world({
+  const world = new Physics.World({
     ticksPerSecond: config.ticksPerSecond,
     gravity: Physics.vec2.create(0, config.gravity),
   });
@@ -86,19 +86,19 @@ function setupMouseHandlers(current: Current): void {
     const bottom = forceY + innerHeight * (1 - margin);
     const top = forceY + innerHeight * margin;
 
-    for (const { body } of current.spheres) {
-      if (body.position.x < left) {
-        // Physics.vec2.reflect(body.velocity, Physics.vec2.create(1, 0));
-        body.velocity.x += keepInBoundsImpulse;
-      } else if (body.position.y < top) {
-        // Physics.vec2.reflect(body.velocity, Physics.vec2.create(0, 1));
-        body.velocity.y += keepInBoundsImpulse;
-      } else if (body.position.y > bottom) {
-        // Physics.vec2.reflect(body.velocity, Physics.vec2.create(0, -1));
-        body.velocity.y -= keepInBoundsImpulse;
-      } else if (body.position.x > right) {
-        // Physics.vec2.reflect(body.velocity, Physics.vec2.create(-1, 0));
-        body.velocity.x -= keepInBoundsImpulse;
+    for (const { position, velocity } of current.spheres) {
+      if (position.x < left) {
+        // Physics.vec2.reflect(velocity, Physics.vec2.create(1, 0));
+        velocity.x += keepInBoundsImpulse;
+      } else if (position.y < top) {
+        // Physics.vec2.reflect(velocity, Physics.vec2.create(0, 1));
+        velocity.y += keepInBoundsImpulse;
+      } else if (position.y > bottom) {
+        // Physics.vec2.reflect(velocity, Physics.vec2.create(0, -1));
+        velocity.y -= keepInBoundsImpulse;
+      } else if (position.x > right) {
+        // Physics.vec2.reflect(velocity, Physics.vec2.create(-1, 0));
+        velocity.x -= keepInBoundsImpulse;
       }
     }
 
@@ -138,17 +138,16 @@ function createSpheres(
 
       const radius =
         Math.pow(random(), sphereDistributionPower) * (max - min) + min;
-      sphere = Physics.create.sphere(position, radius);
-      sphere.body.mass = Math.PI * radius * radius;
+      sphere = new Physics.Sphere(position, radius);
+      sphere.setMass(Math.PI * radius * radius);
       intersection = Physics.findSingleIntersection(sphere, spheres);
     } while (intersection);
-    const { body } = sphere;
 
-    body.velocity.x = random(-baseSphereSpeed, baseSphereSpeed);
-    body.velocity.y = random(-baseSphereSpeed, baseSphereSpeed);
-    body.rotation = random(-Math.PI, Math.PI);
-    body.angularVelocity = random(baseSphereAngularVelocity);
-    body.restitution = restitution;
+    sphere.velocity.x = random(-baseSphereSpeed, baseSphereSpeed);
+    sphere.velocity.y = random(-baseSphereSpeed, baseSphereSpeed);
+    sphere.rotation = random(-Math.PI, Math.PI);
+    // sphere.angularVelocity = random(baseSphereAngularVelocity);
+    sphere.restitution = restitution;
     spheres.add(sphere);
     world.addToAllGroup(sphere);
   }
@@ -170,10 +169,7 @@ function drawWorld(config: Config, current: Current): void {
   ctx.lineCap = "square";
   for (const entity of world.entities) {
     if (entity.type === "sphere") {
-      const {
-        radius,
-        body: { position, rotation },
-      } = entity;
+      const { radius, position, rotation } = entity;
       ctx.moveTo(position.x, position.y);
       ctx.arc(
         position.x,

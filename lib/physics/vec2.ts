@@ -88,3 +88,29 @@ export function reflect(
   vectorOut.y = vectorIn.y - 2 * d * normal.y;
   return vectorOut;
 }
+
+/**
+ * Return a vector that is perpendicular clockwise to the vectorIn.
+ */
+export function perpendicularCW(
+  vectorIn: Vec2,
+  vectorOut: Vec2 = vectorIn
+): Vec2 {
+  const { x, y } = vectorIn;
+  vectorOut.x = y;
+  vectorOut.y = -x;
+  return vectorOut;
+}
+
+/**
+ * Return a vector that is perpendicular counter clockwise to the vectorIn.
+ */
+export function perpendicularCCW(
+  vectorIn: Vec2,
+  vectorOut: Vec2 = vectorIn
+): Vec2 {
+  const { x, y } = vectorIn;
+  vectorOut.x = -y;
+  vectorOut.y = x;
+  return vectorOut;
+}

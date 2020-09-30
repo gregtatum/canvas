@@ -30,7 +30,7 @@ function getConfig() {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function getCurrent(config: Config) {
-  const world = Physics.create.world({
+  const world = new Physics.World({
     gravity: config.gravity,
     ticksPerSecond: config.ticksPerSecond,
   });
@@ -82,11 +82,11 @@ function addSpheres(config: Config, world: Physics.World): void {
       };
       const radius =
         random(sphereSize[0], sphereSize[1]) * lerp(0.3, 1, xFactor);
-      sphere = Physics.create.sphere(position, radius);
+      sphere = new Physics.Sphere(position, radius);
       intersection = Physics.findSingleIntersection(sphere, spheres);
     } while (intersection);
-    sphere.body.fixedPosition = true;
-    sphere.body.friction = 0.9;
+    sphere.fixedPosition = true;
+    sphere.friction = 0.9;
     spheres.add(sphere);
     world.addToOneWayGroup(sphere, "to");
   }
@@ -111,7 +111,7 @@ function generateNewPoints(config: Config, current: Current): void {
     (pointsToGenerateFloat - pointsToGenerate) / pointGenerationPerSecond;
 
   for (let i = 0; i < pointsToGenerate; i++) {
-    const point = Physics.create.point({
+    const point = new Physics.Point({
       x: 0,
       y: random(innerHeight),
     });
@@ -130,7 +130,7 @@ function drawWorld(config: Config, current: Current): void {
   ctx.lineCap = "round";
   for (const entity of world.entities) {
     if (entity.type === "point") {
-      const { position } = entity.body;
+      const { position } = entity;
       let prevPosition = prevPositionMap.get(entity);
       if (!prevPosition) {
         prevPosition = Physics.vec2.clone(position);
@@ -149,10 +149,7 @@ function drawWorld(config: Config, current: Current): void {
     ctx.beginPath();
     for (const entity of world.entities) {
       if (entity.type === "sphere") {
-        const {
-          body: { position },
-          radius,
-        } = entity;
+        const { position, radius } = entity;
         ctx.moveTo(position.x + radius, position.y);
         ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
       }
@@ -164,7 +161,7 @@ function drawWorld(config: Config, current: Current): void {
 function killPointsOffscreen(current: Current): void {
   const { points, world } = current;
   for (const point of points) {
-    const { position } = point.body;
+    const { position } = point;
     if (
       position.x < 0 ||
       position.x > innerWidth ||
