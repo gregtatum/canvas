@@ -18,7 +18,16 @@ const {
 
 const url = "https://gregtatum.com/category/interactive/";
 
+run();
+
 async function run() {
+  if (!process.argv[2]) {
+    console.log("Usage:");
+    console.log("Re-build everything: yarn build main");
+    console.log("Re-build a single session: yarn build 001-tick-tock");
+    process.exit(0);
+  }
+
   // Run the build script.
   const sessions = getAllSessions();
   const sessionPath = findSessionFromCli();
@@ -50,8 +59,6 @@ async function run() {
   }
   updateReadme(sessions);
 }
-
-run();
 
 function buildGregTatumDotCom(sessionSlug) {
   const cwd = path.join(__dirname, "../../greg");

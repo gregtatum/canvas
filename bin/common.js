@@ -3,7 +3,7 @@ const fs = require("fs");
 
 function findSessionFromCli() {
   const session = process.argv[2];
-  if (!session) {
+  if (!session || session === "all") {
     return null;
   }
   // Don't trust this path too much.
@@ -20,6 +20,8 @@ function findSessionFromCli() {
   console.error(`Could not find the session "${session}".`);
   console.error(`Looked in: ${pathToSession}`);
   process.exit();
+
+  // Needed for eslint
   return null;
 }
 
