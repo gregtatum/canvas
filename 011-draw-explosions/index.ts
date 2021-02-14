@@ -96,6 +96,7 @@ function getCurrent(config: Config) {
     }),
     color: "",
     curveDrawing,
+    nothingDrawnYet: true,
   };
 
   return current;
@@ -103,8 +104,12 @@ function getCurrent(config: Config) {
 
 function drawIntroText(config: Config, current: Current): void {
   const { ctx } = config;
-  const { entities, curveDrawing } = current;
-  if (entities.size === 0 && curveDrawing.points.length === 0) {
+  const { curveDrawing } = current;
+
+  if (curveDrawing.points.length > 0) {
+    current.nothingDrawnYet = false;
+  }
+  if (current.nothingDrawnYet) {
     current.textFadeIn += config.textFadeInSpeed;
     current.textFadeIn = Math.min(1, current.textFadeIn);
   } else {
