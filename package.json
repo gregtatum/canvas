@@ -19,8 +19,13 @@
     "trailingComma": "es5"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "ts"],
-    "moduleDirectories": ["node_modules"]
+    "moduleFileExtensions": [
+      "js",
+      "ts"
+    ],
+    "moduleDirectories": [
+      "node_modules"
+    ]
   },
   "dependencies": {
     "@tatumcreative/color": "^1.2.2",
@@ -31,6 +36,7 @@
     "rbush": "^1.4.2",
     "rtree": "^1.4.2",
     "simplex-noise": "^2.2.0",
+    "three": "^0.125.2",
     "verlet-constraint": "^1.1.0",
     "verlet-point": "^1.2.1",
     "verlet-system": "^1.0.15"

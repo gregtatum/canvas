@@ -1,13 +1,21 @@
 import lerp from "lerp";
 
-export function setupCanvas(): CanvasRenderingContext2D {
+type SetupCanvasConfig = Partial<{
+  alpha: boolean;
+  container: HTMLElement;
+}>;
+
+export function setupCanvas(
+  config: SetupCanvasConfig = {}
+): CanvasRenderingContext2D {
   const canvas = document.createElement("canvas");
-  const maybeCtx = canvas.getContext("2d", { alpha: false });
+  const maybeCtx = canvas.getContext("2d", { alpha: Boolean(config.alpha) });
   if (!maybeCtx) {
     throw new Error("Could not get a 2d context.");
   }
   const ctx = maybeCtx;
-  document.body.appendChild(canvas);
+  const container = config.container || document.body;
+  container.appendChild(canvas);
 
   function resize(): void {
     canvas.width = window.innerWidth * devicePixelRatio;

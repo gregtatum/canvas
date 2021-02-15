@@ -62,13 +62,16 @@ export default function shortcuts(seed: string, restart?: () => void): void {
           if (document.fullscreenElement) {
             document.exitFullscreen ? document.exitFullscreen() : null;
           } else {
-            const canvas = document.querySelector("canvas");
-            if (!canvas) {
+            let element = document.querySelector(".fullscreen");
+            if (!element) {
+              element = document.querySelector("canvas");
+            }
+            if (!element) {
               throw new Error(
                 "Could not find the canvas while entering fullscreen."
               );
             }
-            canvas.requestFullscreen ? canvas.requestFullscreen() : null;
+            element.requestFullscreen ? element.requestFullscreen() : null;
           }
           if (restart) {
             restart();
