@@ -30,6 +30,9 @@ body {
 .title-nav {
   display: flex;
   justify-content: center;
+  align-items: center;
+  line-height: 1;
+  margin-bottom: 0.1em
 }
 
 .hide-ui .title {
@@ -56,8 +59,6 @@ canvas {
 
 .title h2 {
   margin: 0;
-  top: 0.2em;
-  position: relative;
 }
 
 .title a {
@@ -68,6 +69,8 @@ canvas {
   font-weight: bold;
   align-self: center;
   user-select: none;
+  margin: 0;
+  position: relative;
 }
 
 .error {

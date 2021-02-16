@@ -27,7 +27,15 @@ const TAU = Math.PI * 2;
     current.grid = createGrid(config);
   });
 
-  window.addEventListener("mousedown", () => (current.isMouseDown = true));
+  window.addEventListener("mousedown", event => {
+    const target = event.target as null | HTMLElement;
+    if (target && target.tagName === "A") {
+      // Don't set mouse down on a link.
+      return;
+    }
+
+    current.isMouseDown = true;
+  });
   window.addEventListener("mouseup", () => (current.isMouseDown = false));
   window.addEventListener("mouseout", () => (current.isMouseDown = false));
 

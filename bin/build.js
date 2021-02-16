@@ -131,7 +131,7 @@ function copyHtmlFolder() {
 
 function removeDistFolder(sessionSlug) {
   const distPath = path.resolve(__dirname, "../dist", sessionSlug);
-  console.log(`Removing the dist folder first "${distPath}"`);
+  console.log(`Removing the session's dist folder first "${distPath}"`);
   rimraf.sync(path.resolve(__dirname, "../dist", sessionSlug));
 }
 
@@ -289,8 +289,8 @@ function getTemplateParameters(sessions, sessionSlug) {
 
   return {
     sessionNumber,
-    previous: `<a id="prev" href='${prevLink}'>⬅</a>`,
-    next: `<a id="next" href='${nextLink}'>➡</a>`,
+    previous: `<a id="prev" href='${prevLink}'>←</a>`,
+    next: `<a id="next" href='${nextLink}'>→</a>`,
     name: packageJson.name,
     description: getSessionReadmeDescription(sessionSlug),
   };

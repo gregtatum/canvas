@@ -36,6 +36,12 @@ export function setupCurveDrawing(config: Config) {
   drawingTarget.style.touchAction = "none";
 
   function onTouchStart(event: TouchEvent): void {
+    const target = event.target as null | HTMLElement;
+    if (target && target.tagName === "A") {
+      // Don't start drawing on a link.
+      return;
+    }
+
     event.preventDefault();
 
     if (current.isDrawingCurve === false) {
@@ -55,6 +61,12 @@ export function setupCurveDrawing(config: Config) {
   }
 
   function onMouseDown(event: MouseEvent): void {
+    const target = event.target as null | HTMLElement;
+    if (target && target.tagName === "A") {
+      // Don't start drawing on a link.
+      return;
+    }
+
     if (current.isDrawingCurve === false) {
       drawingTarget.addEventListener("mousemove", onMouseMove);
       drawingTarget.addEventListener("mouseout", onMouseMoveDone);
