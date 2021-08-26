@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 const inquirer = require("inquirer");
 const {
   findSessionFromCli,
@@ -8,6 +9,19 @@ const {
 const path = require("path");
 const webpack = require("webpack");
 const WebpackDevServer = require("webpack-dev-server");
+const { startServer } = require("./art-archive/server");
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
+const black = "\u001b[30m";
+const red = "\u001b[31m";
+const green = "\u001b[32m";
+const yellow = "\u001b[33m";
+const blue = "\u001b[34m";
+const magenta = "\u001b[35m";
+const cyan = "\u001b[36m";
+const white = "\u001b[37m";
+const reset = "\u001b[0m";
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 (async () => {
   let pathToSession = findSessionFromCli();
@@ -36,6 +50,24 @@ const WebpackDevServer = require("webpack-dev-server");
 
   const sessionSlug = path.basename(pathToSession);
 
+  let sessionDetails = {};
+  try {
+    sessionDetails = require(path.join(pathToSession, "package.json"));
+  } catch (error) {
+    //
+  }
+
+  startServer({
+    port: 55123,
+    projectName: "Canvas",
+    projectPath: path.join(__dirname, ".."),
+    projectSlug: "canvas",
+    pieceName: sessionDetails.name || "Untitled",
+    pieceSlug: sessionSlug,
+    archivePath: path.join(__dirname, "../../art-archive"),
+  });
+
+  /** @type {any} */
   const config = getWebpackConfig({
     title: sessionSlug,
     entry: path.join(pathToSession, "index.ts"),
@@ -53,14 +85,47 @@ const WebpackDevServer = require("webpack-dev-server");
     stats: { colors: true },
   };
 
-  new WebpackDevServer(webpack(config), serverConfig).listen(
-    9966,
+  const port = 9966;
+
+  /** @type {any} */
+  const configuredWebpack = webpack(config);
+
+  new WebpackDevServer(configuredWebpack, serverConfig).listen(
+    port,
     "localhost",
-    function(err) {
+    err => {
       if (err) {
         console.log(err);
       }
-      console.log("Happy creative coding!");
+      const query = buildQueryString({
+        slug: sessionSlug,
+        project: "Canvas",
+        name: sessionDetails.name,
+      });
+      const url = `http://localhost:${port}/?${query}`;
+
+      console.log(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      );
+      console.log("┃ URL: " + green + url + reset);
+      console.log("┃ Happy creative coding!");
+      console.log(
+        "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      );
     }
   );
 })();
+
+function buildQueryString(obj) {
+  let result = "";
+  for (const [key, value] of Object.entries(obj)) {
+    if (!value) {
+      continue;
+    }
+    if (result.length > 0) {
+      result += "&";
+    }
+    result += key + "=" + encodeURIComponent(value);
+  }
+  return result;
+}

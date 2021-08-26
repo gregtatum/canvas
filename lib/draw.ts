@@ -17,10 +17,29 @@ export function setupCanvas(
   const container = config.container || document.body;
   container.appendChild(canvas);
 
+  const params = new URLSearchParams(window.location.search);
+  const width = params.has("width") ? Number(params.get("width")) : null;
+  const height = params.has("height") ? Number(params.get("height")) : null;
+  const dpi = params.has("dpi") ? Number(params.get("dpi")) : null;
+  console.log(
+    [
+      "Url API:",
+      "  http://localhost:9966/?width=1000&height=1000",
+      "  http://localhost:9966/?dpi=10",
+    ].join("\n")
+  );
+
   function resize(): void {
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
-    ctx.scale(devicePixelRatio, devicePixelRatio);
+    if (width && height) {
+      canvas.width = width;
+      canvas.height = height;
+    } else {
+      const scale = dpi ? dpi : devicePixelRatio;
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      ctx.scale(scale, scale);
+      console.log(`Resolution: ${canvas.width}x${canvas.height}`);
+    }
   }
 
   resize();

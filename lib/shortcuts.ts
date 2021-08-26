@@ -3,23 +3,39 @@ function _click(selector: string): void {
   if (el) el.click();
 }
 
+if (process.env.NODE_ENV === "development") {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const artArchive = require("../bin/art-archive/client");
+  artArchive.addKeyboardShortcuts();
+}
+
 export default function shortcuts(seed: string, restart?: () => void): void {
   console.log(
     [
       "Available shortcuts:",
-      "f: enter fullscreen",
-      "h: hide the ui",
-      "r: reload the ui",
-      "s: create a screenshot link",
-      "u: save the current seed to the URL",
-      "left: previous session",
-      "right: next session",
+      "  f: enter fullscreen",
+      "  h: hide the ui",
+      "  r: reload the ui",
+      "  s: create a screenshot link",
+      "  u: save the current seed to the URL",
+      "  left: previous session",
+      "  right: next session",
     ].join("\n")
   );
   window.addEventListener(
     "keydown",
-    function(event) {
-      switch (event.key) {
+    event => {
+      let key = event.key;
+      if (event.metaKey) {
+        key = "cmd-" + key;
+      }
+      if (event.ctrlKey) {
+        key = "ctrl-" + key;
+      }
+      if (event.altKey) {
+        key = "alt-" + key;
+      }
+      switch (key) {
         case "h":
           document.body.classList.toggle("hide-ui");
           break;
