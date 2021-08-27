@@ -4,16 +4,40 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 const path = require("path");
-const { existsSync, mkdirSync } = require("fs");
-const { exec, execSync } = require("child_process");
+const { existsSync } = require("fs");
+const { exec } = require("child_process");
 const jimp = require("jimp");
+const mkdirp = require("mkdirp");
 
 module.exports = { archiveTool };
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
+const black = "\u001b[30m";
+const red = "\u001b[31m";
+const green = "\u001b[32m";
+const yellow = "\u001b[33m";
+const blue = "\u001b[34m";
+const magenta = "\u001b[35m";
+const cyan = "\u001b[36m";
+const white = "\u001b[37m";
+const reset = "\u001b[0m";
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+const prefix = blue + "[art-archive] " + reset;
+
+/** @type {import("./cli").ArchiveConfig[]} */
+const configsToProcess = [];
+let isProcessing = false;
 
 /**
  * @param {import("./cli").ArchiveConfig} config
  */
 async function archiveTool(config) {
+  if (isProcessing) {
+    configsToProcess.push(config);
+    return;
+  }
+  isProcessing = true;
   const {
     archivePath,
     projectPath,
@@ -27,12 +51,15 @@ async function archiveTool(config) {
   validateSlug(projectSlug);
   validateSlug(pieceSlug);
 
-  const filesPath = path.join(archivePath, "files");
+  const targetFilesPath = path.join(archivePath, "files");
   /** @type {import("child_process").ExecSyncOptions} */
   const execConfig = {
     cwd: archivePath,
     stdio: "ignore",
   };
+  if (verbose) {
+    delete execConfig.stdio;
+  }
 
   /**
    * Run a command. It can be configured as verbose. On failure, display the error
@@ -40,77 +67,95 @@ async function archiveTool(config) {
    *
    * @param {string} cmd
    * @param {import("child_process").ExecSyncOptions} [config]
-   * @returns {void}
+   * @returns {Promise<string>}
    */
   function run(cmd, config) {
-    const { execSync } = require("child_process");
-    try {
+    return new Promise((resolve, reject) => {
       if (verbose) {
-        console.log("Running: ", cmd);
+        console.log(prefix + "🏃  Running: ", cmd);
       }
       const combinedConfig = {
         ...execConfig,
         ...(config || {}),
       };
-      const buffer = execSync(cmd, combinedConfig);
-      if (verbose) {
-        console.log(buffer.toString());
-      }
-    } catch (error) {
-      // Output the child process stdout.
-      if (error.output) {
-        const [, stdout, stderr] = error.output;
-        console.error(stdout.toString());
-        console.error(stderr.toString());
-      }
-      throw new Error("Command failed to run: " + cmd);
-    }
+      exec(cmd, combinedConfig, (err, stdout, stderr) => {
+        if (err) {
+          console.error("Command failed to run: " + cmd);
+          console.error("stdout:", stdout);
+          console.error("stderr:", stderr);
+          reject(err);
+          return;
+        }
+        if (verbose) {
+          if (stdout) {
+            console.log(stdout);
+          }
+          if (stderr) {
+            console.log(stderr);
+          }
+        }
+        resolve(stdout);
+      });
+    });
   }
 
   if (!existsSync(projectPath)) {
     throw new Error("The path to this project did not exist: " + projectPath);
+  }
+  if (!existsSync(filePath)) {
+    throw new Error(
+      "The path to the file to archive did not exist: " + filePath
+    );
   }
   if (!existsSync(archivePath)) {
     throw new Error(
       "The path to the art archive did not exist: " + archivePath
     );
   }
+  await run(`rm -rf ${targetFilesPath}`);
+  await mkdirp(targetFilesPath);
 
-  console.log(" 🧹  Clean art archive and remove any staged changes.");
-  run(`git clean -fd`);
+  console.log(prefix + "🧹  Clean art archive and remove any staged changes.");
+  await run(`git clean -fd`);
 
-  console.log(" 🌳  Switch and detach to the root tag.");
-  run(`git switch --detach root`);
-
-  console.log(" 📄  Copy the project's files to the archive.");
-  run(
-    `rsync -av --progress ${projectPath}/ ${filesPath} --exclude .git --exclude node_modules`
+  await run(`rm -rf ${targetFilesPath}`);
+  console.log(prefix + "📄  Copy the project's files to the archive.");
+  await run(
+    `rsync -av --progress ${projectPath} ${targetFilesPath} --exclude .git --exclude node_modules`
   );
 
-  const isoDate = getIsoString();
+  const date = new Date();
+  const isoDate = getIsoString(date);
+  const dateTag = getDateSlug(date);
   const commitMessage = `${projectName} – ${pieceName} ${isoDate}`;
-  const tag = taggify(`${projectSlug}–${pieceSlug}-${isoDate}`);
+  const tag = `${projectSlug}–${pieceSlug}-${dateTag}`;
 
-  console.log(" 💾  Commit the project files.");
-  run("git add .");
-  run(`git commit -m ${asBashString(commitMessage)}`);
-  run(`git tag ${tag}`);
-  const hash = (await ask("git rev-parse HEAD")).trim();
+  console.log(prefix + "💾  Commit the project files.");
+  await run("git add . -f");
+  await run(`git commit -m ${asBashString("Repo: " + commitMessage)}`);
+  await run(`git tag ${tag}`);
+  const hash = (await run("git rev-parse HEAD")).trim();
 
-  console.log(" 👈  Restoring to root.");
-  run("git switch main");
-  run("git clean -fd");
+  console.log(prefix + "🏷  Archive tag: " + tag);
 
-  console.log(" 🌅  Adding the image.");
-  processImage({
+  console.log(prefix + "🌅  Adding the image.");
+  await processImage({
     archivePath,
     projectSlug,
     pieceSlug,
-    isoDate,
+    dateTag,
     hash,
     sourceImagePath: filePath,
+    run,
   });
-  run(`git commit -m ${asBashString(commitMessage)}`);
+  await run(`rm -rf ${targetFilesPath}`);
+  await run("git add . -f");
+  await run(`git commit -m ${asBashString("Art: " + commitMessage)}`);
+  console.log(prefix + "✨  Done archiving image.");
+  if (configsToProcess.length > 0) {
+    await archiveTool(configsToProcess.shift());
+  }
+  isProcessing = false;
 }
 
 /**
@@ -133,9 +178,9 @@ function asBashString(str) {
 
 /**
  * Get an ISO string with a time zone.
+ * @param {Date} date
  */
-function getIsoString() {
-  const date = new Date();
+function getIsoString(date) {
   const tzo = -date.getTimezoneOffset();
   const dif = tzo >= 0 ? "+" : "-";
   function pad(num) {
@@ -163,6 +208,26 @@ function getIsoString() {
 }
 
 /**
+ * Get an ISO string with a time zone.
+ * @param {Date} date
+ */
+function getDateSlug(date) {
+  function pad(num) {
+    const norm = Math.floor(Math.abs(num));
+    return (norm < 10 ? "0" : "") + norm;
+  }
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join("-");
+}
+
+/**
  * @param {string} slug
  */
 function validateSlug(slug) {
@@ -178,35 +243,39 @@ function validateSlug(slug) {
  * @prop {string} isoDate
  * @prop {string} hash
  * @prop {string} sourceImagePath
+ * @prop {string => void} run
  */
 async function processImage({
   archivePath,
   projectSlug,
   pieceSlug,
-  isoDate,
+  dateTag,
   hash,
   sourceImagePath,
+  run,
 }) {
-  const ext = ".jpg";
-  const fileName = `${pieceSlug}-${taggify(isoDate)}-${hash}${ext}`;
-  const archiveProjectPath = path.join(archivePath, projectSlug);
-  const imagePath = path.join(archiveProjectPath, "originals", fileName);
-  const thumbPath = path.join(archiveProjectPath, "thumbs", fileName);
-  const mediumPath = path.join(archiveProjectPath, fileName);
-
-  function mkdirp(p) {
-    try {
-      mkdirSync(path.dirname(p));
-    } catch (e) {
-      // Error if it exists.
-    }
-  }
-  mkdirp(archiveProjectPath);
-  mkdirp(path.dirname(imagePath));
-  mkdirp(path.dirname(thumbPath));
-  mkdirp(path.dirname(mediumPath));
-
   const image = await jimp.read(sourceImagePath);
+  const sourceExt = "." + image.getExtension();
+  const targetExt = ".jpg";
+  const fileName = ext => `${pieceSlug}_${dateTag}_${hash}${ext}`;
+  const archiveProjectPath = path.join(archivePath, projectSlug);
+  const imagePath = path.join(
+    archiveProjectPath,
+    "originals",
+    fileName(sourceExt)
+  );
+  const thumbPath = path.join(
+    archiveProjectPath,
+    "thumbs",
+    fileName(targetExt)
+  );
+  const mediumPath = path.join(archiveProjectPath, fileName(targetExt));
+
+  await mkdirp(archiveProjectPath);
+  await mkdirp(path.dirname(imagePath));
+  await mkdirp(path.dirname(thumbPath));
+  await mkdirp(path.dirname(mediumPath));
+
   const imageWidth = image.bitmap.width;
   const imageHeight = image.bitmap.height;
   const thumbWidth = 450;
@@ -214,7 +283,7 @@ async function processImage({
   const mediumWidth = 1500;
   const mediumHeight = (imageHeight * 1500) / imageWidth;
 
-  execSync(`cp ${sourceImagePath} ${imagePath}`);
+  await run(`cp ${sourceImagePath} ${imagePath}`);
 
   await (await jimp.read(imagePath))
     .cover(thumbWidth, thumbHeight)
@@ -225,20 +294,8 @@ async function processImage({
     .resize(mediumWidth, mediumHeight)
     .quality(90)
     .write(mediumPath);
-}
 
-/**
- * Run a shell command and get the response.
- * @param {string} command
- */
-function ask(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, (err, stdout, stderr) => {
-      if (err) {
-        console.error(stderr);
-        return reject(err);
-      }
-      resolve(stdout);
-    });
-  });
+  console.log(prefix + "📁  Original to: " + imagePath);
+  console.log(prefix + "📁  Medium to: " + mediumPath);
+  console.log(prefix + "📁  Thumb to: " + thumbPath);
 }

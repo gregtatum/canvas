@@ -31,7 +31,6 @@ export function addKeyboardShortcuts() {
       if (event.shiftKey) {
         key = "shift-" + key;
       }
-      console.log({ key });
       let foundKey = true;
       switch (key) {
         case "cmd-d":
@@ -94,9 +93,10 @@ export async function postCanvas(options = {}) {
     formData.append("name", params.get("name"));
   }
 
+  console.log("Saving the art...");
   /** @type {any} */
   const response = await postRequest("/publish-code", formData);
-  console.log(response);
+  console.log(response.success);
 }
 
 /**

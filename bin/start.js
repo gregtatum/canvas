@@ -97,35 +97,19 @@ const reset = "\u001b[0m";
       if (err) {
         console.log(err);
       }
-      const query = buildQueryString({
-        slug: sessionSlug,
-        project: "Canvas",
-        name: sessionDetails.name,
-      });
-      const url = `http://localhost:${port}/?${query}`;
+      const url = `http://localhost:${port}/`;
 
       console.log(
-        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      );
-      console.log("┃ URL: " + green + url + reset);
-      console.log("┃ Happy creative coding!");
-      console.log(
-        "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        [
+          "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          `┃          URL: ${green}${url}${reset}`,
+          `┃     High DPI: ${green}${url}?dpi=5${reset}`,
+          `┃ Width/Height: ${green}${url}?width=4000&width=4000${reset}`,
+          "┃",
+          "┃ Happy creative coding!",
+          "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        ].join("\n")
       );
     }
   );
 })();
-
-function buildQueryString(obj) {
-  let result = "";
-  for (const [key, value] of Object.entries(obj)) {
-    if (!value) {
-      continue;
-    }
-    if (result.length > 0) {
-      result += "&";
-    }
-    result += key + "=" + encodeURIComponent(value);
-  }
-  return result;
-}

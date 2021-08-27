@@ -40,7 +40,6 @@ function startServer({
       const form = formidable({ multiples: true });
 
       form.parse(req, (err, fields, files) => {
-        console.log("Form", { err, fields, files });
         if (err) {
           respondErr(res, 404, "Error processing form data");
           console.error("[art-archive]", err);
@@ -61,22 +60,28 @@ function startServer({
           return;
         }
 
-        archiveTool({
-          projectPath,
-          projectSlug,
-          archivePath,
-          projectName,
-          pieceName: configuredPieceName,
-          pieceSlug,
-          filePath: image.path,
-          verbose: true,
-        });
+        try {
+          archiveTool({
+            projectPath,
+            projectSlug,
+            archivePath,
+            projectName,
+            pieceName: configuredPieceName,
+            pieceSlug,
+            filePath: image.path,
+            verbose: false,
+          });
+        } catch (error) {
+          console.error(error);
+          respondErr(res, 401, "Could not archive the art.");
+          return;
+        }
         res.writeHead(200, {
           "Content-type": "text/json",
           "Access-Control-Allow-Origin": "*",
         });
 
-        res.end(JSON.stringify({ success: "Posted a response." }));
+        res.end(JSON.stringify({ success: "Art archived." }));
       });
     } else {
       respondErr(res, 404, "Only POST is supported.");
