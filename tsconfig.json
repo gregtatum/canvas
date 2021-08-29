@@ -7,11 +7,17 @@
     "strict": true,
     // Allow esnext syntax. Otherwise the default is ES5 only.
     "target": "esnext",
-    "lib": ["esnext", "dom"]
+    "lib": ["esnext", "dom"],
+    "baseUrl": ".",
+    "paths": {
+      // Fix some annoying typing.
+      "vec-math": ["node_modules/gl-matrix"],
+    }
   },
   "include": ["./**/*.ts"],
   "exclude": [
     "node_modules",
-    "bin"
+    "bin",
+    "node_modules/gl-matrix"
   ]
 }

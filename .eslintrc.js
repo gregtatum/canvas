@@ -40,14 +40,19 @@ module.exports = {
     // overriding recommended rules
     'no-constant-condition': ['error', { checkLoops: false }],
     'no-console': ['error', { allow: ['log', 'warn', 'error'] }],
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-use-before-define': 0,
     '@typescript-eslint/no-explicit-any': 0,
+    "@typescript-eslint/no-empty-function": 0,
+    "@typescript-eslint/no-non-null-assertion": 0,
 
     // Use typescript's
     'no-unused-vars': 0,
-    '@typescript-eslint/no-unused-vars': 'error',
-    '@typescript-eslint/explicit-function-return-type': 'error',
+
+    '@typescript-eslint/no-unused-vars': ['error', {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }],
+    '@typescript-eslint/explicit-function-return-type': 0,
 
     // possible errors
     'array-callback-return': 'error',
