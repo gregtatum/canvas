@@ -5,7 +5,7 @@ function _click(selector: string): void {
 
 if (process.env.NODE_ENV === "development") {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const artArchive = require("../bin/art-archive/client");
+  const artArchive = require("../../bin/art-archive/client");
   artArchive.addKeyboardShortcuts();
 }
 

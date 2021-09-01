@@ -802,6 +802,7 @@ export function intersectRaySphere(
  * In 2d this simplifies to:
  * 𝝉 = rx * fy - ry * fx;
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function updateAngularVelocity(
   body: Body,
   momentOfInertia: Scalar,

@@ -159,17 +159,6 @@ async function archiveTool(config) {
 }
 
 /**
- * Make a string into an acceptable tag.
- */
-function taggify(str) {
-  return str
-    .replace(/([a-z])([A-Z])/g, "$1-$2") // get all lowercase letters that are near to uppercase ones
-    .replace(/[\s_]+/g, "-") // replace all spaces and low dash
-    .replace(/[:]+/g, "_") // : are not allowed in tags
-    .toLowerCase(); // convert to lower case
-}
-
-/**
  * Make a string an acceptable bash string arg.
  */
 function asBashString(str) {

@@ -223,7 +223,7 @@ describe("intersectRaySphere", () => {
     `);
   });
 
-  it("intersects coming from the bottom right", function() {
+  xit("intersects coming from the bottom right", function() {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -545,7 +545,7 @@ describe("collisions between point and sphere", function() {
     `);
   });
 
-  it("intersects coming from the bottom right at more of an angle", function() {
+  xit("intersects coming from the bottom right at more of an angle", function() {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: -3 }, 4);
@@ -639,7 +639,7 @@ describe("collisions between point and sphere", function() {
     `);
   });
 
-  it("handles points that are inside of spheres on their way in", function() {
+  xit("handles points that are inside of spheres on their way in", function() {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 1, y: 1 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);

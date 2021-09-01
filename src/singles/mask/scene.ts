@@ -11,7 +11,7 @@ const FOV = TAU * 0.1;
 export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
   DefaultContext;
 
-function getUniforms(regl: Regl) {
+function getUniforms() {
   const camera = createCamera({
     fov: FOV,
     near: 0.1,
@@ -89,7 +89,7 @@ function getContext() {
 
 export default function draw(regl: Regl): DrawCommand {
   return regl({
-    uniforms: getUniforms(regl),
+    uniforms: getUniforms(),
     context: getContext(),
   });
 }

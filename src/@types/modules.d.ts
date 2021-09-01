@@ -4,37 +4,31 @@ declare module "lerp" {
 }
 
 declare module "resl" {
-  type ManifestTypes = 'text' | 'image' | 'video' | 'binary' | 'audio';
-  interface ManifestItem<
-    Type extends ManifestTypes,
-    ParsedResult
-  > {
+  type ManifestTypes = "text" | "image" | "video" | "binary" | "audio";
+  interface ManifestItem<Type extends ManifestTypes, ParsedResult> {
     // The type declares the type of the asset
-    type: Type,
+    type: Type;
     // Declares the URL of the asset.
-    src: String,
+    src: string;
     // Setting the streaming flag specifies that the done() callback will fire as
     // soon as the asset has started loading
-    stream?: boolean
+    stream?: boolean;
     // e.g. JSON.parse
-    parser?: (item: LoadedManifestItem[Type]) => ParsedResult,
+    parser?: (item: LoadedManifestItem[Type]) => ParsedResult;
     // If set to true, then pass credentials to cross origin requests.
-    credentials?: boolean
+    credentials?: boolean;
   }
 
   interface LoadedManifestItem {
-    text: string,
-    image: HTMLImageElement,
-    video: HTMLVideoElement,
-    audio: HTMLAudioElement,
-    binary: ArrayBuffer,
+    text: string;
+    image: HTMLImageElement;
+    video: HTMLVideoElement;
+    audio: HTMLAudioElement;
+    binary: ArrayBuffer;
   }
 
-  interface Manifest<
-    Type extends ManifestTypes,
-    ParsedResult
-  >{
-    [key: string]: ManifestItem<Type, ParsedResult>
+  interface Manifest<Type extends ManifestTypes, ParsedResult> {
+    [key: string]: ManifestItem<Type, ParsedResult>;
   }
 
   interface Options<
@@ -42,23 +36,27 @@ declare module "resl" {
     ParsedResult,
     M extends Manifest<Type, ParsedResult>
   > {
-    manifest: M,
-    onDone: (assets: {
-      [Property in keyof M]: M[Property]["parser"] extends Function
-        ? ReturnType<M[Property]["parser"]>
-        : LoadedManifestItem[M[Property]["type"]];
-    }) => void,
+    manifest: M;
+    onDone: (
+      assets: {
+        [Property in keyof M]: M[Property]["parser"] extends Function
+          ? ReturnType<M[Property]["parser"]>
+          : LoadedManifestItem[M[Property]["type"]];
+      }
+    ) => void;
     // As assets are preloaded the progress callback gets fired
-    onProgress?: (progress: number, message: string) => void,
+    onProgress?: (progress: number, message: string) => void;
     // Called when there is an error.
-    onError?: (err: Error) => void
+    onError?: (err: Error) => void;
   }
 
   const resl: <
     Type extends ManifestTypes,
     ParsedResult,
     M extends Manifest<Type, ParsedResult>
-  >(options: Options<Type, ParsedResult, M>) => void;
+  >(
+    options: Options<Type, ParsedResult, M>
+  ) => void;
   export default resl;
 }
 
@@ -104,7 +102,7 @@ declare module "orbit-controls" {
     // The rotation speed of the controls.
     rotateSpeed: number;
     // The zoom speed of the controls.
-    zoomSpeed: number
+    zoomSpeed: number;
     // The pinch speed of the controls.
     pinchSpeed: number;
 
@@ -129,41 +127,41 @@ declare module "orbit-controls" {
 
   interface Config {
     //  the initial position of the camera, default [0, 0, 1]
-     position: Tuple3,
+    position: Tuple3;
     //  the initial direction of the camera, default [0, 1, 0]
-     up: Tuple3,
+    up: Tuple3;
     //  the center of the orbit, default [0, 0, 0]
-     target: Tuple3,
+    target: Tuple3;
     //  the initial rotation in radians, phi in spherical coordinates, default Math.PI/2
-     phi: Radian,
+    phi: Radian;
     //  the initial rotation in radians, theta in spherical coordinates, default 0
-     theta: Radian,
+    theta: Radian;
     //  the distance from the target, default 1
-     distance: number,
+    distance: number;
     //  how fast the controls slow down, between 0 and 1, default 0.25
-     damping: UnitInterval,
+    damping: UnitInterval;
     //  the speed of the rotation, default 0.28
-     rotateSpeed: number,
+    rotateSpeed: number;
     //  the speed of the zoom, default 0.0075
-     zoomSpeed: number,
+    zoomSpeed: number;
     //  (coming soon) the speed of the pinch, default 0.0075
-     pinchSpeed: number,
+    pinchSpeed: number;
     //  (coming soon) enable pinching, default true
-     pinch: boolean,
+    pinch: boolean;
     //  enable zooming, default true
-     zoom: boolean,
+    zoom: boolean;
     //  enable rotating, default true
-     rotate: boolean,
+    rotate: boolean;
     //  the bounds of the phi rotation, default [0, Math.PI]
-     phiBounds: [Radian, Radian],
+    phiBounds: [Radian, Radian];
     //  the bounds of the theta rotation, default [-Infinity, Infinity]
-     thetaBounds: [Radian, Radian],
+    thetaBounds: [Radian, Radian];
     //  the bounds of the distance, default [0, Infinity]
-     distanceBounds: [number, number],
+    distanceBounds: [number, number];
     //  the parent element, default window
-     parent: HTMLElement,
+    parent: HTMLElement;
     //  the element, default window
-     element: HTMLElement,
+    element: HTMLElement;
   }
 
   /**
@@ -178,55 +176,55 @@ declare module "orbit-controls" {
 declare module "perspective-camera" {
   interface Camera {
     // Updates the camera projection and view matrices from the camera's current state (position, direction, viewport, etc).
-    update(): void
+    update(): void;
     // Resets the position, direction, up, projection and view values to their identity; the defaults described in the constructor.
-    identity(): void
+    identity(): void;
     // Translates this camera's position by the given vec3.
-    translate(vec3: Tuple3): void
+    translate(vec3: Tuple3): void;
     // Updates the direction and up to look at the given vec3 target.
-    lookAt(vec3: Tuple3): void
+    lookAt(vec3: Tuple3): void;
     // Projects the world space 3D point vec3 into 2D screen-space based on this camera's viewport bounds. Returns a new vec4 point with z and w components representing the computed depth (similar to gl_FragCoord).
-    project(vec3: Tuple3): void
+    project(vec3: Tuple3): void;
     // Unprojects the screen-space point into 3D world-space. The Z of the screen-space point is between 0 (near plane) and 1 (far plane).
-    unproject(vec3: Tuple3): void
+    unproject(vec3: Tuple3): void;
     // Creates a new picking ray from the 2D screen-space vec2 point (i.e. the mouse).
     // The ray is an instance of ray-3d, and it can be used for hit-testing
-    createPickingRay(vec2: Tuple2): void
+    createPickingRay(vec2: Tuple2): void;
 
     // A [x, y, width, height] array defining the viewport in screen space.
-    viewport: [number, number, number, number],
+    viewport: [number, number, number, number];
 
     // The 4x4 projection and view matrices, computed after a call to update().
-    projection: MatrixTuple4x4,
-    view: MatrixTuple4x4,
+    projection: MatrixTuple4x4;
+    view: MatrixTuple4x4;
     // The combined projection and view matrix.
-    projView: MatrixTuple4x4,
+    projView: MatrixTuple4x4;
     // The inverted combined projection and view matrix.
-    invProjView: MatrixTuple4x4,
+    invProjView: MatrixTuple4x4;
 
     // The current position, direction, and up vectors.
-    position: Tuple3,
+    position: Tuple3;
     // The current position, direction, and up vectors.
-    direction: Tuple3,
+    direction: Tuple3;
     // The current position, direction, and up vectors.
-    up: Tuple3,
+    up: Tuple3;
   }
 
   interface Config {
-     // field of view in radians, default Math.PI / 4
-     fov: Radian;
-     // the far range, default 100
-     far: number;
-     // the near range, default 1 / 100
-     near: number;
-     // the camera position, default [0, 0, 0]
-     position: Tuple3;
-     // the camera direction, default [0, 0, -1]
-     direction: Tuple3;
-     // the camera up vector, default [0, 1, 0]
-     up: Tuple3;
-     // the screen-space viewport bounds, default [-1, -1, 1, 1]
-     viewport: Tuple4;
+    // field of view in radians, default Math.PI / 4
+    fov: Radian;
+    // the far range, default 100
+    far: number;
+    // the near range, default 1 / 100
+    near: number;
+    // the camera position, default [0, 0, 0]
+    position: Tuple3;
+    // the camera direction, default [0, 0, -1]
+    direction: Tuple3;
+    // the camera up vector, default [0, 1, 0]
+    up: Tuple3;
+    // the screen-space viewport bounds, default [-1, -1, 1, 1]
+    viewport: Tuple4;
   }
 
   /**
@@ -237,14 +235,13 @@ declare module "perspective-camera" {
   export default createCamera;
 }
 
-type RandomFn =
-  (() => number) &
+type RandomFn = (() => number) &
   ((max: number) => number) &
   ((min: number, max: number) => number) &
   ((min: number, max: number, isInteger: boolean) => number);
 
 declare module "@tatumcreative/random" {
-  const setupRandom: (...seed: Array<string | number>) => RandomFn
+  const setupRandom: (...seed: Array<string | number>) => RandomFn;
   export default setupRandom;
 }
 
@@ -386,45 +383,50 @@ declare module "rtree" {
     y: number;
     w: number;
     h: number;
-}
+  }
 
   export interface RTree<T> {
     insert(bounds: RTreeRectangle, element: T): boolean;
     remove(area: RTreeRectangle, element?: T): T[];
     geoJSON(geoJSON: any): void;
     bbox(x1: any, y1: any, x2: number, y2: number): T[];
-    search(area: RTreeRectangle, return_node?: boolean, return_array?: T[]): T[];
+    search(
+      area: RTreeRectangle,
+      // eslint-disable-next-line @typescript-eslint/camelcase
+      return_node?: boolean,
+      // eslint-disable-next-line @typescript-eslint/camelcase
+      return_array?: T[]
+    ): T[];
   }
 
   const createRTRree: <T>(maxNodeWidth?: number) => RTree<T>;
-  export default createRTRree
+  export default createRTRree;
 }
 
 declare module "verlet-system" {
   import { VerletPoint } from "verlet-point";
 
   export interface VerletSystem {
-    integrate: (points: VerletPoint[], step: Seconds) => void
-    integratePoint: (points: VerletPoint, step: Seconds) => void
-    gravity?: Tuple2<Scalar>,
-    min?: BoundsTuple2D,
-    max?: BoundsTuple2D,
-    friction: Scalar,
-    bounce: Scalar,
-
+    integrate: (points: VerletPoint[], step: Seconds) => void;
+    integratePoint: (points: VerletPoint, step: Seconds) => void;
+    gravity?: Tuple2<Scalar>;
+    min?: BoundsTuple2D;
+    max?: BoundsTuple2D;
+    friction: Scalar;
+    bounce: Scalar;
   }
 
   interface VerletSystemOptions {
     // A vector describing the gravity of this system, defaults to a zero vector
-    gravity?: Tuple2<Scalar>,
+    gravity?: Tuple2<Scalar>;
     // The minimum bounds vector, defaults to null (i.e. negative infinity)
-    min?: BoundsTuple2D,
+    min?: BoundsTuple2D;
     // The maximum bounds vector, defaults to null (i.e. positive infinity)
-    max?: BoundsTuple2D,
+    max?: BoundsTuple2D;
     // The air friction, defaults to 0.98
-    friction?: Scalar,
+    friction?: Scalar;
     // The friction with collision edges, i.e. "bounciness", defaults to 1.0
-    bounce?: Scalar,
+    bounce?: Scalar;
   }
 
   const createVerletSystem: (options: VerletSystemOptions) => VerletSystem;
@@ -443,15 +445,15 @@ declare module "verlet-point" {
 
   interface VerletPointOptions {
     // The position vector, defaults to zero.
-    position: Tuple2<WorldSpace>,
+    position: Tuple2<WorldSpace>;
     // The previous vector, useful for creating forces. If not specified, this will default to position value.
-    previous?: Tuple2<WorldSpace>,
+    previous?: Tuple2<WorldSpace>;
     // The acceleration vector of the point, defaults to zero
-    acceleration?: Tuple2<Scalar>,
+    acceleration?: Tuple2<Scalar>;
     // The mass of this point, defaults to 1.0. A mass of zero is considered "unmovable."
-    mass?: Scalar,
+    mass?: Scalar;
     // The radius of this point, only useful for collision testing. Defaults to zero.
-    radius?: Scalar,
+    radius?: Scalar;
   }
 
   const createVerletPoint: (option: VerletPointOptions) => VerletPoint;
@@ -459,21 +461,21 @@ declare module "verlet-point" {
 }
 
 declare module "verlet-constraint" {
-  import { VerletPoint } from "verlet-point"
+  import { VerletPoint } from "verlet-point";
 
   export interface VerletConstraint {
-    solve: () => void,
-    points: [VerletPoint, VerletPoint],
-    restingDistance: WorldSpace,
-    stiffness: Scalar,
+    solve: () => void;
+    points: [VerletPoint, VerletPoint];
+    restingDistance: WorldSpace;
+    stiffness: Scalar;
   }
 
   interface VerletConstraintOptions {
     // The desired resting distance between the two points, defaults to using the
     // distance between the two points during construction
-    restingDistance?: WorldSpace,
+    restingDistance?: WorldSpace;
     // The stiffness of the constraint, defaults to 1.0
-    stiffness?: Scalar,
+    stiffness?: Scalar;
   }
 
   const createVerletConstraint: (
@@ -493,20 +495,25 @@ declare module "delaunay-triangulate" {
   export default delaunaryTrianglulate;
 }
 
-
 // src/@types/jest-matcher-deep-close-to/index.d.ts
 declare namespace jest {
   interface Matchers<R> {
-    toBeDeepCloseTo: (expected: number | number[] | object, decimals?: number) => R;
-    toMatchCloseTo: (expected: number | number[] | object, decimals?: number) => R;
+    toBeDeepCloseTo: (
+      expected: number | number[] | object,
+      decimals?: number
+    ) => R;
+    toMatchCloseTo: (
+      expected: number | number[] | object,
+      decimals?: number
+    ) => R;
   }
 }
 
-declare module 'jest-matcher-deep-close-to' {
+declare module "jest-matcher-deep-close-to" {
   export function toBeDeepCloseTo(
     received: number | number[] | object,
     expected: number | number[] | object,
-    decimals?: number,
+    decimals?: number
   ): {
     message(): string;
     pass: boolean;
@@ -515,7 +522,7 @@ declare module 'jest-matcher-deep-close-to' {
   export function toMatchCloseTo(
     received: number | number[] | object,
     expected: number | number[] | object,
-    decimals?: number,
+    decimals?: number
   ): {
     message(): string;
     pass: boolean;

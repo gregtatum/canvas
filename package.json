@@ -8,9 +8,10 @@
     "serve-static": "echo 'http://localhost:8000'; python3 -m http.server --directory dist",
     "build": "./bin/build.js",
     "add-image": "./bin/add-image.js",
-    "test": "npm run lint-es && npm run lint-ts",
+    "test": "npm run lint-es && npm run lint-ts && npm run test-js",
     "lint-es": "eslint '*/**/*.{js,ts,tsx}'",
-    "lint-ts": "tsc --noEmit"
+    "lint-ts": "tsc --noEmit",
+    "test-js": "jest"
   },
   "author": "",
   "repository": "https://github.com/gregtatum/canvas",
