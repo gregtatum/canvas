@@ -85,6 +85,7 @@ function createGeometry() {
   });
   shapeEyes(mesh);
   shapeMaskBack(mesh);
+  quads.subdivide(mesh, 1);
   refineEyes(mesh);
   // shapeNose(mesh);
   // extrudeHair(mesh);
@@ -136,9 +137,8 @@ function createEyeHoles(mesh: QuadMesh, w: number, h: number, d: number) {
 }
 
 function refineEyes(mesh: QuadMesh): void {
-  quads.subdivide(mesh, 1);
   [
-    { quadIndex: 48, opposite: true },
+    { quadIndex: 48, opposite: false },
     { quadIndex: 75, opposite: false },
   ].forEach(({ quadIndex, opposite }) => {
     const quad = mesh.quads[quadIndex];
