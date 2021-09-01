@@ -132,7 +132,7 @@ function setupWebs(config: Config, current: Current): void {
   }
 }
 
-const _force: Tuple2D = [0, 0];
+const _force: Tuple2 = [0, 0];
 function updateRestoreShape(config: Config, current: Current): void {
   const {
     webPointCount,
@@ -309,7 +309,7 @@ function drawClearScreen({ ctx }: Config): void {
 }
 
 const _mousePoint = createPoint({ position: [0, 0] });
-const _forcePoint: Tuple2D = [0, 0];
+const _forcePoint: Tuple2 = [0, 0];
 
 function updateMouseForces(config: Config, current: Current): void {
   const { mouseForce } = config;
