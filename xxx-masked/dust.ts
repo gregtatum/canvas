@@ -1,6 +1,7 @@
 import glsl from "glslify";
 import { Regl, DrawCommand } from "regl";
 import { fill } from "../lib/utils";
+import { simplex } from "../lib/shaders";
 
 const DUST_COUNT = 3000;
 
@@ -8,7 +9,7 @@ export default function drawDust(regl: Regl): DrawCommand {
   return regl({
     vert: glsl`
       precision mediump float;
-      #pragma glslify: noise = require('glsl-noise/simplex/2d')
+      ${simplex}
       attribute vec4 position;
       uniform float time, viewportHeight, aspectRatio;
       uniform mat4 projection, view;
@@ -42,14 +43,14 @@ export default function drawDust(regl: Regl): DrawCommand {
     `,
     frag: glsl`
       precision mediump float;
-      #pragma glslify: snoise3 = require(glsl-noise/simplex/3d)
+      ${simplex}
       varying vec3 vColor;
       varying float vParticleId;
       uniform float time;
 
       void main() {
         float alpha = max(0.0, 2.5 * (0.5 - length(gl_PointCoord - vec2(0.5)))
-          * (snoise3(vec3(gl_PointCoord, vParticleId * 100.0 + time * 0.25)) * 0.5 + 0.5));
+          * (simplex(vec3(gl_PointCoord, vParticleId * 100.0 + time * 0.25)) * 0.5 + 0.5));
         gl_FragColor = vec4(alpha * alpha * vColor, 1.0);
       }
     `,

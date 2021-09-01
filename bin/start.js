@@ -67,6 +67,7 @@ const reset = "\u001b[0m";
     archivePath: path.join(__dirname, "../../art-archive"),
   });
 
+  // TODO - Type this:
   /** @type {any} */
   const config = getWebpackConfig({
     title: sessionSlug,
@@ -78,9 +79,12 @@ const reset = "\u001b[0m";
     outputPublicPath: "/",
   });
 
+  /** @type {import("webpack-dev-server").Configuration} */
   const serverConfig = {
+    disableHostCheck: true,
     contentBase: config.output.path,
     publicPath: config.output.publicPath,
+    noInfo: true,
     hot: process.env.NODE_ENV === "development" ? true : false,
     stats: { colors: true },
   };

@@ -1,6 +1,6 @@
-import { vec3 } from "vec-math";
+import { vec3 } from "../vec-math";
 import { ensureExists, UnhandledCaseError } from "../utils";
-export { subdivide } from "./catmull-clark";
+import { catmullClarkSubdivision } from "./catmull-clark";
 
 /**
  * Split a quad horizontally.
@@ -247,9 +247,9 @@ export const inset = (() => {
  * @param {Number} extrude Distance to extrude, defaults to `0`
  */
 export const extrude = (() => {
-  const toTranslate = [0, 0, 0, 0];
-  const translation = vec3.create();
-  const targetQuadNormal = vec3.create();
+  const toTranslate: number[] = [];
+  const translation: Tuple3 = [0, 0, 0];
+  const targetQuadNormal: Tuple3 = [0, 0, 0];
   return function(mesh: QuadMesh, targetQuad: Quad, insetT = 0, extrude = 0) {
     const { positions, normals } = mesh;
     const ring = inset(mesh, targetQuad, insetT);
@@ -340,7 +340,7 @@ export var averageNormalForPosition = (() => {
   return function averageNormalForPosition(
     mesh: QuadMesh,
     positionIndex: Index,
-    target = vec3.create(),
+    target = [0, 0, 0] as Tuple3,
     normalCache: Map<Quad, Tuple3>,
     positionIndexToQuads?: Map<Index, Quad[]>
   ) {
@@ -401,7 +401,7 @@ export var averageNormalForPosition = (() => {
  * @returns {Quad[]} quads `[qL, qT, qR, qB, targetQuad]`.
  */
 export const insetDisjoint = (() => {
-  const center = vec3.create();
+  const center = [0, 0, 0] as Tuple3;
   return function(mesh: QuadMesh, targetQuad: Quad, t = 0) {
     const { positions, quads, normals } = mesh;
     const [a, b, c, d] = targetQuad;
@@ -519,7 +519,7 @@ export const insetDisjoint = (() => {
  */
 export const extrudeDisjoint = (() => {
   const toTranslate: Index[] = [];
-  const translation: Tuple3 = vec3.create();
+  const translation: Tuple3 = [0, 0, 0];
   return function(mesh: QuadMesh, targetQuad: Quad, insetT = 0, extrude = 0) {
     const { positions, normals } = mesh;
     const ring = insetDisjoint(mesh, targetQuad, insetT);
@@ -543,19 +543,21 @@ export const extrudeDisjoint = (() => {
     toTranslate[10] = qB[1];
     toTranslate[11] = qB[2];
 
+    if (!normals) {
+      throw new Error("The extrude command needs a normal");
+    }
+    // Assume that disjoint quads all share the same normal.
+    const targetQuadNormal = normals[targetQuad[0]];
+    vec3.scale(translation, targetQuadNormal, extrude);
+
     for (let i = 0; i < toTranslate.length; i++) {
       const position = positions[toTranslate[i]];
       vec3.add(position, position, translation);
     }
-    if (normals) {
-      // Assume that disjoint quads all share the same normal.
-      const targetQuadNormal = normals[targetQuad[0]];
-      vec3.scale(translation, targetQuadNormal, extrude);
 
-      // Calculate the normals for the translated rings.
-      for (let i = 0; i < ring.length; i++) {
-        updateNormals(mesh, ring[i]);
-      }
+    // Calculate the normals for the translated rings.
+    for (let i = 0; i < ring.length; i++) {
+      updateNormals(mesh, ring[i]);
     }
   };
 })();
@@ -568,7 +570,7 @@ export const extrudeDisjoint = (() => {
  * @param {Position} target
  * @returns {Position} center
  */
-export function getCenter(mesh: QuadMesh, quad: Quad, target = vec3.create()) {
+export function getCenter(mesh: QuadMesh, quad: Quad, target = [0, 0, 0]) {
   const a = mesh.positions[quad[0]];
   const b = mesh.positions[quad[1]];
   const c = mesh.positions[quad[2]];
@@ -671,8 +673,8 @@ export function updateNormals(mesh: QuadMesh, quad: Quad) {
 
 // eslint-disable-next-line no-var
 export var getQuadNormal = (() => {
-  const edgeA = vec3.create();
-  const edgeB = vec3.create();
+  const edgeA: Tuple3 = [0, 0, 0];
+  const edgeB: Tuple3 = [0, 0, 0];
   /**
    * Compute a quad's normal regardless of it's neighboring quads.
    *
@@ -684,7 +686,7 @@ export var getQuadNormal = (() => {
   return function getQuadNormal(
     mesh: QuadMesh,
     quad: Quad,
-    target = vec3.create()
+    target: Tuple3 = [0, 0, 0]
   ): Tuple3 {
     const positionA = mesh.positions[quad[0]];
     const positionB = mesh.positions[quad[1]];
@@ -812,10 +814,10 @@ export function createQuad(
         positions.push([w, 0, -h]);
         break;
       case "z":
-        positions.push([w, -h, 0]);
-        positions.push([w, h, 0]);
-        positions.push([-w, h, 0]);
         positions.push([-w, -h, 0]);
+        positions.push([-w, h, 0]);
+        positions.push([w, h, 0]);
+        positions.push([w, -h, 0]);
         break;
       default:
         throw new Error("Unknown Facing type");
@@ -855,9 +857,9 @@ export function createBoxDisjoint(
   optionalMesh?: QuadMesh
 ) {
   const { mesh, quad } = createQuad({ w: x, h: z }, optionalMesh);
-  mesh.positions.forEach(position => {
+  for (const position of mesh.positions) {
     position[1] -= y / 2;
-  });
+  }
   clone(mesh, quad);
   flip(mesh, mesh.quads[1]);
   extrudeDisjoint(mesh, quad, 0, y);
@@ -889,11 +891,8 @@ export function createBox(
 
 /**
  * Combine all positions together and recompute the normals.
- *
- * @param {QuadMesh} mesh
- * @returns {QuadMesh}
  */
-export function mergePositions(mesh: QuadMesh) {
+export function mergePositions(mesh: QuadMesh): QuadMesh {
   const { positions, normals, quads } = mesh;
   // Go through each position.
   for (let aIndex = 0; aIndex < positions.length; aIndex++) {
@@ -1005,7 +1004,7 @@ export function computeNormals(mesh: QuadMesh) {
   for (let i = 0; i < mesh.positions.length; i++) {
     let normal = mesh.normals[i];
     if (!normal) {
-      normal = vec3.create();
+      normal = [0, 0, 0];
       mesh.normals[i] = normal;
     }
     averageNormalForPosition(
@@ -1339,7 +1338,7 @@ export function computeCenterPositions(mesh: QuadMesh): Tuple3[] {
 export function computeCellCenter(
   mesh: QuadMesh,
   quad: Quad,
-  target = vec3.create()
+  target: Tuple3 = [0, 0, 0]
 ): Tuple3 {
   const [aI, bI, cI, dI] = quad;
   const { positions } = mesh;
@@ -1581,5 +1580,19 @@ export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
     mesh.quads.push(mirrorCell);
   });
 
+  return mesh;
+}
+
+/**
+ * Apply catmull clark subdivision to a quad mesh.
+ */
+export function subdivide(mesh: QuadMesh, count: number): QuadMesh {
+  let meshNew = mesh;
+  for (let i = 0; i < count; i++) {
+    meshNew = catmullClarkSubdivision(mesh);
+  }
+  mesh.positions = meshNew.positions;
+  mesh.quads = meshNew.quads;
+  computeNormals(mesh);
   return mesh;
 }

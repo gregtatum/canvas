@@ -1,13 +1,12 @@
 import glsl from "glslify";
-import { Regl, DrawCommand, DefaultContext } from "regl";
+import { Regl, DrawCommand } from "regl";
 
 import * as quads from "../lib/quads";
-import { mat4 } from "vec-math";
-import { drawCommand } from "../lib/regl";
+import { accessors, composeDrawCommands, drawCommand } from "../lib/regl";
+import { SceneContext } from "./scene";
 
-const IDENTITY = mat4.identity([]);
-const POSITION_COLOR = [0.5, 0, 0];
-const CELL_COLOR = [0, 0.5, 0];
+const POSITION_COLOR: Tuple3 = [0.5, 0, 0];
+const CELL_COLOR: Tuple3 = [0, 0.5, 0];
 const DIGIT_LENGTH = 3;
 const POSITION_FONT_SIZE = 0.025;
 const CELL_FONT_SIZE = 0.03;
@@ -16,29 +15,39 @@ const NOOP: DrawCommand = (() => {}) as any;
 interface LabelProps {
   height?: number;
   color?: Tuple3;
-  model?: MatrixTuple4x4;
+  model: MatrixTuple4x4;
 }
 
-export default function createDrawFunctions(regl: Regl, mesh: QuadMesh) {
+type DrawLabelQuads = DrawCommand<SceneContext, LabelProps>;
+
+interface LabelQuadsCommands {
+  drawLines: DrawLabelQuads;
+  drawCellIndices: DrawLabelQuads;
+  drawPositionIndices: DrawLabelQuads;
+}
+
+export default function createDrawFunctions(
+  regl: Regl,
+  mesh: QuadMesh
+): LabelQuadsCommands {
   if (mesh.positions.length > 999 || mesh.quads.length > 1000) {
     return {
-      drawLines: NOOP,
-      drawCellIndices: NOOP,
-      drawPositionIndicies: NOOP,
+      drawLines: NOOP as any,
+      drawCellIndices: NOOP as any,
+      drawPositionIndices: NOOP as any,
     };
   }
   const drawNumbers = createDrawNumbers(regl);
   return {
     drawLines: createDrawLines(regl, mesh),
     drawCellIndices: createDrawCellIndices(regl, mesh, drawNumbers),
-    drawPositionIndicies: createDrawPositionIndices(regl, mesh, drawNumbers),
+    drawPositionIndices: createDrawPositionIndices(regl, mesh, drawNumbers),
   };
 }
 
-function createDrawLines(
-  regl: Regl,
-  mesh: QuadMesh
-): DrawCommand<DefaultContext, LabelProps> {
+function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
+  const { getContext } = accessors<LabelProps, SceneContext>();
+
   return drawCommand(regl, {
     vert: glsl`
       precision mediump float;
@@ -69,8 +78,7 @@ function createDrawLines(
       normal: mesh.normals,
     },
     uniforms: {
-      model: (_: any, props: LabelProps) =>
-        props && props.model ? props.model : IDENTITY,
+      model: getContext("headModel"),
     },
     elements: quads.getElements(mesh, "lines"),
     primitive: "lines",
@@ -79,8 +87,8 @@ function createDrawLines(
   });
 }
 
-function createDrawNumbers(regl: Regl): DrawCommand {
-  return regl({
+function createDrawNumbers(regl: Regl): DrawLabelQuads {
+  return drawCommand(regl, {
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;
@@ -90,7 +98,7 @@ function createDrawNumbers(regl: Regl): DrawCommand {
       varying vec3 vDigits;
       void main() {
         vDigits = digits;
-        gl_Position = projection * view * vec4(position, 1.0);
+        gl_Position = projection * view * model * vec4(position, 1.0);
         gl_PointSize = viewportHeight * fontHeight;
       }
     `,
@@ -165,51 +173,51 @@ function createDrawNumbers(regl: Regl): DrawCommand {
 function createDrawCellIndices(
   regl: Regl,
   mesh: QuadMesh,
-  drawNumbers: DrawCommand
-) {
+  drawNumbers: DrawLabelQuads
+): DrawLabelQuads {
   const centerPositions = quads.computeCenterPositions(mesh);
   const digits = toDigits(centerPositions);
+  const { getProp } = accessors<LabelProps, SceneContext>();
 
-  const drawCells = drawCommand<LabelProps>(regl, {
+  const drawCells: DrawLabelQuads = drawCommand<LabelProps>(regl, {
     attributes: {
       position: centerPositions,
       digits: digits,
     },
     uniforms: {
-      fontHeight: (_: any, props: LabelProps) =>
-        props && props.height ? props.height : CELL_FONT_SIZE,
-      color: (_: any, props: LabelProps) =>
-        props && props.color ? props.color : CELL_COLOR,
+      fontHeight: getProp("height", CELL_FONT_SIZE),
+      color: getProp("color", CELL_COLOR),
+      model: getProp("model"),
     },
     count: centerPositions.length,
   });
 
-  return () => drawNumbers(drawCells);
+  return composeDrawCommands(drawCells, drawNumbers);
 }
 
 function createDrawPositionIndices(
   regl: Regl,
   mesh: QuadMesh,
-  drawNumbers: DrawCommand
-) {
+  drawNumbers: DrawLabelQuads
+): DrawLabelQuads {
   const positions = mesh.positions;
   const digits = toDigits(positions);
+  const { getProp } = accessors<LabelProps, SceneContext>();
 
-  const drawPositions = regl({
+  const drawPositions = drawCommand<LabelProps>(regl, {
     attributes: {
       position: positions,
       digits: digits,
     },
     uniforms: {
-      fontHeight: (_, props: LabelProps) =>
-        props && props.height ? props.height : POSITION_FONT_SIZE,
-      color: (_, props: LabelProps) =>
-        props && props.color ? props.color : POSITION_COLOR,
+      fontHeight: getProp("height", POSITION_FONT_SIZE),
+      color: getProp("color", POSITION_COLOR),
+      model: getProp("model"),
     },
     count: positions.length,
   });
 
-  return () => drawNumbers(drawPositions);
+  return composeDrawCommands(drawPositions, drawNumbers);
 }
 
 function toDigits(centers: Tuple3[]): Tuple3[] {

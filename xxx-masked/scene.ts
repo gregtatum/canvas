@@ -1,5 +1,5 @@
 import { Regl, DefaultContext, DrawCommand } from "regl";
-import { vec3, mat3, mat4 } from "vec-math";
+import { vec3, mat3, mat4 } from "../lib/vec-math";
 import createControls from "orbit-controls";
 import createCamera from "perspective-camera";
 
@@ -8,7 +8,8 @@ const simplex = new (require("simplex-noise"))();
 const TAU = 6.283185307179586;
 const FOV = TAU * 0.1;
 
-export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> & DefaultContext;
+export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
+  DefaultContext;
 
 function getUniforms(regl: Regl) {
   const camera = createCamera({
@@ -27,8 +28,6 @@ function getUniforms(regl: Regl) {
     pinchSpeed: 0.00001,
     rotateSpeed: 0.0025,
     damping: 0.01,
-    parent: regl._gl.canvas as HTMLElement,
-    element: regl._gl.canvas as HTMLElement,
   });
 
   camera.update();
@@ -37,7 +36,6 @@ function getUniforms(regl: Regl) {
   function update<T>(callback: () => T) {
     return ({ tick, viewportWidth, viewportHeight }: DefaultContext): T => {
       if (tick !== prevTick) {
-        // vec3.rotateY(controls.position, controls.position, ORIGIN, 0.001)
         controls.update();
         controls.copyInto(camera.position, camera.direction, camera.up);
         camera.viewport[2] = viewportWidth;
@@ -91,9 +89,7 @@ function getContext() {
 
 export default function draw(regl: Regl): DrawCommand {
   return regl({
-    uniforms: {
-      uniforms: getUniforms(regl),
-      context: getContext(),
-    },
+    uniforms: getUniforms(regl),
+    context: getContext(),
   });
 }

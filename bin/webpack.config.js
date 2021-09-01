@@ -19,7 +19,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      title: "Revenant",
+      title: "Canvas",
       template: "./index.html",
     }),
   ],

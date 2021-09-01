@@ -1,18 +1,19 @@
 import glsl from "glslify";
 import { Regl, Texture } from "regl";
 
-import { vec3 } from "vec-math";
+import { vec3 } from "../lib/vec-math";
 import * as quads from "../lib/quads";
 import createRandom from "@tatumcreative/random";
 import { SceneContext } from "./scene";
 import { accessors, drawCommand } from "../lib/regl";
+import { matcap } from "../lib/shaders";
 
 export default function mainMask(regl: Regl) {
-  const quads = createGeometry();
+  const maskMesh = createGeometry();
 
   return {
-    drawMask: createDrawMask(regl, quads),
-    maskQuads: quads,
+    drawMask: createDrawMask(regl, maskMesh),
+    maskMesh,
   };
 }
 
@@ -36,7 +37,7 @@ function createDrawMask(regl: Regl, mesh: QuadMesh) {
     `,
     frag: glsl`
       precision mediump float;
-      #pragma glslify: matcap = require(matcap)
+      ${matcap}
       uniform vec3 cameraPosition;
       uniform sampler2D matcapTexture;
       varying vec3 vNormal;
@@ -85,9 +86,9 @@ function createGeometry() {
   shapeEyes(mesh);
   shapeMaskBack(mesh);
   refineEyes(mesh);
-  shapeNose(mesh);
-  extrudeHair(mesh);
-  quads.subdivide(mesh, 2);
+  // shapeNose(mesh);
+  // extrudeHair(mesh);
+  // quads.subdivide(mesh, 2);
   return mesh;
 }
 
@@ -137,10 +138,10 @@ function createEyeHoles(mesh: QuadMesh, w: number, h: number, d: number) {
 function refineEyes(mesh: QuadMesh): void {
   quads.subdivide(mesh, 1);
   [
-    { cellIndex: 48, opposite: true },
-    { cellIndex: 75, opposite: false },
-  ].forEach(({ cellIndex, opposite }) => {
-    const quad = mesh.quads[cellIndex];
+    { quadIndex: 48, opposite: true },
+    { quadIndex: 75, opposite: false },
+  ].forEach(({ quadIndex, opposite }) => {
+    const quad = mesh.quads[quadIndex];
     quads.insetLoop(mesh, quad, 0.05, opposite);
 
     const ring = quads.getNewGeometry(mesh, "positions", () => {
@@ -162,12 +163,12 @@ function shapeNose(mesh: QuadMesh): void {
     mesh.positions[i][2] -= 0.05;
   });
 
-  quads.splitLoop(mesh, mesh.quads[25], 0.2, true);
-  [230, 231, 232].forEach(i => {
-    mesh.positions[i][0] *= 2;
-    mesh.positions[i][1] += 0.05;
-    mesh.positions[i][2] += 0.05;
-  });
+  // quads.splitLoop(mesh, mesh.quads[25], 0.2, true);
+  // [230, 231, 232].forEach(i => {
+  //   mesh.positions[i][0] *= 2;
+  //   mesh.positions[i][1] += 0.05;
+  //   mesh.positions[i][2] += 0.05;
+  // });
 }
 
 function extrudeHair(mesh: QuadMesh): void {

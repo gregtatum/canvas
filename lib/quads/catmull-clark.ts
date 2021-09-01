@@ -19,19 +19,9 @@ function addToMapSet<K, V>(map: Map<K, Set<V>>, key: K, value: V): void {
 }
 
 /**
- * Apply catmull clark subdivision to a quad mesh.
- */
-export function subdivide(mesh: QuadMesh, count: number): QuadMesh {
-  for (let i = 0; i < count; i++) {
-    mesh = subdivideOne(mesh);
-  }
-  return mesh;
-}
-
-/**
  * Subdivide only once.
  */
-export function subdivideOne(mesh: QuadMesh): QuadMesh {
+export function catmullClarkSubdivision(mesh: QuadMesh): QuadMesh {
   // https://rosettacode.org/wiki/Catmull%E2%80%93Clark_subdivision_surface
   // https://people.eecs.berkeley.edu/~sequin/CS284/PAPERS/CatmullClark_SDSurf.pdf
 

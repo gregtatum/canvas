@@ -1,4 +1,4 @@
-import startRegl from "regl";
+import startRegl, { DrawCommand } from "regl";
 import {
   InitializationOptions,
   Regl,
@@ -10,7 +10,7 @@ import {
 /**
  * Apply a nice error to the DOM when a regl error occurs.
  */
-export function regl(config: InitializationOptions = {}): Regl {
+export function initRegl(config: InitializationOptions = {}): Regl {
   const baseConfig: InitializationOptions = {
     onDone: (...args) => {
       if (typeof config.onDone === "function") {
@@ -31,7 +31,7 @@ export function regl(config: InitializationOptions = {}): Regl {
 
   return startRegl({
     ...baseConfig,
-    config,
+    ...config,
   } as InitializationOptions);
 }
 
@@ -50,16 +50,46 @@ export function accessors<
   Context extends DefaultContext = DefaultContext
 >() {
   function getProp<K extends keyof Props>(
-    key: K
+    key: K,
+    defaultValue?: Props[K]
   ): DynamicVariableFn<Props[K], Context, Props> {
-    return (_, props) => props[key];
+    return (_, props) => {
+      const value = props[key];
+      if (value === undefined && defaultValue !== undefined) {
+        return defaultValue;
+      }
+      return value;
+    };
   }
 
   function getContext<K extends keyof Context>(
-    key: K
+    key: K,
+    defaultValue?: Context[K]
   ): DynamicVariableFn<Context[K], Context, Props> {
-    return (ctx, _) => ctx[key];
+    return (ctx, _) => {
+      const value = ctx[key];
+      if (value === undefined && defaultValue !== undefined) {
+        return defaultValue;
+      }
+      return value;
+    };
   }
 
   return { getProp, getContext };
+}
+
+/**
+ * Work around CommandBodyFn types not seeming to work as I expect them to.
+ */
+export function composeDrawCommands<
+  Context extends DefaultContext = DefaultContext,
+  Props = {}
+>(
+  drawA: DrawCommand<Context, Props>,
+  drawB: DrawCommand<Context, Props>
+): DrawCommand<Context, Props> {
+  const fn: any = (props: Props) => {
+    drawB(() => drawA(props));
+  };
+  return fn;
 }
