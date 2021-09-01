@@ -1,7 +1,7 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
 import createRtree, { RTree } from "rtree";
 import ease from "eases/sine-in-out";
 const TAU = Math.PI * 2;

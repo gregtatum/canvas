@@ -1,7 +1,7 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
 import elasticOut from "eases/elastic-out";
 const TAU = Math.PI * 2;
 

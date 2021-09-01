@@ -1,5 +1,5 @@
 // /* eslint-disable @typescript-eslint/no-var-requires */
-import { initRegl } from "../lib/regl";
+import { initRegl } from "lib/regl";
 import _regl from "regl";
 import resl from "resl";
 

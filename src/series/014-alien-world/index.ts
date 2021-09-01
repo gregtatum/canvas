@@ -17,15 +17,15 @@ import * as THREE from "three";
 import lerp from "lerp";
 
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
+import initializeShortcuts from "lib/shortcuts";
 import Simplex from "simplex-noise";
 import {
   createCanvasTexture,
   scaleHexColor,
   guiMeshPhysicalMaterial,
   guiAddMesh,
-} from "../lib/three";
-// import { generateSeed } from "../lib/draw";
+} from "lib/three";
+// import { generateSeed } from "lib/draw";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = ReturnType<typeof getCurrent>;

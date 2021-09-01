@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 const path = require("path");
 const fs = require("fs");
 const template = require("lodash.template");
@@ -9,6 +10,7 @@ const { ncp } = require("ncp");
 const touch = require("touch");
 const removeMarkdown = require("remove-markdown");
 const { spawn } = require("child_process");
+const { getPathToSession } = require("./common");
 
 const {
   findSessionFromCli,
@@ -106,7 +108,7 @@ async function webpackBundleNeighboringSessions(sessions, sessionSlug) {
 function copyProjectFiles(sessionSlug) {
   const fileNames = ["image.jpg", "thumb.jpg"];
   for (const fileName of fileNames) {
-    const src = path.join(__dirname, "../", sessionSlug, fileName);
+    const src = path.join(getPathToSession(sessionSlug), fileName);
     const dest = path.join(__dirname, "../dist", sessionSlug, fileName);
     console.log(`Copying "${src}"`);
     fs.copyFileSync(src, dest);
@@ -166,17 +168,19 @@ function updateReadme(sessions) {
 
 function getSessionTitle(sessionSlug) {
   const packageDestination = path.resolve(
-    __dirname,
-    "../",
-    sessionSlug,
+    getPathToSession(sessionSlug),
     "package.json"
   );
   const packageJson = require(packageDestination);
   packageJson.name;
 }
 
+/**
+ * @param {string} sessionSlug
+ * @returns {string}
+ */
 function getSessionReadmeDescription(sessionSlug) {
-  const sessionPath = path.join(__dirname, "..", sessionSlug);
+  const sessionPath = getPathToSession(sessionSlug);
   const markdown = fs.readFileSync(path.join(sessionPath, "README.md"), "utf8");
   if (!markdown) {
     throw new Error("No REAMDE.md was written for the session.");
@@ -186,8 +190,10 @@ function getSessionReadmeDescription(sessionSlug) {
 }
 
 async function webpackBundle(sessions, sessionSlug) {
-  const sessionPath = path.join(__dirname, "..", sessionSlug);
+  const sessionPath = getPathToSession(sessionSlug);
   const entry = path.resolve(sessionPath, "index.ts");
+
+  /** @type {any} */
   const config = getWebpackConfig({
     title: getSessionTitle(sessionPath),
     entry,
@@ -238,7 +244,7 @@ function getBundlePath(sessionSlug) {
 }
 
 async function generateThumbnail(sessions, sessionSlug) {
-  const sessionPath = path.resolve(__dirname, "../", sessionSlug);
+  const sessionPath = getPathToSession(sessionSlug);
   const fullImagePath = path.resolve(sessionPath, "image.jpg");
   const thumbPath = path.resolve(sessionPath, "thumb.jpg");
   // Fit this nicely into GitHub's README.md display width.
@@ -264,9 +270,7 @@ async function generateThumbnail(sessions, sessionSlug) {
 
 function getTemplateParameters(sessions, sessionSlug) {
   const packageDestination = path.resolve(
-    __dirname,
-    "../",
-    sessionSlug,
+    getPathToSession(sessionSlug),
     "package.json"
   );
 

@@ -1,8 +1,8 @@
 import glsl from "glslify";
 import { Regl, DrawCommand } from "regl";
 
-import * as quad from "../lib/quads";
-import { accessors, drawCommand } from "../lib/regl";
+import * as quad from "lib/quads";
+import { accessors, drawCommand } from "lib/regl";
 import { SceneContext } from "./scene";
 
 export default function(regl: Regl) {

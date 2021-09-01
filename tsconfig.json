@@ -9,11 +9,14 @@
     "target": "esnext",
     "lib": ["esnext", "dom"],
     "baseUrl": ".",
+    "paths": {
+      // Also see webpack config and .eslintrc to update.
+      "lib/*": ["src/lib/*"],
+    }
   },
-  "include": ["./**/*.ts"],
+  "include": ["./src/**/*.ts","./bin/**/*.js"],
   "exclude": [
     "node_modules",
-    "bin",
     "node_modules/gl-matrix"
   ]
 }

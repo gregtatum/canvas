@@ -1,5 +1,5 @@
 import glsl from "glslify";
-import { simplex } from "../lib/shaders";
+import { simplex } from "lib/shaders";
 import { Regl, DrawCommand } from "regl";
 
 export default function drawBackground(regl: Regl): DrawCommand {

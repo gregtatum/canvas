@@ -16,9 +16,9 @@ import {
 import * as THREE from "three";
 import lerp from "lerp";
 
-import { generateSeed, setupCanvas } from "../lib/draw";
+import { generateSeed, setupCanvas } from "lib/draw";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
+import initializeShortcuts from "lib/shortcuts";
 import Simplex from "simplex-noise";
 
 type Config = ReturnType<typeof getConfig>;

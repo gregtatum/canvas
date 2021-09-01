@@ -1,7 +1,7 @@
 import glsl from "glslify";
 import { Regl, DrawCommand } from "regl";
-import { fill } from "../lib/utils";
-import { simplex } from "../lib/shaders";
+import { fill } from "lib/utils";
+import { simplex } from "lib/shaders";
 
 const DUST_COUNT = 3000;
 

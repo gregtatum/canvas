@@ -1,6 +1,6 @@
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
-import * as Physics from "../lib/physics";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
+import * as Physics from "lib/physics";
 import setupRandom from "@tatumcreative/random";
 import lerp from "lerp";
 

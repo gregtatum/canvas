@@ -1,8 +1,8 @@
 import glsl from "glslify";
 import { Regl, DrawCommand } from "regl";
 
-import * as quads from "../lib/quads";
-import { accessors, composeDrawCommands, drawCommand } from "../lib/regl";
+import * as quads from "lib/quads";
+import { accessors, composeDrawCommands, drawCommand } from "lib/regl";
 import { SceneContext } from "./scene";
 
 const POSITION_COLOR: Tuple3 = [0.5, 0, 0];

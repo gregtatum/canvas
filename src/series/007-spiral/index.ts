@@ -1,11 +1,11 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
 import createVerletSystem from "verlet-system";
 import createPoint, { VerletPoint } from "verlet-point";
 import createConstraint, { VerletConstraint } from "verlet-constraint";
-import { range } from "../lib/range";
+import { range } from "lib/range";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = ReturnType<typeof getCurrent>;

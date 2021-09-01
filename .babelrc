@@ -7,5 +7,13 @@
     }],
     "@babel/preset-typescript"
   ],
-  "plugins": ["glslify"]
+  "plugins": [
+    "glslify",
+    // Also see webpack config and tsconfig to update.
+    ["module-resolver", {
+      "alias": {
+        "lib": "./src/lib"
+      }
+    }]
+  ]
 }

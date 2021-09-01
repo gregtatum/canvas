@@ -1,5 +1,5 @@
 import { Regl, DefaultContext, DrawCommand } from "regl";
-import { vec3, mat3, mat4 } from "../lib/vec-math";
+import { vec3, mat3, mat4 } from "lib/vec-math";
 import createControls from "orbit-controls";
 import createCamera from "perspective-camera";
 

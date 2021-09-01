@@ -1,5 +1,16 @@
+// @ts-check
 const path = require("path");
 const fs = require("fs");
+
+/**
+ * @param {string} slug
+ * @returns {string}
+ */
+function getPathToSession(slug) {
+  return slug.match(/^\d+/)
+    ? path.join(__dirname, "../src/series", slug)
+    : path.join(__dirname, "../src/singles", slug);
+}
 
 function findSessionFromCli() {
   const session = process.argv[2];
@@ -8,7 +19,8 @@ function findSessionFromCli() {
   }
   // Don't trust this path too much.
   const { name } = path.parse(session);
-  const pathToSession = path.join(__dirname, "..", name);
+
+  const pathToSession = getPathToSession(name);
   try {
     if (fs.statSync(pathToSession).isDirectory()) {
       return pathToSession;
@@ -26,7 +38,7 @@ function findSessionFromCli() {
 }
 
 function getAllSessions() {
-  const dir = path.join(__dirname, "..");
+  const dir = path.join(__dirname, "../src/series");
   const sessions = [];
 
   // Go through the root directory and get all of the projects
@@ -42,7 +54,7 @@ function getAllSessions() {
   }
 
   // Sort the projects alphabetically.
-  sessions.sort((a, b) => a.fileName - b.fileName);
+  sessions.sort((a, b) => a.fileName.localeCompare(b.fileName));
 
   return sessions;
 }
@@ -64,9 +76,13 @@ function getWebpackConfig({
     module: {
       rules: [
         {
-          test: /\.ts$/,
-          use: "ts-loader",
+          test: /\.tsx?$/,
+          loader: "ts-loader",
           exclude: /node_modules/,
+          options: {
+            // disable type checker - we will use it in fork plugin
+            transpileOnly: true,
+          },
         },
         {
           test: /\.css$/i,
@@ -85,6 +101,10 @@ function getWebpackConfig({
     ],
     resolve: {
       extensions: [".ts", ".js"],
+      alias: {
+        // Also see .babelrc, and tsconfig to update.
+        lib: path.resolve(__dirname, "../src/lib"),
+      },
     },
     output: {
       path: outputPath,
@@ -96,4 +116,9 @@ function getWebpackConfig({
   };
 }
 
-module.exports = { findSessionFromCli, getAllSessions, getWebpackConfig };
+module.exports = {
+  findSessionFromCli,
+  getAllSessions,
+  getWebpackConfig,
+  getPathToSession,
+};

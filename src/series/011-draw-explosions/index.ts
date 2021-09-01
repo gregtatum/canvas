@@ -1,8 +1,8 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
-import { setupCurveDrawing, Curve } from "../lib/curve-drawing";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
+import { setupCurveDrawing, Curve } from "lib/curve-drawing";
 import createVerletSystem from "verlet-system";
 import ease from "eases/cubic-in-out";
 import lerp from "lerp";

@@ -1,12 +1,12 @@
 import glsl from "glslify";
 import { Regl, Texture } from "regl";
 
-import { vec3 } from "../lib/vec-math";
-import * as quads from "../lib/quads";
+import { vec3 } from "lib/vec-math";
+import * as quads from "lib/quads";
 import createRandom from "@tatumcreative/random";
 import { SceneContext } from "./scene";
-import { accessors, drawCommand } from "../lib/regl";
-import { matcap } from "../lib/shaders";
+import { accessors, drawCommand } from "lib/regl";
+import { matcap } from "lib/shaders";
 
 export default function mainMask(regl: Regl) {
   const maskMesh = createGeometry();

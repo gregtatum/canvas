@@ -1,8 +1,8 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
-import { lerpTheta } from "../lib/lerpTheta";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
+import { lerpTheta } from "lib/lerpTheta";
 import lerp from "lerp";
 import createRtree, { RTree } from "rtree";
 import ease from "eases/sine-in-out";

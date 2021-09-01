@@ -1,8 +1,8 @@
 import Simplex from "simplex-noise";
 import setupRandom from "@tatumcreative/random";
-import initializeShortcuts from "../lib/shortcuts";
-import { setupCanvas, loop, generateSeed } from "../lib/draw";
-import { lerpTheta } from "../lib/lerpTheta";
+import initializeShortcuts from "lib/shortcuts";
+import { setupCanvas, loop, generateSeed } from "lib/draw";
+import { lerpTheta } from "lib/lerpTheta";
 
 const TAU = Math.PI * 2;
 

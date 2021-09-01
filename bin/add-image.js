@@ -7,8 +7,8 @@ const fs = require("fs");
 
 {
   const usage = "Usage: yarn add-image 001-tick-tock /path/to/screenshot.png";
-  const session = findSessionFromCli();
-  if (!session) {
+  const sessionPath = findSessionFromCli();
+  if (!sessionPath) {
     console.error("No session was specified");
     console.error(usage);
     console.error();
@@ -34,14 +34,14 @@ const fs = require("fs");
     process.exit();
   }
 
-  addJpegImage(imagePath, session).catch(error => {
+  addJpegImage(imagePath, sessionPath).catch(error => {
     throw error;
   });
 }
 
-async function addJpegImage(sourceImagePath, session) {
-  const imagePath = path.join(session, "image.jpg");
-  const thumbPath = path.join(session, "thumb.jpg");
+async function addJpegImage(sourceImagePath, sessionPath) {
+  const imagePath = path.join(sessionPath, "image.jpg");
+  const thumbPath = path.join(sessionPath, "thumb.jpg");
 
   const image = await jimp.read(sourceImagePath);
   const imageWidth = image.bitmap.width;
@@ -52,7 +52,7 @@ async function addJpegImage(sourceImagePath, session) {
   const targetWidth = (targetHeight / imageHeight) * imageWidth;
 
   const copiedOriginalPath = path.join(
-    session,
+    sessionPath,
     "original." + image.getExtension()
   );
 
