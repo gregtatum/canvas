@@ -14,15 +14,13 @@ export class UnhandledCaseError extends Error {
  */
 export function ensureExists<T>(
   item: T | null | undefined,
-  message = "an item"
+  message = "The item did not exist when it was supposed to."
 ): T {
   if (item === null) {
-    throw new Error(message || "Expected ${name} to exist, and it was null.");
+    throw new Error(message);
   }
   if (item === undefined) {
-    throw new Error(
-      message || "Expected ${name} to exist, and it was undefined."
-    );
+    throw new Error(message);
   }
   return item;
 }
