@@ -1596,3 +1596,29 @@ export function subdivide(mesh: QuadMesh, count: number): QuadMesh {
   computeNormals(mesh);
   return mesh;
 }
+
+/**
+ * Get a Tuple4 of the quads' positions with an optional target.
+ */
+export function getPositions(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  target?: Array<any>
+): Tuple4<Tuple3> {
+  if (typeof quad === "number") {
+    const quadIndex = quad;
+    quad = mesh.quads[quadIndex];
+    if (!quad) {
+      throw new Error("Could not find quad at index " + quadIndex);
+    }
+  }
+  const [a, b, c, d] = quad;
+  if (!target) {
+    target = [];
+  }
+  target[0] = ensureExists(mesh.positions[a]);
+  target[1] = ensureExists(mesh.positions[b]);
+  target[2] = ensureExists(mesh.positions[c]);
+  target[3] = ensureExists(mesh.positions[d]);
+  return target as Tuple4<Tuple3>;
+}

@@ -69,6 +69,7 @@ type DevicePixels = number;
 type Integer = number;
 type Scalar = number;
 type Index = number;
+type QuadIndex = number;
 type Radian = number;
 type UnitInterval = number;
 type CellIndex = number;
