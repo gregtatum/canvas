@@ -241,3 +241,22 @@ export function assertArt(
     reportIsDifferent();
   }
 }
+
+/**
+ * Lower the precicion of some values so they can be used in
+ * assertions and logging better.
+ */
+export function lowerPrecision(array: Array<number[]>, digits = 3): void {
+  const units = Math.pow(10, digits);
+  for (const position of array) {
+    for (let i = 0; i < position.length; i++) {
+      let n = position[i];
+      n = Math.round(n * units) / units;
+      if (Object.is(n, -0)) {
+        // Remove -0.
+        n = 0;
+      }
+      position[i] = n;
+    }
+  }
+}

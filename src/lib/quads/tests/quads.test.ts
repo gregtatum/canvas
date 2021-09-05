@@ -1,8 +1,34 @@
+import { vec3 } from "lib/vec-math";
 import * as Quads from "../";
-import { assertArt, replaceCodepoint } from "./helpers";
+import { assertArt, replaceCodepoint, lowerPrecision } from "./helpers";
+
+// const Quads = require("/Users/greg/me/sessions/common/quads");
 
 describe("QuadMesh", () => {
-  it("can create a quad from positions", () => {
+  it("creates a quad from size", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("creates a quad from positions", () => {
     const { mesh } = Quads.createQuad({
       positions: [
         [-4.0, 0.0, -3.0],
@@ -30,32 +56,11 @@ describe("QuadMesh", () => {
       │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
       `
     );
+
+    expect(Quads.getCenter(mesh, mesh.quads[0])).toEqual([-1.5, 0, 0]);
   });
 
-  it("can create a quad from size", () => {
-    const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
-
-    assertArt(
-      mesh,
-      "z",
-      `
-      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
-      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      │ -2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
-      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
-      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
-      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
-      │  2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
-      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
-      `
-    );
-  });
-
-  it("can split a quad vertically", () => {
+  it("splits a quad vertically", () => {
     const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
 
     assertArt(
@@ -98,7 +103,65 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can split a quad horizontally", () => {
+  it("clones quads", () => {
+    const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
+    Quads.splitVerticalDisjoint(mesh, mesh.quads[0], 0.25);
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ◆━━◆━━━━━━━━◆  ·  ·  ·
+      │ -1  ·  ·  ·  ┃  ┃  ┊  ·  ┃  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┃┈┈┃┈┈┊┈┈┈┈┈┃┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ┃  ┃  ┊  ·  ┃  ·  ·  ·
+      │  2  ·  ·  ·  ◆━━◆━━━━━━━━◆  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+    const firstQuads = [...mesh.quads];
+    const secondQuads = Quads.getNewGeometry(mesh, "quads", () => {
+      Quads.cloneQuads(mesh, firstQuads);
+    });
+
+    for (const quad of firstQuads) {
+      for (const p of Quads.getPositions(mesh, quad)) {
+        p[0] -= 3;
+      }
+    }
+
+    for (const quad of secondQuads) {
+      for (const p of Quads.getPositions(mesh, quad)) {
+        p[0] += 3;
+      }
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ◆━━◆━━━━━━━━◆  ┊  ◆━━◆━━━━━━━━◆
+      │ -1  ┃  ┃  ·  ·  ┃  ┊  ┃  ┃  ·  ·  ┃
+      │  0 ┈┃┈┈┃┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┃┈┈┈┈┈┈┈┈┃┈
+      │  1  ┃  ┃  ·  ·  ┃  ┊  ┃  ┃  ·  ·  ┃
+      │  2  ◆━━◆━━━━━━━━◆  ┊  ◆━━◆━━━━━━━━◆
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("splits a quad horizontally", () => {
     const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
 
     assertArt(
@@ -141,7 +204,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can split a quad horizontally disjointly", () => {
+  it("splits a quad horizontally disjointly", () => {
     const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
 
     assertArt(
@@ -184,7 +247,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can split a quad horizontally disjointly", () => {
+  it("splits a quad horizontally disjointly", () => {
     const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
 
     assertArt(
@@ -250,7 +313,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can clone a quad", () => {
+  it("clones a quad", () => {
     const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
 
     assertArt(
@@ -297,7 +360,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can render diagonals (-x, -y)", () => {
+  it("renders diagonals (-x, -y)", () => {
     const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
     for (const p of Quads.getPositions(mesh, 0)) {
       p[0] += 3;
@@ -326,7 +389,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can render diagonals (+x, -y)", () => {
+  it("renders diagonals (+x, -y)", () => {
     const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
     for (const p of Quads.getPositions(mesh, 0)) {
       p[0] -= 3;
@@ -355,7 +418,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can render diagonals (-x, +y)", () => {
+  it("renders diagonals (-x, +y)", () => {
     const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
     for (const p of Quads.getPositions(mesh, 0)) {
       p[0] += 3;
@@ -384,7 +447,7 @@ describe("QuadMesh", () => {
     );
   });
 
-  it("can render diagonals (+x, +y)", () => {
+  it("renders diagonals (+x, +y)", () => {
     const { mesh } = Quads.createQuad({ w: 4, h: 4, facing: "z+" });
     for (const p of Quads.getPositions(mesh, 0)) {
       p[0] -= 3;
@@ -584,6 +647,767 @@ describe("QuadMesh", () => {
       │  3  ·  ·  ·━━━━ ·  ┃  ·  ·  ·  ·  ·
       │  4  ·  ·  ·  · ━━━ ┃  ·  ·  ·  ·  ·
       │  5  ·  ·  ·  ·  · ━◆  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("extrudes geometry disjointly", () => {
+    const { mesh } = Quads.createQuad({ w: 10, h: 10, facing: "z+" });
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      │ -4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈┈┊┈┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      `
+    );
+
+    Quads.extrudeDisjoint(mesh, mesh.quads[0], 0.55, 3);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      │ -4  ┃ ━━━ ·  ·  ·  ┊  ·  ·  · ━━━ ┃
+      │ -3  ┃  · ━━━ ·  ·  ┊  ·  · ━━━ ·  ┃
+      │ -2  ┃  ·  · ◆━━━━━━━━━━━━━◆ ·  ·  ┃
+      │ -1  ┃  ·  · ┃·  ·  ┊  ·  ·┃ ·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┊┈┈┈┈┈┈┃┈┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  · ┃·  ·  ┊  ·  ·┃ ·  ·  ┃
+      │  2  ┃  ·  · ◆━━━━━━━━━━━━━◆ ·  ·  ┃
+      │  3  ┃  · ━━━ ·  ·  ┊  ·  · ━━━ ·  ┃
+      │  4  ┃ ━━━ ·  ·  ·  ┊  ·  ·  · ━━━ ┃
+      │  5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      `
+    );
+
+    assertArt(
+      mesh,
+      "x",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  · ━◆  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  · ━━━ ┃  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·━━━━ ·  ┃  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ◆  ·  ·  ┃  ·  ·  ·  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┃  ·  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  ·  ┃  ·  ·  ·  ·  ·
+      │  2  ·  ·  ◆  ·  ·  ┃  ·  ·  ·  ·  ·
+      │  3  ·  ·  ·━━━━ ·  ┃  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  · ━━━ ┃  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  · ━◆  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("updates normals", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 2, facing: "z+" });
+    mesh.normals![0] = [1000, 1000, 1000];
+    expect(mesh.normals).toEqual([
+      [1000, 1000, 1000],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+    ]);
+    Quads.updateNormalsForQuad(mesh, mesh.quads[0]);
+
+    expect(mesh.normals).toEqual([
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+    ]);
+    for (const p of Quads.getPositions(mesh, mesh.quads[0])) {
+      vec3.rotateY(p, p, [0, 1, 0], Math.PI);
+    }
+
+    Quads.updateNormalsForQuad(mesh, mesh.quads[0]);
+    lowerPrecision(mesh.normals!, 3);
+    expect(mesh.normals).toEqual([
+      [0, 0, 1],
+      [0, 0, 1],
+      [0, 0, 1],
+      [0, 0, 1],
+    ]);
+  });
+
+  it("flips normals", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 2, facing: "z+" });
+    expect(mesh.normals).toEqual([
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+    ]);
+    Quads.flip(mesh, mesh.quads[0]);
+    expect(mesh.normals).toEqual([
+      [-0, -0, 1],
+      [-0, -0, 1],
+      [-0, -0, 1],
+      [-0, -0, 1],
+    ]);
+  });
+
+  it("gets a quad from position index", () => {
+    const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
+
+    Quads.splitVertical(mesh, mesh.quads[0], 0.25);
+    expect(Quads.getQuadsFromPositionIndex(mesh, 0)).toEqual([[0, 1, 4, 5]]);
+    expect(Quads.getQuadsFromPositionIndex(mesh, 5)).toEqual([
+      [0, 1, 4, 5],
+      [5, 4, 2, 3],
+    ]);
+  });
+
+  it("creates a box disjoint", () => {
+    const mesh = Quads.createBox(2, 4, 6);
+    expect(mesh.quads).toEqual([
+      [4, 5, 6, 7],
+      [3, 2, 1, 0],
+      [0, 1, 5, 4],
+      [5, 1, 2, 6],
+      [7, 6, 2, 3],
+      [0, 4, 7, 3],
+    ]);
+    expect(mesh.positions).toHaveLength(8);
+    expect(mesh.normals).toHaveLength(8);
+
+    assertArt(
+      mesh,
+      "y",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  2  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    assertArt(
+      mesh,
+      "x",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈┈┊┈┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("creates a box disjoint", () => {
+    const mesh = Quads.createBoxDisjoint(2, 4, 6);
+    expect(mesh.quads).toEqual([
+      [12, 15, 18, 21],
+      [7, 6, 5, 4],
+      [0, 1, 16, 14],
+      [17, 9, 10, 19],
+      [22, 20, 2, 3],
+      [8, 13, 23, 11],
+    ]);
+    expect(mesh.positions).toHaveLength(24);
+    expect(mesh.normals).toHaveLength(24);
+
+    assertArt(
+      mesh,
+      "y",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  2  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    assertArt(
+      mesh,
+      "x",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈┈┊┈┈┈┈┈┈┈┈┃┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │ -1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  0 ┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ·  ·  ·  ┃  ┊  ┃  ·  ·  ·  ·
+      │  2  ·  ·  ·  ·  ◆━━━━━◆  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    expect(Quads.computeCenterPositions(mesh)).toEqual([
+      [0, 2, 0],
+      [0, -2, 0],
+      [-1, 0, 0],
+      [0, 0, 3],
+      [1, 0, 0],
+      [0, 0, -3],
+    ]);
+  });
+
+  it("creates a quad from size", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
+    expect(Quads.getElements(mesh)).toEqual(
+      new Uint16Array([0, 1, 2, 2, 3, 0])
+    );
+    expect(Quads.getElements(mesh, "triangles")).toEqual(
+      new Uint16Array([0, 1, 2, 2, 3, 0])
+    );
+    expect(Quads.getElements(mesh, "lines")).toEqual(
+      new Uint16Array([0, 1, 1, 2, 2, 3, 3, 0])
+    );
+  });
+
+  it("computes smooth normals", () => {
+    const { mesh } = Quads.createQuad({ w: 8, h: 8, facing: "z+" });
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    expect(mesh.normals).toEqual([
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+      [0, 0, -1],
+    ]);
+
+    mesh.positions[2][0] += 1;
+    mesh.positions[2][1] += 1;
+    mesh.positions[2][2] += 1;
+    Quads.computeSmoothNormals(mesh);
+    expect(mesh.normals).toHaveLength(6);
+    lowerPrecision(mesh.normals!, 3);
+    expect(mesh.normals).toEqual([
+      [0.055, 0, -0.998],
+      [0.11, 0, -0.994],
+      [0.11, 0, -0.994],
+      [0.055, 0, -0.998],
+      [0.055, 0, -0.998],
+      [0.055, 0, -0.998],
+    ]);
+  });
+
+  it("splits a loop vertically", () => {
+    const { mesh } = Quads.createQuad({ w: 6, h: 10, facing: "z+" });
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[1], 0.5);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -4  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │ -3  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │ -2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━━━━━━━━━━━━━━━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  2  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  3  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │  4  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  5  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      `
+    );
+
+    Quads.splitLoopVertical(mesh, mesh.quads[1], 1 / 6);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ◆━━◆━━━━━━━━━━━━━━◆  ·  ·
+      │ -4  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │ -3  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │ -2  ·  ·  ◆━━◆━━━━━━━━━━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━◆━━━━━━━━━━━━━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │  2  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │  3  ·  ·  ◆━━◆━━━━━━━━━━━━━━◆  ·  ·
+      │  4  ·  ·  ┃  ┃  ·  ┊  ·  ·  ┃  ·  ·
+      │  5  ·  ·  ◆━━◆━━━━━━━━━━━━━━◆  ·  ·
+      `
+    );
+  });
+
+  it("splits a loop horizontally", () => {
+    const { mesh } = Quads.createQuad({ w: 10, h: 6, facing: "z+" });
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[1], 0.5);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │ -2  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │ -1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  2  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    Quads.splitLoopHorizontal(mesh, mesh.quads[1], 1 / 6);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │ -2  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │ -1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  2  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("insets a loop vertically", () => {
+    const { mesh } = Quads.createQuad({ w: 6, h: 10, facing: "z+" });
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[1], 0.5);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -4  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │ -3  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │ -2  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━━━━━━━━━━━━━━━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  2  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  3  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      │  4  ·  ·  ┃  ·  ·  ┊  ·  ·  ┃  ·  ·
+      │  5  ·  ·  ◆━━━━━━━━━━━━━━━━━◆  ·  ·
+      `
+    );
+
+    Quads.insetLoopVertical(mesh, mesh.quads[1], 1 / 3);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ◆━━◆━━━━━━━━━━━◆━━◆  ·  ·
+      │ -4  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │ -3  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │ -2  ·  ·  ◆━━◆━━━━━━━━━━━◆━━◆  ·  ·
+      │ -1  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━◆━━━━━━━━━━━◆━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │  2  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │  3  ·  ·  ◆━━◆━━━━━━━━━━━◆━━◆  ·  ·
+      │  4  ·  ·  ┃  ┃  ·  ┊  ·  ┃  ┃  ·  ·
+      │  5  ·  ·  ◆━━◆━━━━━━━━━━━◆━━◆  ·  ·
+      `
+    );
+  });
+
+  it("insets a loop horizontally", () => {
+    const { mesh } = Quads.createQuad({ w: 10, h: 6, facing: "z+" });
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[1], 0.5);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │ -2  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │ -1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  2  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    Quads.insetLoopHorizontal(mesh, mesh.quads[1], 1 / 3);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │ -2  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │ -1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈┈┈┈┈┈┈┃┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  · ┃·  ·  ┃  ·  · ┃·  ·  ┃
+      │  2  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  3  ◆━━━━━━━◆━━━━━━◆━━━━━━━◆━━━━━━◆
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("gets a loop vertically", () => {
+    const { mesh } = Quads.createQuad({ w: 6, h: 8, facing: "z+" });
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[0], 0.5);
+    Quads.splitHorizontal(mesh, mesh.quads[1], 0.5);
+    Quads.insetLoopVertical(mesh, mesh.quads[1], 2 / 3);
+
+    const quad = 6;
+    for (const p of Quads.getPositions(mesh, quad)) {
+      p[0] += 1;
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ◆━━━━━◆━━━━━◆━━━━━◆  ·  ·
+      │ -3  ·  ·  ┃  ·  · ⟍┊  · ⟍·  ┃  ·  ·
+      │ -2  ·  ·  ◆━━━━━━━━◆━━━━━◆━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ·  ┃  ·  ┃  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━━━━━━━◆━━━━━◆━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  ·  · ⟋┊  · ⟋·  ┃  ·  ·
+      │  2  ·  ·  ◆━━━━━◆━━━━━◆━━━━━◆  ·  ·
+      │  3  ·  ·  ┃  ·  ┃  ┊  ┃  ·  ┃  ·  ·
+      │  4  ·  ·  ◆━━━━━◆━━━━━◆━━━━━◆  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    lowerPrecision(mesh.positions, 3);
+    const positions = Quads.getLoopVertical(
+      mesh,
+      mesh.quads[quad],
+      "positions"
+    );
+    expect(positions).toHaveLength(10);
+    for (const p of positions) {
+      p[0] -= 1;
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ◆━━◆━━━━━◆━━━━━━━━◆  ·  ·
+      │ -3  ·  ·  ┃  · ⟍·  ┊ ⟍·  ·  ┃  ·  ·
+      │ -2  ·  ·  ◆━━━━━◆━━━━━◆━━━━━◆  ·  ·
+      │ -1  ·  ·  ┃  ·  ┃  ┊  ┃  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈◆━━━━━◆━━━━━◆━━━━━◆┈┈┈┈┈┈┈
+      │  1  ·  ·  ┃  · ⟋·  ┊ ⟋·  ·  ┃  ·  ·
+      │  2  ·  ·  ◆━━◆━━━━━◆━━━━━━━━◆  ·  ·
+      │  3  ·  ·  ┃  ┃  ·  ┃  ·  ·  ┃  ·  ·
+      │  4  ·  ·  ◆━━◆━━━━━◆━━━━━━━━◆  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("gets a horizontal loop", () => {
+    const { mesh } = Quads.createQuad({ w: 8, h: 6, facing: "z+" });
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[0], 0.5);
+    Quads.splitVertical(mesh, mesh.quads[1], 0.5);
+    Quads.insetLoopHorizontal(mesh, mesh.quads[1], 2 / 3);
+
+    const quad = 8;
+    for (const p of Quads.getPositions(mesh, quad)) {
+      p[0] += 1;
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━━◆  ·
+      │ -2  ·  ┃  ·  ┃  ·  ┊ ⟍·  · ⟍·  ┃  ·
+      │ -1  ·  ◆━━━━━◆━━━━━━━━◆━━━━━◆━━◆  ·
+      │  0 ┈┈┈┈┃┈┈┈┈┈┃┈┈┈┈┈┊┈┈┃┈┈┈┈┈┃┈┈┃┈┈┈┈
+      │  1  ·  ◆━━━━━◆━━━━━━━━◆━━━━━◆━━◆  ·
+      │  2  ·  ┃  ·  ┃  ·  ┊ ⟋·  · ⟋·  ┃  ·
+      │  3  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━━◆  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    lowerPrecision(mesh.positions, 3);
+    const positions = Quads.getLoopHorizontal(
+      mesh,
+      mesh.quads[quad],
+      "positions"
+    );
+    expect(positions).toHaveLength(10);
+    for (const p of positions) {
+      p[1] -= 1;
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━━◆  ·
+      │ -2  ·  ◆━━━━━◆━━━━━━━━◆━━━━━◆━━◆  ·
+      │ -1  ·  ┃  ·  ┃  ·  ┊  ┃  ·  ┃  ┃  ·
+      │  0 ┈┈┈┈◆━━━━━◆━━━━━━━━◆━━━━━◆━━◆┈┈┈┈
+      │  1  ·  ┃  ·  ┃  ·  ┊ ⟋·  · ⟋·  ┃  ·
+      │  2  ·  ┃  ·  ┃  ·  ┊⟋ ·  ·⟋ ·  ┃  ·
+      │  3  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━━◆  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("subdivides a mesh with 1 iteration", () => {
+    const { mesh } = Quads.createQuad({ w: 10, h: 10, facing: "z+" });
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      │ -4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈┈┊┈┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      `
+    );
+
+    Quads.subdivide(mesh, 1);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·━━◆━━·  ·  ·  ·  ·
+      │ -4  ·  ·  ·━━━━━━  ┃  ━━━━━━·  ·  ·
+      │ -3  ·  · ◆━  ·  ·  ┃  ·  ·  ━◆⟍·  ·
+      │ -2  ·  ·⟋ ·  ·  ·  ┃  ·  ·  ·  ⟍  ·
+      │ -1  · ⟋·  ·  ·  ·  ┃  ·  ·  ·  · ⟍·
+      │  0 ┈◆━━━━━━━━━━━━━━◆━━━━━━━━━━━━━━◆┈
+      │  1  · ⟍·  ·  ·  ·  ┃  ·  ·  ·  ·⟋ ·
+      │  2  ·  ⟍  ·  ·  ·  ┃  ·  ·  ·  ⟋  ·
+      │  3  ·  · ◆·  ·  ·  ┃  ·  ·  ·◆ ·  ·
+      │  4  ·  ·  ━━━━━━·  ┃  ·━━━━━━  ·  ·
+      │  5  ·  ·  ·  ·  ━━━◆━━━  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("subdivides a mesh with 1 iteration", () => {
+    const { mesh } = Quads.createQuad({ w: 10, h: 10, facing: "z+" });
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      │ -4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │ -1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  0 ┈┃┈┈┈┈┈┈┈┈┈┈┈┈┈┈┊┈┈┈┈┈┈┈┈┈┈┈┈┈┈┃┈
+      │  1  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  2  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  3  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  4  ┃  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ┃
+      │  5  ◆━━━━━━━━━━━━━━━━━━━━━━━━━━━━━◆
+      `
+    );
+
+    Quads.subdivide(mesh, 2);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  · ━━◆━━━━◆━━━━◆━━ ·  ·  ·
+      │ -3  ·  · ⟋◆━ ⟋  ·  ┃  ·  ⟍ ━◆⟍ ·  ·
+      │ -2  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━⟍⟍◆ ·
+      │ -1  · ⟋·  · ┃·  ·  ┃  ·  ·┃ ·  ·⟍ ·
+      │  0 ┈┈┈◆━━━━━◆━━━━━━◆━━━━━━◆━━━━━◆┈┈┈
+      │  1  · ⟍·  · ┃·  ·  ┃  ·  ·┃ ·  ·⟋ ·
+      │  2  ·  ◆━━━━━◆━━━━━◆━━━━━◆━━━━━━◆ ·
+      │  3  ·  · ⟍◆━ ⟍  ·  ┃  ·  ⟋ ━◆⟋ ·  ·
+      │  4  ·  ·  · ━━◆━━━━◆━━━━◆━━ ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
+  it("mirrors a mesh", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
+    for (const p of Quads.getPositions(mesh, 0)) {
+      p[0] -= 3;
+    }
+    Quads.splitLoopHorizontal(mesh, mesh.quads[0], 0.5);
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ◆━━━━━◆  ·  ┊  ·  ·  ·  ·  ·
+      │ -1  ·  ┃  ·  ┃  ·  ┊  ·  ·  ·  ·  ·
+      │  0 ┈┈┈┈◆━━━━━◆┈┈┈┈┈┊┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+      │  1  ·  ┃  ·  ┃  ·  ┊  ·  ·  ·  ·  ·
+      │  2  ·  ◆━━━━━◆  ·  ┊  ·  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    Quads.mirror(mesh, mesh.quads, "x");
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ◆━━━━━◆  ·  ┊  ·  ◆━━━━━◆  ·
+      │ -1  ·  ┃  ·  ┃  ·  ┊  ·  ┃  ·  ┃  ·
+      │  0 ┈┈┈┈◆━━━━━◆┈┈┈┈┈┊┈┈┈┈┈◆━━━━━◆┈┈┈┈
+      │  1  ·  ┃  ·  ┃  ·  ┊  ·  ┃  ·  ┃  ·
+      │  2  ·  ◆━━━━━◆  ·  ┊  ·  ◆━━━━━◆  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
       `
     );
   });

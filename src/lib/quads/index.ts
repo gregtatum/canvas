@@ -11,17 +11,13 @@ import { catmullClarkSubdivision } from "./catmull-clark";
  *  |   |    |
  *  a---ad---d
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`, defaults to `0.5`.
  */
 export function splitVertical(
   mesh: QuadMesh,
   targetQuad: Quad,
   t: UnitInterval = 0.5
 ) {
-  const { positions, quads } = mesh;
+  const { positions, quads, normals } = mesh;
   const [a, b, c, d] = targetQuad;
   const positionA = positions[a];
   const positionB = positions[b];
@@ -36,6 +32,10 @@ export function splitVertical(
   targetQuad[2] = bc;
   targetQuad[3] = ad;
   quads.push([ad, bc, c, d]);
+  if (normals) {
+    normals[bc] = normals[b];
+    normals[ad] = normals[a];
+  }
 }
 
 /**
@@ -47,10 +47,6 @@ export function splitVertical(
  *  |     |  |     |
  *  a---ad1  ad2---d
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`, defaults to `0.5`.
  */
 export function splitVerticalDisjoint(
   mesh: QuadMesh,
@@ -97,13 +93,9 @@ export function splitVerticalDisjoint(
  *  |        |
  *  a--------d
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`
  */
 export function splitHorizontal(mesh: QuadMesh, targetQuad: Quad, t = 0.5) {
-  const { positions, quads } = mesh;
+  const { positions, quads, normals } = mesh;
   const [a, b, c, d] = targetQuad;
   const positionA = positions[a];
   const positionB = positions[b];
@@ -117,6 +109,10 @@ export function splitHorizontal(mesh: QuadMesh, targetQuad: Quad, t = 0.5) {
   positions[cd] = cdPosition;
   targetQuad[1] = ab;
   targetQuad[2] = cd;
+  if (normals) {
+    normals[ab] = normals[a];
+    normals[cd] = normals[d];
+  }
   quads.push([ab, b, c, cd]);
 }
 
@@ -131,10 +127,6 @@ export function splitHorizontal(mesh: QuadMesh, targetQuad: Quad, t = 0.5) {
  *  | target |
  *  a--------d
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`
  */
 export function splitHorizontalDisjoint(
   mesh: QuadMesh,
@@ -186,10 +178,6 @@ export function splitHorizontalDisjoint(
  *  a----------d
  * ```
  *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`, defaults to `0`.
- * @returns {Quad[]} quads `[q0, q1, q2, q3, targetQuad]`
  */
 export const inset = (() => {
   const center: Tuple3 = [0, 0, 0];
@@ -240,11 +228,6 @@ export const inset = (() => {
 /**
  * Given a target quad, first inset it, then move it along the quad's normal
  * outwards by a given distance.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} insetT Value ranged from `0` to `1`, defaults to `0`
- * @param {Number} extrude Distance to extrude, defaults to `0`
  */
 export const extrude = (() => {
   const toTranslate: number[] = [];
@@ -325,13 +308,6 @@ export function _calculatePositionIndexToQuads(
 
 /**
  * Computes the average normal for a position given the connected quads.
- *
- * @param {QuadMesh} mesh
- * @param {Number} positionIndex
- * @param {Array?} target = []
- * @param {Map?} normalCache A Map can be provided to cache intermediate normal computations.
- * @param {Map?} positionIndexToQuads A Map where positionIndex is mapped to its quad, used primarily internally.
- * @returns {Normal} target
  */
 // eslint-disable-next-line no-var
 export var averageNormalForPosition = (() => {
@@ -341,7 +317,9 @@ export var averageNormalForPosition = (() => {
     mesh: QuadMesh,
     positionIndex: Index,
     target = [0, 0, 0] as Tuple3,
+    // A Map can be provided to cache intermediate normal computations.
     normalCache: Map<Quad, Tuple3>,
+    // A Map where positionIndex is mapped to its quad, used primarily internally.
     positionIndexToQuads?: Map<Index, Quad[]>
   ) {
     let quads: Quad[];
@@ -395,9 +373,6 @@ export var averageNormalForPosition = (() => {
  *      aB----------dB
  * ```
  *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} [t=0] value between 0 - 1
  * @returns {Quad[]} quads `[qL, qT, qR, qB, targetQuad]`.
  */
 export const insetDisjoint = (() => {
@@ -511,11 +486,6 @@ export const insetDisjoint = (() => {
  * Given a target quad, first inset it, then move it along the quad's normal
  * outwards by a given distance, but all new geometry generated will not
  * share positions.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} insetT = 0, ranged from `0` (the edge) to `1` (the center).
- * @param {Number} extrude = 0, the distance to extrude out.
  */
 export const extrudeDisjoint = (() => {
   const toTranslate: Index[] = [];
@@ -557,18 +527,13 @@ export const extrudeDisjoint = (() => {
 
     // Calculate the normals for the translated rings.
     for (let i = 0; i < ring.length; i++) {
-      updateNormals(mesh, ring[i]);
+      updateNormalsForQuad(mesh, ring[i]);
     }
   };
 })();
 
 /**
  * Computes the center of a quad.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Position} target
- * @returns {Position} center
  */
 export function getCenter(mesh: QuadMesh, quad: Quad, target = [0, 0, 0]) {
   const a = mesh.positions[quad[0]];
@@ -583,10 +548,6 @@ export function getCenter(mesh: QuadMesh, quad: Quad, target = [0, 0, 0]) {
 
 /**
  * Clones a quad. Returns the new quad.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @returns {Quad} cloned quad
  */
 export function clone(mesh: QuadMesh, quad: Quad): Quad {
   const index = mesh.positions.length;
@@ -609,9 +570,6 @@ export function clone(mesh: QuadMesh, quad: Quad): Quad {
 /**
  * Clones a group of quads and their geometry. Use getNewGeometry to capture the newly
  * created geometry.
- *
- * @param {QuadMesh} mesh
- * @param {Quad[]} quads
  */
 export function cloneQuads(mesh: QuadMesh, quads: Quad[]): void {
   // Get a list of the position indices used
@@ -626,13 +584,13 @@ export function cloneQuads(mesh: QuadMesh, quads: Quad[]): void {
   const indices = positions.filter(i => i !== undefined);
 
   // Clone the quads.
-  const cellIndexOffset = mesh.positions.length;
-  const cellsLength = quads.length;
-  for (let i = 0; i < cellsLength; i++) {
+  const quadIndexOffset = mesh.positions.length;
+  const quadsLength = quads.length;
+  for (let i = 0; i < quadsLength; i++) {
     const quad = quads[i];
     mesh.quads.push(
       quad.map(
-        cellIndex => indices.indexOf(cellIndex) + cellIndexOffset
+        quadIndex => indices.indexOf(quadIndex) + quadIndexOffset
       ) as Tuple4
     );
   }
@@ -655,12 +613,8 @@ export function cloneQuads(mesh: QuadMesh, quads: Quad[]): void {
  * Updates all of the normals for all the positions using
  * {@link #averageNormalForPosition}. If a normal doesn't exist,
  * then it is created.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @returns {QuadMesh}
  */
-export function updateNormals(mesh: QuadMesh, quad: Quad) {
+export function updateNormalsForQuad(mesh: QuadMesh, quad: Quad) {
   const { normals } = mesh;
   if (normals) {
     const normal = normals[quad[0]];
@@ -677,11 +631,6 @@ export var getQuadNormal = (() => {
   const edgeB: Tuple3 = [0, 0, 0];
   /**
    * Compute a quad's normal regardless of it's neighboring quads.
-   *
-   * @param {QuadMesh} mesh
-   * @param {Quad} quad
-   * @param {Normal?} target **= []**
-   * @returns {Normal} The target normal.
    */
   return function getQuadNormal(
     mesh: QuadMesh,
@@ -700,11 +649,6 @@ export var getQuadNormal = (() => {
 
 /**
  * Given a position index, find any quads that include it.
- *
- * @param {QuadMesh} mesh
- * @param {Number} index
- * @param {Quad[]} target
- * @returns {Quad[]} The target quads.
  */
 export function getQuadsFromPositionIndex(
   mesh: QuadMesh,
@@ -722,10 +666,6 @@ export function getQuadsFromPositionIndex(
 
 /**
  * Flip a quad's normal to point the other way. Returns the quad.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @returns {Quad} The quad
  */
 export function flip(mesh: QuadMesh, quad: Quad): void {
   quad.reverse();
@@ -755,16 +695,6 @@ type QuadOptions =
  * quad will be created inside of that simplicial complex, otherwise a new
  * mesh simplicial complex will be generated. Both the mesh simplicial
  * complex and the created quad are returned in an object.
- *
- * @example <caption>Usage:</caption>
- *
- * const {mesh, quad} = createQuad({ positions: [[-1, 0, -1], [-1, 0, 1], [1, 0, 1], [1, 0, -1]] })
- * const {mesh, quad} = createQuad({ w: 1, h: 1 })
- * const {mesh, quad} = createQuad()
- *
- * @param {Object} options
- * @param {QuadMesh} mesh
- * @returns {Object} `{mesh, quad}`
  */
 export function createQuad(
   options?: QuadOptions,
@@ -843,12 +773,6 @@ export function createQuad(
  * This box renders as a flat shaded box. If the optionalMesh object is
  * passed, then the box will be created inside of that simplicial complex,
  * otherwise a new mesh simplicial complex will be generated.
- *
- * @param {Number} x
- * @param {Number} y
- * @param {Number} z
- * @param {Object?} optionalMesh
- * @returns {QuadMesh}
  */
 export function createBoxDisjoint(
   x = 1,
@@ -873,12 +797,6 @@ export function createBoxDisjoint(
  * `optionalMesh` object is passed, then the box will be created inside of
  * that simplicial complex, otherwise a new mesh simplicial complex will be
  * generated.
- *
- * @param {Number?} x = 1
- * @param {Number?} y = 1
- * @param {Number?} z = 1
- * @param {Object?} optionalMesh
- * @returns {QuadMesh}
  */
 export function createBox(
   x: number,
@@ -938,25 +856,20 @@ export function mergePositions(mesh: QuadMesh): QuadMesh {
 }
 /**
  * Returns an elements array using the given `ArrayType`, which can be used by WebGL.
- *
- * @param {QuadMesh} mesh
- * @param {String} drawMode
- * @param {typeof} ArrayType
- * @returns {Array} Elements using the given `ArrayType`, which can be used by WebGL.
  */
 export function getElements(
   mesh: QuadMesh,
   drawMode = "triangles",
   ArrayType = Uint16Array
 ): Uint16Array {
-  const countPerCell = drawMode === "lines" ? 8 : 6;
-  const elements = new ArrayType(mesh.quads.length * countPerCell);
+  const countPerQuad = drawMode === "lines" ? 8 : 6;
+  const elements = new ArrayType(mesh.quads.length * countPerQuad);
 
   if (drawMode === "lines") {
     // lines
     for (let i = 0; i < mesh.quads.length; i++) {
       const [a, b, c, d] = mesh.quads[i];
-      const offset = i * countPerCell;
+      const offset = i * countPerQuad;
       // Lines
       elements[offset + 0] = a;
       elements[offset + 1] = b;
@@ -972,7 +885,7 @@ export function getElements(
     }
   } else {
     for (let i = 0; i < mesh.quads.length; i++) {
-      const offset = i * countPerCell;
+      const offset = i * countPerQuad;
       const [a, b, c, d] = mesh.quads[i];
       // Triangle:
       elements[offset + 0] = a;
@@ -989,13 +902,9 @@ export function getElements(
 
 /**
  * Updates all of the normals for all the positions using
- * {@link #averageNormalForPosition}. If a normal doesn't exist,
- * then it is created.
- *
- * @param {QuadMesh} mesh
- * @returns {QuadMesh}
+ * `averageNormalForPosition`. If a normal doesn't exist, then it is created.
  */
-export function computeNormals(mesh: QuadMesh) {
+export function computeSmoothNormals(mesh: QuadMesh): QuadMeshNormals {
   if (!mesh.normals) {
     mesh.normals = [];
   }
@@ -1015,7 +924,7 @@ export function computeNormals(mesh: QuadMesh) {
       positionIndexToQuads
     );
   }
-  return mesh;
+  return mesh as QuadMeshNormals;
 }
 
 /**
@@ -1024,42 +933,62 @@ export function computeNormals(mesh: QuadMesh) {
  * ```
  * *--------*--------*--------*--------*--------*--------*--------*
  * |        |        |        |        |        |        |        |
- * *        *<-------*--------*--quad--*--------*------->*        *
+ * *     <--*--------*--------*--quad--*--------*--------*-->     *
  * |        |        |        |        |        |        |        |
  * *--------*--------*--------*--------*--------*--------*--------*
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`
- * @param {Boolean} opposite - will walk in the opposite direction, e.g. up and down, versus left and right
- * @returns {QuadMesh}
  */
-export function splitLoop(
+export function splitLoopHorizontal(mesh: QuadMesh, quad: Quad, t = 0.5): void {
+  splitLoop(mesh, quad, t, true);
+}
+
+/**
+ * Given a quad, walk along the mesh in both directions and split the quad.
+ *
+ * ```
+ * *---------*
+ * |    ^    |
+ * *----*----*
+ * |    |    |
+ * *----|----*
+ * |  quad   |
+ * *----|----*
+ * |    |    |
+ * *----*----*
+ * |    V    |
+ * *---------*
+ * ```
+ */
+export function splitLoopVertical(mesh: QuadMesh, quad: Quad, t = 0.5): void {
+  splitLoop(mesh, quad, t);
+}
+
+function splitLoop(
   mesh: QuadMesh,
   quad: Quad,
   t = 0.5,
+  // Will walk in the opposite direction, e.g. up and down, versus left and right
   opposite?: boolean
-) {
-  let cellIndexA, cellIndexB, cellIndexC, cellIndexD;
+): void {
+  let quadIndexA, quadIndexB, quadIndexC, quadIndexD;
   if (opposite) {
-    cellIndexA = 1;
-    cellIndexB = 2;
-    cellIndexC = 3;
-    cellIndexD = 0;
+    quadIndexA = 1;
+    quadIndexB = 2;
+    quadIndexC = 3;
+    quadIndexD = 0;
   } else {
-    cellIndexA = 0;
-    cellIndexB = 1;
-    cellIndexC = 2;
-    cellIndexD = 3;
+    quadIndexA = 0;
+    quadIndexB = 1;
+    quadIndexC = 2;
+    quadIndexD = 3;
   }
 
-  const positionIndexLB = quad[cellIndexA];
-  const positionIndexLT = quad[cellIndexB];
+  const positionIndexLB = quad[quadIndexA];
+  const positionIndexLT = quad[quadIndexB];
   const positionIndexMT = mesh.positions.length;
   const positionIndexMB = mesh.positions.length + 1;
-  const positionIndexRT = quad[cellIndexC];
-  const positionIndexRB = quad[cellIndexD];
+  const positionIndexRT = quad[quadIndexC];
+  const positionIndexRB = quad[quadIndexD];
   const { positions, quads, normals } = mesh;
 
   const positionA = vec3.lerp(
@@ -1097,12 +1026,12 @@ export function splitLoop(
   const quadL = quad;
   const quadR: Quad = [0, 0, 0, 0];
   quads.push(quadR);
-  quadL[cellIndexC] = positionIndexMT;
-  quadL[cellIndexD] = positionIndexMB;
-  quadR[cellIndexA] = positionIndexMB;
-  quadR[cellIndexB] = positionIndexMT;
-  quadR[cellIndexC] = positionIndexRT;
-  quadR[cellIndexD] = positionIndexRB;
+  quadL[quadIndexC] = positionIndexMT;
+  quadL[quadIndexD] = positionIndexMB;
+  quadR[quadIndexA] = positionIndexMB;
+  quadR[quadIndexB] = positionIndexMT;
+  quadR[quadIndexC] = positionIndexRT;
+  quadR[quadIndexD] = positionIndexRB;
 
   // Split by walking up and down from the quad, and then merge the last points if they
   // meet.
@@ -1127,8 +1056,6 @@ export function splitLoop(
       1 - t
     );
   }
-
-  return mesh;
 }
 
 function _mergePositionsIfEqual(
@@ -1199,18 +1126,18 @@ function _walkAndSplitLoop(
   let newPositionIndex;
   const { positions, normals, quads } = mesh;
   while (true) {
-    const quad = getCellFromEdge(mesh, positionIndexLB, positionIndexRB);
+    const quad = getQuadFromEdge(mesh, positionIndexLB, positionIndexRB);
     if (!quad) {
       break;
     }
-    const cellIndexA = quad.indexOf(positionIndexLB);
-    const cellIndexD = quad.indexOf(positionIndexRB);
-    const cellIndexB = (cellIndexA + 1) % 4;
-    const cellIndexC = (cellIndexD + 3) % 4;
+    const quadIndexA = quad.indexOf(positionIndexLB);
+    const quadIndexD = quad.indexOf(positionIndexRB);
+    const quadIndexB = (quadIndexA + 1) % 4;
+    const quadIndexC = (quadIndexD + 3) % 4;
 
-    const positionIndexLT = quad[cellIndexB];
+    const positionIndexLT = quad[quadIndexB];
     const positionIndexMT = mesh.positions.length;
-    const positionIndexRT = quad[cellIndexC];
+    const positionIndexRT = quad[quadIndexC];
 
     // Create a new middle position at the opposite end
     const position = vec3.lerp(
@@ -1237,13 +1164,13 @@ function _walkAndSplitLoop(
     const quadR: Quad = [0, 0, 0, 0];
     quads.push(quadR);
 
-    quadL[cellIndexC] = positionIndexMT;
-    quadL[cellIndexD] = positionIndexMB;
+    quadL[quadIndexC] = positionIndexMT;
+    quadL[quadIndexD] = positionIndexMB;
 
-    quadR[cellIndexA] = positionIndexMB;
-    quadR[cellIndexB] = positionIndexMT;
-    quadR[cellIndexC] = positionIndexRT;
-    quadR[cellIndexD] = positionIndexRB;
+    quadR[quadIndexA] = positionIndexMB;
+    quadR[quadIndexB] = positionIndexMT;
+    quadR[quadIndexC] = positionIndexRT;
+    quadR[quadIndexD] = positionIndexRB;
 
     // Modify the arguments to keep on walking.
     positionIndexLB = positionIndexLT;
@@ -1256,30 +1183,25 @@ function _walkAndSplitLoop(
 }
 
 /**
- * Find a quad given two position indices. Optionally provide a `previousCell`
+ * Find a quad given two position indices. Optionally provide a `ignoreQuad`
  * that will not be matched against. Returns the first quad that matches.
- *
- * @param {QuadMesh} mesh
- * @param {Number} positionIndexA
- * @param {Number} positionIndexB
- * @param {Quad?} previousCell - Optional will not be matched against
- * @returns {Quad}
  */
-export function getCellFromEdge(
+export function getQuadFromEdge(
   mesh: QuadMesh,
   positionIndexA: PositionIndex,
   positionIndexB: PositionIndex,
-  previousCell?: Quad
-) {
+  // A quad that will not be matched against.
+  ignoreQuad?: Quad
+): Quad | void {
   return mesh.quads.find(quad => {
-    if (quad === previousCell) {
+    if (quad === ignoreQuad) {
       return false;
     }
-    const cellIndexA = quad.indexOf(positionIndexA);
-    if (cellIndexA >= 0) {
+    const quadIndexA = quad.indexOf(positionIndexA);
+    if (quadIndexA >= 0) {
       if (
-        quad[(cellIndexA + 1) % 4] === positionIndexB ||
-        quad[(cellIndexA + 3) % 4] === positionIndexB
+        quad[(quadIndexA + 1) % 4] === positionIndexB ||
+        quad[(quadIndexA + 3) % 4] === positionIndexB
       ) {
         return true;
       }
@@ -1293,15 +1215,10 @@ export function getCellFromEdge(
  * operations were done on the mesh. This assumes new geometry was created
  * and not destroyed.
  *
- * @example <caption>Usage:</caption>
- * const extrudedCells = quad.getNewGeometry(mesh, "quads", () => {
- *   quad.extrude(mesh, tipCell, 0.5, 3)
- * });
- *
- * @param {QuadMesh} mesh
- * @param {Number} key
- * @param {Function} callback
- * @returns {Array}
+ * Usage:
+ *   const extrudedQuads = quad.getNewGeometry(mesh, "quads", () => {
+ *     quad.extrude(mesh, tipQuad, 0.5, 3)
+ *   });
  */
 export function getNewGeometry<K extends keyof QuadMesh>(
   mesh: QuadMesh,
@@ -1319,23 +1236,15 @@ export function getNewGeometry<K extends keyof QuadMesh>(
 
 /**
  * Computes all of the centers of all the quads.
- *
- * @param {QuadMesh} mesh
- * @returns {Position[]} centers
  */
 export function computeCenterPositions(mesh: QuadMesh): Tuple3[] {
-  return mesh.quads.map(quad => computeCellCenter(mesh, quad));
+  return mesh.quads.map(quad => computeQuadCenter(mesh, quad));
 }
 
 /**
  * Computes the center of a single quad.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Position} targetPosition, defaults to a new array
- * @returns {Position} center
  */
-export function computeCellCenter(
+export function computeQuadCenter(
   mesh: QuadMesh,
   quad: Quad,
   target: Tuple3 = [0, 0, 0]
@@ -1354,9 +1263,29 @@ export function computeCellCenter(
 
 /**
  * Given a quad, walk a loop and inset the loop, where 0 is the inset being on
- * the edge, and 1 the inset being in the enter. Setting opposite to true will
- * make the quad walk the loop in the opposite direction, e.g. up/down rather
- * than left/right.
+ * the edge, and 1 the inset being in the end.
+ *
+ * ```
+ * *----------------*
+ * |  ^          ^  |
+ * *--*----------*--*
+ * |  |          |  |
+ * *--|----------|--*
+ * |  |   quad   |  |
+ * *--|----------|--*
+ * |  |          |  |
+ * *--*----------*--*
+ * |  V          V  |
+ * *----------------*
+ * ```
+ */
+export function insetLoopVertical(mesh: QuadMesh, quad: Quad, t = 0.5): void {
+  insetLoop(mesh, quad, t, false);
+}
+
+/**
+ * Given a quad, walk a loop and inset the loop, where 0 is the inset being on
+ * the edge, and 1 the inset being in the end.
  *
  * ```
  * *----*----*----*----*----*----*----*----*----*
@@ -1367,20 +1296,23 @@ export function computeCellCenter(
  * |    |    |    |    |    |    |    |    |    |
  * *----*----*----*----*----*----*----*----*----*
  * ```
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {Number} t Specifies where the split should be. Ranged from `0` to `1`
- * @param {Boolean} opposite - will walk in the opposite direction, e.g. up and down, versus left and right
  */
+export function insetLoopHorizontal(mesh: QuadMesh, quad: Quad, t = 0.5): void {
+  insetLoop(mesh, quad, t, true);
+}
+
 export function insetLoop(
   mesh: QuadMesh,
   quad: Quad,
-  t = 0.5,
+  t: number,
+  // Will walk in the opposite direction, e.g. up and down, versus left and right
   opposite: boolean
 ): void {
+  if (t < 0 || t > 1) {
+    throw new Error("t was out of range: " + t);
+  }
   const tA = 1 - 0.5 * t;
-  const tB = 0.5 * t + (1 - tA) * t;
+  const tB = (t * 0.5) / tA;
   splitLoop(mesh, quad, tA, opposite);
   splitLoop(mesh, quad, tB, opposite);
 }
@@ -1388,49 +1320,73 @@ export function insetLoop(
 /**
  * Gets a loop of quads. Given a single quad, start walking in both
  * directions to select a loop. .
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quad
- * @param {String} type - can either be `"quads"`, `"positions"`, or `"normals"`.
- * @param {Boolean} opposite - will walk in the opposite direction, e.g. up and down, versus left and right
- * @returns {Array} an array according to the `type`.
  */
-export function getLoop<K extends "positions" | "normals" | "quads">(
+export function getLoopVertical<K extends "positions" | "normals" | "quads">(
+  mesh: QuadMesh,
+  quad: Quad,
+  type: K
+): QuadMesh[K] {
+  return getLoop(mesh, quad, type, false);
+}
+
+/**
+ * Gets a loop of quads. Given a single quad, start walking in both
+ * directions to select a loop. .
+ */
+export function getLoopHorizontal<K extends "positions" | "normals" | "quads">(
+  mesh: QuadMesh,
+  quad: Quad,
+  type: K
+): QuadMesh[K] {
+  return getLoop(mesh, quad, type, true);
+}
+
+function getLoop<K extends "positions" | "normals" | "quads">(
   mesh: QuadMesh,
   quad: Quad,
   type: K,
-  opposite?: boolean
-): QuadMesh[K] {
+  // Will walk in the opposite direction, e.g. up and down, versus left and right
+  opposite: boolean
+): QuadMeshNormals[K] {
   if (type === "quads") {
     const quads: Quad[] = _getLoopQuads(mesh, quad, opposite);
     return quads as any;
   }
-  let positionIndexLB, positionIndexRB;
+  if (type === "normals" && !mesh.normals) {
+    computeSmoothNormals(mesh);
+  }
+  const mesh2 = mesh as QuadMeshNormals;
+
+  let positionIndexALB, positionIndexARB, positionIndexBLB, positionIndexBRB;
   if (opposite) {
-    positionIndexLB = quad[1];
-    positionIndexRB = quad[2];
+    positionIndexALB = quad[0];
+    positionIndexARB = quad[1];
+    positionIndexBLB = quad[2];
+    positionIndexBRB = quad[3];
   } else {
-    positionIndexLB = quad[0];
-    positionIndexRB = quad[1];
+    positionIndexALB = quad[1];
+    positionIndexARB = quad[2];
+    positionIndexBLB = quad[3];
+    positionIndexBRB = quad[0];
   }
 
   return [
-    ...(_getLoopOneDirection(
-      mesh,
+    ..._getLoopOneDirection(
+      mesh2,
       quad,
       type,
-      positionIndexLB,
-      positionIndexRB
-    ) as any),
-    ...quad.map(i => (mesh[type] as any)[i]),
-    ...(_getLoopOneDirection(
-      mesh,
+      positionIndexALB,
+      positionIndexARB
+    ),
+    ...quad.map(i => mesh2[type][i]),
+    ..._getLoopOneDirection(
+      mesh2,
       quad,
       type,
-      positionIndexRB,
-      positionIndexLB
-    ) as any).reverse(),
-  ];
+      positionIndexBLB,
+      positionIndexBRB
+    ),
+  ] as QuadMeshNormals[K];
 }
 
 function _getLoopQuads(mesh: QuadMesh, quad: Quad, opposite?: boolean): Quad[] {
@@ -1444,9 +1400,9 @@ function _getLoopQuads(mesh: QuadMesh, quad: Quad, opposite?: boolean): Quad[] {
   }
 
   return [
-    ..._getLoopCellsOneDirection(mesh, quad, positionIndexLB, positionIndexRB),
+    ..._getLoopQuadssOneDirection(mesh, quad, positionIndexLB, positionIndexRB),
     quad,
-    ..._getLoopCellsOneDirection(
+    ..._getLoopQuadssOneDirection(
       mesh,
       quad,
       positionIndexRB,
@@ -1455,7 +1411,7 @@ function _getLoopQuads(mesh: QuadMesh, quad: Quad, opposite?: boolean): Quad[] {
   ];
 }
 
-function _getLoopCellsOneDirection(
+function _getLoopQuadssOneDirection(
   mesh: QuadMesh,
   quad: Quad,
   indexA: PositionIndex,
@@ -1464,78 +1420,74 @@ function _getLoopCellsOneDirection(
   const loop = [];
   let positionIndexLB = indexA;
   let positionIndexRB = indexB;
-  let neighborCell: Quad | void = quad;
+  let neighborQuad: Quad | void = quad;
   while (true) {
-    neighborCell = getCellFromEdge(
+    neighborQuad = getQuadFromEdge(
       mesh,
       positionIndexLB,
       positionIndexRB,
-      neighborCell
+      neighborQuad
     );
-    if (!neighborCell || neighborCell === quad) {
+    if (!neighborQuad || neighborQuad === quad) {
       break;
     }
 
-    loop.push(neighborCell);
+    loop.push(neighborQuad);
 
-    const cellIndexA = neighborCell.indexOf(positionIndexLB);
-    const cellIndexD = neighborCell.indexOf(positionIndexRB);
-    const cellIndexB = (cellIndexA + 1) % 4;
-    const cellIndexC = (cellIndexD + 3) % 4;
+    const quadIndexA = neighborQuad.indexOf(positionIndexLB);
+    const quadIndexD = neighborQuad.indexOf(positionIndexRB);
+    const quadIndexB = (quadIndexA + 1) % 4;
+    const quadIndexC = (quadIndexD + 3) % 4;
 
     // Modify the arguments to keep on walking.
-    positionIndexLB = neighborCell[cellIndexB];
-    positionIndexRB = neighborCell[cellIndexC];
+    positionIndexLB = neighborQuad[quadIndexB];
+    positionIndexRB = neighborQuad[quadIndexC];
   }
   return loop;
 }
 
 function _getLoopOneDirection<K extends "positions" | "normals" | "quads">(
-  mesh: QuadMesh,
+  mesh: QuadMeshNormals,
   quad: Quad,
   type: K,
   indexA: PositionIndex,
   indexB: PositionIndex
-): QuadMesh[K] {
-  const loop: QuadMesh[K] = [];
+): QuadMeshNormals[K] {
+  const loop: QuadMeshNormals[K] = [];
   let positionIndexLB = indexA;
   let positionIndexRB = indexB;
-  let neighborCell: Quad | void = quad;
+  let neighborQuad: Quad | void = quad;
   while (true) {
-    neighborCell = getCellFromEdge(
+    neighborQuad = getQuadFromEdge(
       mesh,
       positionIndexLB,
       positionIndexRB,
-      neighborCell
+      neighborQuad
     );
-    if (!neighborCell || neighborCell === quad) {
+    if (!neighborQuad || neighborQuad === quad) {
       break;
     }
 
-    const cellIndexA = neighborCell.indexOf(positionIndexLB);
-    const cellIndexD = neighborCell.indexOf(positionIndexRB);
-    const cellIndexB = (cellIndexA + 1) % 4;
-    const cellIndexC = (cellIndexD + 3) % 4;
+    const quadIndexA = neighborQuad.indexOf(positionIndexLB);
+    const quadIndexD = neighborQuad.indexOf(positionIndexRB);
+    const quadIndexB = (quadIndexA + 1) % 4;
+    const quadIndexC = (quadIndexD + 3) % 4;
 
     const meshProp: any = mesh[type];
     if (meshProp) {
-      loop.push(meshProp[neighborCell[cellIndexB]]);
-      loop.push(meshProp[neighborCell[cellIndexC]]);
+      loop.push(meshProp[neighborQuad[quadIndexB]]);
+      loop.push(meshProp[neighborQuad[quadIndexC]]);
     }
 
     // Modify the arguments to keep on walking.
-    positionIndexLB = neighborCell[cellIndexB];
-    positionIndexRB = neighborCell[cellIndexC];
+    positionIndexLB = neighborQuad[quadIndexB];
+    positionIndexRB = neighborQuad[quadIndexC];
   }
   return loop;
 }
 
 /**
  * Clone all existing geometry, and mirror it about the given axis.
- *
- * @param {QuadMesh} mesh
- * @param {Quad} quads
- * @param {Number} axis - is either `0`, `1`, or `2`, which represents the `x`, `y`, and `z` axis respectively.
  */
 export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
   const mirrorMap: { [key: number]: number } = {};
@@ -1556,7 +1508,7 @@ export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
 
   const { positions, normals } = mesh;
   quads.forEach(quad => {
-    const mirrorCell = quad.map(positionIndex => {
+    const mirrorQuad = quad.map(positionIndex => {
       let mirrorIndex = mirrorMap[positionIndex];
       if (mirrorIndex === undefined) {
         mirrorIndex = positions.length;
@@ -1576,8 +1528,8 @@ export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
       }
       return mirrorIndex;
     }) as Quad;
-    mirrorCell.reverse();
-    mesh.quads.push(mirrorCell);
+    mirrorQuad.reverse();
+    mesh.quads.push(mirrorQuad);
   });
 
   return mesh;
@@ -1590,10 +1542,10 @@ export function subdivide(mesh: QuadMesh, count: number): QuadMesh {
   let meshNew = mesh;
   for (let i = 0; i < count; i++) {
     meshNew = catmullClarkSubdivision(mesh);
+    mesh.positions = meshNew.positions;
+    mesh.quads = meshNew.quads;
   }
-  mesh.positions = meshNew.positions;
-  mesh.quads = meshNew.quads;
-  computeNormals(mesh);
+  computeSmoothNormals(mesh);
   return mesh;
 }
 
