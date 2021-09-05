@@ -86,7 +86,7 @@ function createGeometry() {
     position[2] *= 1.5;
     position[2] -= 0.5;
   });
-  quad.splitLoop(mesh, mesh.quads[2], 0.9, true);
+  quad.splitLoopHorizontal(mesh, mesh.quads[2], 0.9);
   quad.subdivide(mesh, 3);
   return mesh;
 }

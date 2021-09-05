@@ -72,8 +72,8 @@ function createGeometry() {
 
   // Split the box in half.
   const centerRing = quads.getNewGeometry(mesh, "positions", () => {
-    quads.splitLoop(mesh, mesh.quads[3], 0.6);
-    quads.splitLoop(mesh, mesh.quads[3], 0.75);
+    quads.splitLoopVertical(mesh, mesh.quads[3], 0.6);
+    quads.splitLoopVertical(mesh, mesh.quads[3], 0.75);
   });
   createEyeHoles(mesh, w, h, d);
   // Adjust nose shape.
@@ -149,7 +149,7 @@ function refineEyes(mesh: QuadMesh): void {
       quads.insetLoop(mesh, quad, 0.05, opposite);
     });
 
-    (quads.getLoop(mesh, mesh.quads[146], "quads") as number[][])
+    (quads.getLoopHorizontal(mesh, mesh.quads[146], "quads") as number[][])
       .reduce((a, b): number[] => a.concat(b))
       .map(i => mesh.positions[i])
       .concat(ring)
@@ -186,16 +186,16 @@ function extrudeHair(mesh: QuadMesh): void {
   mesh.positions[36][2] -= 0.03;
   mesh.positions[51][2] -= 0.03;
   mesh.positions[8][2] -= 0.03;
-  quads.computeNormals(mesh);
+  quads.computeSmoothNormals(mesh);
 
-  quads.splitLoop(mesh, mesh.quads[10], 0.5, true);
-  quads.splitLoop(mesh, mesh.quads[9], 0.5);
-  quads.splitLoop(mesh, mesh.quads[13], 0.5);
-  quads.splitLoop(mesh, mesh.quads[14], 0.5, true);
+  quads.splitLoopVertical(mesh, mesh.quads[10], 0.5);
+  quads.splitLoopHorizontal(mesh, mesh.quads[9], 0.5);
+  quads.splitLoopHorizontal(mesh, mesh.quads[13], 0.5);
+  quads.splitLoopVertical(mesh, mesh.quads[14], 0.5);
 
   const random = createRandom(11);
   const faces = quads
-    .getLoop(mesh, mesh.quads[0], "quads", true)
+    .getLoopVertical(mesh, mesh.quads[0], "quads")
     .filter(unique)
     .filter(
       quad =>
