@@ -1,11 +1,11 @@
-import startRegl, { DrawCommand } from "regl";
-import {
+import startRegl, {
+  DrawCommand,
   InitializationOptions,
   Regl,
   DefaultContext,
   DrawConfig,
   DynamicVariableFn,
-} from "regl";
+} from "lib/regl";
 
 /**
  * Apply a nice error to the DOM when a regl error occurs.
@@ -41,7 +41,10 @@ export function initRegl(config: InitializationOptions = {}): Regl {
 export function drawCommand<
   Props,
   Context extends DefaultContext = DefaultContext
->(regl: Regl, drawConfig: DrawConfig<any, any, Props, any, Context>) {
+>(
+  regl: Regl,
+  drawConfig: DrawConfig<any, any, Props, any, Context> & { name: string }
+) {
   return regl(drawConfig);
 }
 
@@ -88,8 +91,12 @@ export function composeDrawCommands<
   drawA: DrawCommand<Context, Props>,
   drawB: DrawCommand<Context, Props>
 ): DrawCommand<Context, Props> {
-  const fn: any = (props: Props) => {
-    drawB(() => drawA(props));
+  const name = `composed(${drawA.name},${drawB.name})`;
+  const namedFn = {
+    [name]: (props: Props) => {
+      drawA(props, () => drawB(props));
+    },
   };
-  return fn;
+
+  return namedFn[name] as any;
 }

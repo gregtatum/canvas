@@ -58,6 +58,8 @@ interface TriangleMeshNormals {
   normals: Tuple3[];
 }
 
+type Triangle = Tuple3<Tuple3>;
+
 // Numbers. These are just hints.
 type Milliseconds = number;
 type Seconds = number;

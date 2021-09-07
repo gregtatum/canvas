@@ -12,10 +12,11 @@
     "paths": {
       // Also see webpack config and .eslintrc to update.
       "lib/*": ["src/lib/*"],
-    }
+    },
   },
   "include": ["./src/**/*.ts","./bin/**/*.js"],
   "exclude": [
+    "src/lib/regl/example/typescript",
     "node_modules",
     "node_modules/gl-matrix"
   ]

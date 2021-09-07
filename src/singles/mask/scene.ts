@@ -1,7 +1,7 @@
-import { Regl, DefaultContext, DrawCommand } from "regl";
+import { Regl, DefaultContext, DrawCommand } from "lib/regl";
 import { vec3, mat3, mat4 } from "lib/vec-math";
-import createControls from "orbit-controls";
-import createCamera from "perspective-camera";
+import createControls, { OrbitControls } from "orbit-controls";
+import createCamera, { Ray3d, PerspectiveCamera } from "perspective-camera";
 
 const simplex = new (require("simplex-noise"))();
 
@@ -11,27 +11,16 @@ const FOV = TAU * 0.1;
 export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
   DefaultContext;
 
-function getUniforms() {
-  const camera = createCamera({
-    fov: FOV,
-    near: 0.1,
-    far: 10,
-    position: [0, 0, 1],
-  });
+interface SceneConfig {
+  onMouseMove?: (ray: Ray3d) => void;
+}
 
-  const controls = createControls({
-    phi: Math.PI * 0.4,
-    theta: 0.2,
-    distanceBounds: [0.5, 1.5],
-    phiBounds: [Math.PI * 0.4, Math.PI * 0.6],
-    zoomSpeed: 0.00001,
-    pinchSpeed: 0.00001,
-    rotateSpeed: 0.0025,
-    damping: 0.01,
-  });
-
-  camera.update();
-
+function getUniforms(
+  camera: PerspectiveCamera,
+  controls: OrbitControls,
+  canvas: HTMLCanvasElement,
+  config: SceneConfig
+) {
   let prevTick: Integer;
   function update<T>(callback: () => T) {
     return ({ tick, viewportWidth, viewportHeight }: DefaultContext): T => {
@@ -66,9 +55,11 @@ function getUniforms() {
   };
 }
 
-function getContext() {
+function getContext(camera: PerspectiveCamera, controls: OrbitControls) {
   return {
     fov: FOV,
+    camera,
+    controls,
     headModel: (() => {
       const out = mat4.create();
       const eye: Tuple3 = [0, 0, -1];
@@ -87,9 +78,36 @@ function getContext() {
   };
 }
 
-export default function draw(regl: Regl): DrawCommand {
+export function createSetupScene(
+  regl: Regl,
+  config: SceneConfig = {}
+): DrawCommand {
+  const camera = createCamera({
+    fov: FOV,
+    near: 0.1,
+    far: 10,
+    position: [0, 0, 1],
+  });
+
+  const controls = createControls({
+    phi: Math.PI * 0.4,
+    theta: 0.2,
+    distanceBounds: [0.5, 1.5],
+    phiBounds: [Math.PI * 0.4, Math.PI * 0.6],
+    zoomSpeed: 0.00001,
+    pinchSpeed: 0.00001,
+    rotateSpeed: 0.0025,
+    damping: 0.01,
+  });
+
   return regl({
-    uniforms: getUniforms(),
-    context: getContext(),
+    name: "setupScene",
+    uniforms: getUniforms(
+      camera,
+      controls,
+      regl._gl.canvas as HTMLCanvasElement,
+      config
+    ),
+    context: getContext(camera, controls),
   });
 }

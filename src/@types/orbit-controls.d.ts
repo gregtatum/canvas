@@ -1,5 +1,5 @@
 declare module "orbit-controls" {
-  interface Controls {
+  export interface OrbitControls {
     // Update the internal position, direction, and up vectors that represent the camera.
     update(): void;
 
@@ -106,7 +106,7 @@ declare module "orbit-controls" {
    * Generic controls for orbiting a target in 3D. Can be used to control a camera, a
    * 3D ray, or anything with { position, direction }.
    */
-  const createControls: (config: Partial<Config>) => Controls;
+  const createControls: (config: Partial<Config>) => OrbitControls;
 
   export default createControls;
 }

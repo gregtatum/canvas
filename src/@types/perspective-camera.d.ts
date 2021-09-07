@@ -1,5 +1,41 @@
 declare module "perspective-camera" {
-  interface Camera {
+  /**
+   * https://github.com/Jam3/ray-3d
+   */
+  export class Ray3d {
+    // Defaults to [0, 0, 0].
+    direction: Tuple3;
+    // Defaults to [0, 0, -1].
+    origin: Tuple3;
+
+    constructor(origin?: Tuple3, direction?: Tuple3);
+    // Assigns this ray's origin and direction to the given values.
+    set(origin: Tuple3, direction: Tuple3): void;
+    // Copies the origin and direction from the otherRay into this ray.
+    copy(other: Ray3d): void;
+    // Deep clones this ray into a new Ray instance.
+    clone(): Ray3d;
+    // Whether this ray intersects with the sphere at center [x, y, z] and radius.
+    intersectsSphere(center: Tuple3, radius: number): Tuple3 | null;
+    // Whether this ray intersects the plane with the unit normal [x, y, z] and distance from origin.
+    intersectsPlane(normal: Tuple3, distance: number): Tuple3 | null;
+    // Whether this ray intersects with the triangle:
+    // [ [x1, y1, z1], [x2, y2, z2], [x3, y3, z3] ]
+    intersectsTriangle(triange: Triangle): Tuple3 | null;
+    // Whether this ray intersects with the triangle cell, where cell is a face like so:
+    // [ a, b, c ]
+    // Where [ a, b, c ] are indices into the positions array:
+    // [ [x1, y1, z1], [x2, y2, z2] ... ]
+    intersectsTriangleCell(
+      cell: Tuple3<Index>,
+      positions: Tuple3[]
+    ): Tuple3 | null;
+    //   Whether this ray intersects with the Axis-Aligned Bounding Box aabb:
+    // [ [x1, y1, z1], [x2, y2, z2] ]
+    intersectsAABB(aabb: [Tuple3, Tuple3]): Tuple3 | null;
+  }
+
+  export interface PerspectiveCamera {
     // Updates the camera projection and view matrices from the camera's current state (position, direction, viewport, etc).
     update(): void;
     // Resets the position, direction, up, projection and view values to their identity; the defaults described in the constructor.
@@ -14,7 +50,7 @@ declare module "perspective-camera" {
     unproject(vec3: Tuple3): void;
     // Creates a new picking ray from the 2D screen-space vec2 point (i.e. the mouse).
     // The ray is an instance of ray-3d, and it can be used for hit-testing
-    createPickingRay(vec2: Tuple2): void;
+    createPickingRay(vec2: Tuple2): Ray3d;
 
     // A [x, y, width, height] array defining the viewport in screen space.
     viewport: [number, number, number, number];
@@ -55,7 +91,7 @@ declare module "perspective-camera" {
   /**
    *
    */
-  const createCamera: (config: Partial<Config>) => Camera;
+  const createCamera: (config: Partial<Config>) => PerspectiveCamera;
 
   export default createCamera;
 }

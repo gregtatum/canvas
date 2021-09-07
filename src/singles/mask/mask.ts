@@ -1,14 +1,14 @@
 import glsl from "glslify";
-import { Regl, Texture } from "regl";
+import { Regl, Texture } from "lib/regl";
 
 import { vec3 } from "lib/vec-math";
 import * as quads from "lib/quads";
 import createRandom from "@tatumcreative/random";
 import { SceneContext } from "./scene";
-import { accessors, drawCommand } from "lib/regl";
+import { accessors, drawCommand } from "lib/regl-helpers";
 import { matcap } from "lib/shaders";
 
-export default function mainMask(regl: Regl) {
+export function createMask(regl: Regl) {
   const maskMesh = createGeometry();
 
   return {
@@ -24,6 +24,7 @@ export interface MaskProps {
 function createDrawMask(regl: Regl, mesh: QuadMesh) {
   const { getProp, getContext } = accessors<MaskProps, SceneContext>();
   return drawCommand<MaskProps, SceneContext>(regl, {
+    name: "drawMask",
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;

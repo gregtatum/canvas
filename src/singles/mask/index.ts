@@ -1,22 +1,23 @@
 // /* eslint-disable @typescript-eslint/no-var-requires */
-import { initRegl } from "lib/regl";
-import _regl from "regl";
+import { initRegl } from "lib/regl-helpers";
+import _regl from "lib/regl";
 import resl from "resl";
 
-import _setupScene, { SceneContext } from "./scene";
-import _drawMask from "./mask";
+import { createSetupScene, SceneContext } from "./scene";
+import { createMask } from "./mask";
 import _maskBody from "./mask-body";
 import _background from "./background";
 import _dust from "./background";
-import _labelQuads from "./label-quads";
+import { createDrawLabelQuads } from "./label-quads";
+import { Ray3d } from "perspective-camera";
 
 const regl = initRegl();
-const setupScene = _setupScene(regl);
-const { drawMask, maskMesh } = _drawMask(regl);
+const { drawMask, maskMesh } = createMask(regl);
+const setupScene = createSetupScene(regl);
 // const { drawMaskBody, maskBodyQuads } = _maskBody(regl);
 const drawBackground = _background(regl);
 const drawDust = _dust(regl);
-const maskLabels = _labelQuads(regl, maskMesh);
+const drawLabelQuads = createDrawLabelQuads(regl, maskMesh);
 const clear = { depth: 1.0, color: [0, 0, 0, 1] as Tuple4 };
 
 resl({
@@ -36,15 +37,15 @@ resl({
     const frameLoop = regl.frame(() => {
       try {
         regl.clear(clear);
-        setupScene((ctx: SceneContext) => {
+        setupScene(function setupSceneInner(ctx: SceneContext) {
           drawMask(assets);
           // drawMaskBody();
           drawBackground();
           // eslint-disable-next-line no-constant-condition
           if (true) {
-            maskLabels.drawLines({ model: ctx.headModel });
-            maskLabels.drawCellIndices({ model: ctx.headModel });
-            // maskLabels.drawPositionIndices({ model: ctx.headModel });
+            drawLabelQuads.drawLines({ model: ctx.headModel });
+            drawLabelQuads.drawCellIndices({ model: ctx.headModel });
+            // drawLabelQuads.drawPositionIndices({ model: ctx.headModel });
           }
           drawDust();
         });

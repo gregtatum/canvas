@@ -1,8 +1,8 @@
 import glsl from "glslify";
-import { Regl, DrawCommand } from "regl";
+import { Regl, DrawCommand } from "lib/regl";
 
 import * as quad from "lib/quads";
-import { accessors, drawCommand } from "lib/regl";
+import { accessors, drawCommand } from "lib/regl-helpers";
 import { SceneContext } from "./scene";
 
 export default function(regl: Regl) {
@@ -16,6 +16,7 @@ export default function(regl: Regl) {
 function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
   const { getContext } = accessors<{}, SceneContext>();
   return drawCommand(regl, {
+    name: "drawMaskBody",
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;

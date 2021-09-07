@@ -1,5 +1,5 @@
 import glsl from "glslify";
-import { Regl, DrawCommand } from "regl";
+import { Regl, DrawCommand } from "lib/regl";
 import { fill } from "lib/utils";
 import { simplex } from "lib/shaders";
 
@@ -7,6 +7,7 @@ const DUST_COUNT = 3000;
 
 export default function drawDust(regl: Regl): DrawCommand {
   return regl({
+    name: "drawDust",
     vert: glsl`
       precision mediump float;
       ${simplex}

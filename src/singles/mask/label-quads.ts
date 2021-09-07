@@ -1,8 +1,8 @@
 import glsl from "glslify";
-import { Regl, DrawCommand } from "regl";
+import { Regl, DrawCommand } from "lib/regl";
 
 import * as quads from "lib/quads";
-import { accessors, composeDrawCommands, drawCommand } from "lib/regl";
+import { accessors, composeDrawCommands, drawCommand } from "lib/regl-helpers";
 import { SceneContext } from "./scene";
 
 const POSITION_COLOR: Tuple3 = [0.5, 0, 0];
@@ -18,7 +18,8 @@ interface LabelProps {
   model: MatrixTuple4x4;
 }
 
-type DrawLabelQuads = DrawCommand<SceneContext, LabelProps>;
+type LabelQuadsContext = SceneContext & { quadIndex: QuadIndex | null };
+type DrawLabelQuads = DrawCommand<LabelQuadsContext, LabelProps>;
 
 interface LabelQuadsCommands {
   drawLines: DrawLabelQuads;
@@ -26,7 +27,7 @@ interface LabelQuadsCommands {
   drawPositionIndices: DrawLabelQuads;
 }
 
-export default function createDrawFunctions(
+export function createDrawLabelQuads(
   regl: Regl,
   mesh: QuadMesh
 ): LabelQuadsCommands {
@@ -37,18 +38,81 @@ export default function createDrawFunctions(
       drawPositionIndices: NOOP as any,
     };
   }
+
+  const pickingRay = createPickingRay(regl, mesh);
+
   const drawNumbers = createDrawNumbers(regl);
   return {
-    drawLines: createDrawLines(regl, mesh),
-    drawCellIndices: createDrawCellIndices(regl, mesh, drawNumbers),
-    drawPositionIndices: createDrawPositionIndices(regl, mesh, drawNumbers),
+    drawLines: composeDrawCommands(pickingRay, createDrawLines(regl, mesh)),
+    drawCellIndices: composeDrawCommands(
+      pickingRay,
+      createDrawCellIndices(regl, mesh, drawNumbers)
+    ),
+    drawPositionIndices: composeDrawCommands(
+      pickingRay,
+      createDrawPositionIndices(regl, mesh, drawNumbers)
+    ),
   };
+}
+
+function createPickingRay(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
+  const mouse: Tuple2 = [0, 0];
+
+  window.addEventListener("mousemove", event => {
+    const { canvas } = regl._gl;
+    const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+    const dpi = canvas.width / rect.width;
+    mouse[0] = event.pageX * dpi;
+    mouse[1] = event.pageY * dpi;
+  });
+
+  const _triangle: Tuple3 = [0, 0, 0];
+  let lastQuadIndex: Index;
+
+  return drawCommand(regl, {
+    name: "pickingRay",
+    context: {
+      quadIndex: ({ camera }: SceneContext): QuadIndex | null => {
+        const ray = camera.createPickingRay(mouse);
+        const { quads, positions } = mesh;
+        let quadIndex = 0;
+        for (; quadIndex < quads.length; quadIndex++) {
+          const quad = quads[quadIndex];
+          _triangle[0] = quad[0];
+          _triangle[1] = quad[1];
+          _triangle[2] = quad[2];
+          if (ray.intersectsTriangleCell(_triangle, positions)) {
+            break;
+          }
+          _triangle[0] = quad[1];
+          _triangle[1] = quad[2];
+          _triangle[2] = quad[3];
+          ray.intersectsTriangleCell(_triangle, positions);
+          if (ray.intersectsTriangleCell(_triangle, positions)) {
+            break;
+          }
+        }
+        if (quadIndex < quads.length) {
+          if (lastQuadIndex !== quadIndex) {
+            // console.log({ quadIndex, quad: quads[quadIndex] });
+          }
+          lastQuadIndex = quadIndex;
+          return quadIndex;
+        }
+        return null;
+      },
+    },
+  });
 }
 
 function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
   const { getContext } = accessors<LabelProps, SceneContext>();
+  const elements = quads.getElements(mesh, "lines");
+  let lastQuadIndex: Index;
+  let lastQuadElements: Index[];
 
   return drawCommand(regl, {
+    name: "labelQuadsDrawLines",
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;
@@ -80,7 +144,17 @@ function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
     uniforms: {
       model: getContext("headModel"),
     },
-    elements: quads.getElements(mesh, "lines"),
+    elements: ({ quadIndex }: LabelQuadsContext) => {
+      if (quadIndex === null) {
+        return elements;
+      }
+      let quadElements = lastQuadElements;
+      if (lastQuadIndex !== quadIndex || !quadElements) {
+        const [a, b, c, d] = mesh.quads[quadIndex];
+        quadElements = [a, b, b, c, c, d, d, a];
+      }
+      return quadElements;
+    },
     primitive: "lines",
     cull: { enable: false },
     depth: { enable: false },
@@ -89,6 +163,7 @@ function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
 
 function createDrawNumbers(regl: Regl): DrawLabelQuads {
   return drawCommand(regl, {
+    name: "labelQuadsDrawNumbers",
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;
@@ -180,6 +255,7 @@ function createDrawCellIndices(
   const { getProp } = accessors<LabelProps, SceneContext>();
 
   const drawCells: DrawLabelQuads = drawCommand<LabelProps>(regl, {
+    name: "drawCellIndices",
     attributes: {
       position: centerPositions,
       digits: digits,
@@ -189,7 +265,10 @@ function createDrawCellIndices(
       color: getProp("color", CELL_COLOR),
       model: getProp("model"),
     },
-    count: centerPositions.length,
+    count: ({ quadIndex }: LabelQuadsContext) =>
+      quadIndex === null ? centerPositions.length : 1,
+    offset: ({ quadIndex }: LabelQuadsContext) =>
+      quadIndex === null ? 0 : quadIndex,
   });
 
   return composeDrawCommands(drawCells, drawNumbers);
@@ -205,6 +284,7 @@ function createDrawPositionIndices(
   const { getProp } = accessors<LabelProps, SceneContext>();
 
   const drawPositions = drawCommand<LabelProps>(regl, {
+    name: "drawPositionIndices",
     attributes: {
       position: positions,
       digits: digits,

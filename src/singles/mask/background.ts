@@ -1,9 +1,10 @@
 import glsl from "glslify";
 import { simplex } from "lib/shaders";
-import { Regl, DrawCommand } from "regl";
+import { Regl, DrawCommand } from "lib/regl";
 
 export default function drawBackground(regl: Regl): DrawCommand {
   return regl({
+    name: "drawBackground",
     vert: glsl`
       precision mediump float;
       attribute vec2 position;
