@@ -1,12 +1,16 @@
 import glsl from "glslify";
-import { Regl, Texture } from "lib/regl";
+import { DefaultContext, Regl, Texture } from "lib/regl";
 
-import { vec3 } from "lib/vec-math";
+import { mat4, vec3 } from "lib/vec-math";
 import * as quads from "lib/quads";
 import createRandom from "@tatumcreative/random";
-import { SceneContext } from "./scene";
 import { accessors, drawCommand } from "lib/regl-helpers";
 import { matcap } from "lib/shaders";
+import { createWithModel, ModelContext } from "lib/draw/with-model";
+
+const simplex = new (require("simplex-noise"))();
+
+export type MaskContext = ModelContext<"head">;
 
 export function createMask(regl: Regl) {
   const maskMesh = createGeometry();
@@ -14,7 +18,24 @@ export function createMask(regl: Regl) {
   return {
     drawMask: createDrawMask(regl, maskMesh),
     maskMesh,
+    withMaskModel: createWithMaskModel(regl),
   };
+}
+
+function createWithMaskModel(regl: Regl) {
+  const out = mat4.create();
+  const eye: Tuple3 = [0, 0, -1];
+  const center: Tuple3 = [0, 0, 0];
+  const up: Tuple3 = [0, 1, 0];
+
+  return createWithModel(regl, "head", ({ time }: DefaultContext) => {
+    center[0] = simplex.noise2D(time * 0.1, 0) * 0.05;
+    center[1] = simplex.noise2D(time * 0.1, 10) * 0.025;
+    up[0] = simplex.noise2D(time * 0.1, 10) * 0.25;
+    eye[0] = simplex.noise2D(time * 0.05, 0) * 0.25;
+    // return mat4.identity(out)
+    return mat4.lookAt(out, center, eye, up);
+  });
 }
 
 export interface MaskProps {
@@ -22,8 +43,8 @@ export interface MaskProps {
 }
 
 function createDrawMask(regl: Regl, mesh: QuadMesh) {
-  const { getProp, getContext } = accessors<MaskProps, SceneContext>();
-  return drawCommand<MaskProps, SceneContext>(regl, {
+  const { getProp, getContext } = accessors<MaskProps, MaskContext>();
+  return drawCommand<MaskProps, MaskContext>(regl, {
     name: "drawMask",
     vert: glsl`
       precision mediump float;
@@ -78,7 +99,7 @@ function createGeometry() {
   });
   createEyeHoles(mesh, w, h, d);
   // Adjust nose shape.
-  centerRing.forEach(p => {
+  centerRing.forEach((p) => {
     p[2] += 0.1;
     if (p[1] < 0) {
       p[2] += 0.1;
@@ -95,14 +116,14 @@ function createGeometry() {
 }
 
 function shapeEyes(quads: QuadMesh): void {
-  [27, 19, 20, 28].forEach(i => {
+  [27, 19, 20, 28].forEach((i) => {
     quads.positions[i][0] *= 0.5;
     quads.positions[i][1] -= 0.1;
   });
 }
 
 function shapeMaskBack(quads: QuadMesh): void {
-  [0, 3].forEach(i => {
+  [0, 3].forEach((i) => {
     quads.positions[i][0] *= 1.2;
     quads.positions[i][1] -= 0.1;
     quads.positions[i][2] -= 0.1;
@@ -128,8 +149,8 @@ function createEyeHoles(mesh: QuadMesh, w: number, h: number, d: number) {
   quads.extrude(mesh, leftEyeFront, 0, 0);
   quads.extrude(mesh, rightEyeFront, 0, 0);
 
-  leftEyeFront.forEach(i => (mesh.positions[i][2] = -d / 2));
-  rightEyeFront.forEach(i => (mesh.positions[i][2] = -d / 2));
+  leftEyeFront.forEach((i) => (mesh.positions[i][2] = -d / 2));
+  rightEyeFront.forEach((i) => (mesh.positions[i][2] = -d / 2));
   mesh.quads.splice(8, 1);
   mesh.quads.splice(6, 1);
   mesh.quads.splice(5, 1);
@@ -152,15 +173,15 @@ function refineEyes(mesh: QuadMesh): void {
 
     (quads.getLoopHorizontal(mesh, mesh.quads[146], "quads") as number[][])
       .reduce((a, b): number[] => a.concat(b))
-      .map(i => mesh.positions[i])
+      .map((i) => mesh.positions[i])
       .concat(ring)
       .filter(unique)
-      .forEach(p => (p[2] += 0.01));
+      .forEach((p) => (p[2] += 0.01));
   });
 }
 
 function shapeNose(mesh: QuadMesh): void {
-  [42, 43, 46].forEach(i => {
+  [42, 43, 46].forEach((i) => {
     mesh.positions[i][2] -= 0.05;
   });
 
@@ -199,7 +220,7 @@ function extrudeHair(mesh: QuadMesh): void {
     .getLoopVertical(mesh, mesh.quads[0], "quads")
     .filter(unique)
     .filter(
-      quad =>
+      (quad) =>
         mesh.positions[quad[0]][1] +
           mesh.positions[quad[1]][1] +
           mesh.positions[quad[2]][1] +
@@ -207,13 +228,13 @@ function extrudeHair(mesh: QuadMesh): void {
         -0.4
     );
 
-  faces.forEach(quad => extrudeAndRotateCell(mesh, quad, random));
-  faces.forEach(quad => quads.extrude(mesh, quad, 0.1, 0.005));
-  faces.forEach(quad => extrudeAndRotateCell(mesh, quad, random));
-  faces.forEach(quad => quads.extrude(mesh, quad, 0.25, 0.025));
-  faces.forEach(quad => extrudeAndRotateCell(mesh, quad, random));
-  faces.forEach(quad => quads.extrude(mesh, quad, 0.25, 0.025));
-  faces.forEach(quad => extrudeAndRotateCell(mesh, quad, random));
+  faces.forEach((quad) => extrudeAndRotateCell(mesh, quad, random));
+  faces.forEach((quad) => quads.extrude(mesh, quad, 0.1, 0.005));
+  faces.forEach((quad) => extrudeAndRotateCell(mesh, quad, random));
+  faces.forEach((quad) => quads.extrude(mesh, quad, 0.25, 0.025));
+  faces.forEach((quad) => extrudeAndRotateCell(mesh, quad, random));
+  faces.forEach((quad) => quads.extrude(mesh, quad, 0.25, 0.025));
+  faces.forEach((quad) => extrudeAndRotateCell(mesh, quad, random));
 }
 
 function extrudeAndRotateCell(
@@ -226,7 +247,7 @@ function extrudeAndRotateCell(
   const rotateA = random() * range - range / 2;
   const rotateB = random() * range - range / 2;
 
-  quad.forEach(i => {
+  quad.forEach((i) => {
     const position = mesh.positions[i];
     vec3.rotateZ(position, position, [0, 0, 0], rotateA);
     vec3.rotateY(position, position, [0, 0, 0], rotateB);

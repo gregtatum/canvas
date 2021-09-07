@@ -4,8 +4,9 @@ import { Regl, DrawCommand } from "lib/regl";
 import * as quad from "lib/quads";
 import { accessors, drawCommand } from "lib/regl-helpers";
 import { SceneContext } from "./scene";
+import { MaskContext } from "./mask";
 
-export default function(regl: Regl) {
+export default function (regl: Regl) {
   const quads = createGeometry();
   return {
     maskBodyQuads: quads,
@@ -14,7 +15,7 @@ export default function(regl: Regl) {
 }
 
 function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
-  const { getContext } = accessors<{}, SceneContext>();
+  const { getContext } = accessors<{}, MaskContext>();
   return drawCommand(regl, {
     name: "drawMaskBody",
     vert: glsl`
@@ -76,11 +77,11 @@ function createGeometry() {
   const d = 0.5;
   const mesh = quad.createBox(w, h, d);
   mesh.quads.splice(1, 1);
-  mesh.positions.forEach(p => {
+  mesh.positions.forEach((p) => {
     p[1] -= 0.4;
     p[2] -= 0.13;
   });
-  [0, 1, 2, 3].forEach(i => {
+  [0, 1, 2, 3].forEach((i) => {
     const position = mesh.positions[i];
     position[0] *= 3.75;
     position[1] *= 1.5;

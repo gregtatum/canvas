@@ -12,7 +12,7 @@ import { createDrawLabelQuads } from "./label-quads";
 import { Ray3d } from "perspective-camera";
 
 const regl = initRegl();
-const { drawMask, maskMesh } = createMask(regl);
+const { withMaskModel, drawMask, maskMesh } = createMask(regl);
 const setupScene = createSetupScene(regl);
 // const { drawMaskBody, maskBodyQuads } = _maskBody(regl);
 const drawBackground = _background(regl);
@@ -25,7 +25,7 @@ resl({
     matcapTexture: {
       type: "image",
       src: "html/matcap/Jade_Light.png",
-      parser: data =>
+      parser: (data) =>
         regl.texture({
           data: data as HTMLImageElement,
           mag: "linear",
@@ -33,21 +33,23 @@ resl({
         }),
     },
   },
-  onDone: assets => {
+  onDone: (assets) => {
     const frameLoop = regl.frame(() => {
       try {
         regl.clear(clear);
-        setupScene(function setupSceneInner(ctx: SceneContext) {
-          drawMask(assets);
-          // drawMaskBody();
-          drawBackground();
-          // eslint-disable-next-line no-constant-condition
-          if (true) {
-            drawLabelQuads.drawLines({ model: ctx.headModel });
-            drawLabelQuads.drawCellIndices({ model: ctx.headModel });
-            // drawLabelQuads.drawPositionIndices({ model: ctx.headModel });
-          }
-          drawDust();
+        setupScene(() => {
+          withMaskModel((ctx) => {
+            drawMask(assets);
+            // drawMaskBody();
+            drawBackground();
+            // eslint-disable-next-line no-constant-condition
+            if (true) {
+              drawLabelQuads.drawLines({ model: ctx.headModel });
+              drawLabelQuads.drawCellIndices({ model: ctx.headModel });
+              // drawLabelQuads.drawPositionIndices({ model: ctx.headModel });
+            }
+            drawDust();
+          });
         });
       } catch (error) {
         console.error(error);

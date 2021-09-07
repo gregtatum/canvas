@@ -3,8 +3,6 @@ import { vec3, mat3, mat4 } from "lib/vec-math";
 import createControls, { OrbitControls } from "orbit-controls";
 import createCamera, { Ray3d, PerspectiveCamera } from "perspective-camera";
 
-const simplex = new (require("simplex-noise"))();
-
 const TAU = 6.283185307179586;
 const FOV = TAU * 0.1;
 
@@ -60,21 +58,7 @@ function getContext(camera: PerspectiveCamera, controls: OrbitControls) {
     fov: FOV,
     camera,
     controls,
-    headModel: (() => {
-      const out = mat4.create();
-      const eye: Tuple3 = [0, 0, -1];
-      const center: Tuple3 = [0, 0, 0];
-      const up: Tuple3 = [0, 1, 0];
-      return ({ time }: DefaultContext) => {
-        center[0] = simplex.noise2D(time * 0.1, 0) * 0.05;
-        center[1] = simplex.noise2D(time * 0.1, 10) * 0.025;
-        up[0] = simplex.noise2D(time * 0.1, 10) * 0.25;
-
-        eye[0] = simplex.noise2D(time * 0.05, 0) * 0.25;
-        // return mat4.identity(out)
-        return mat4.lookAt(out, center, eye, up);
-      };
-    })(),
+    view: () => camera.view,
   };
 }
 

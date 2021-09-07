@@ -100,3 +100,20 @@ export function composeDrawCommands<
 
   return namedFn[name] as any;
 }
+
+/**
+ * Memoizes a function based on the current draw tick.
+ */
+export function tickMemoized<Context extends DefaultContext, T>(
+  fn: (ctx: Context) => T
+): (ctx: Context) => T {
+  let lastTick = -1;
+  let lastT: T;
+  return (ctx: Context) => {
+    if (ctx.tick !== lastTick) {
+      lastT = fn(ctx);
+      lastTick = ctx.tick;
+    }
+    return lastT;
+  };
+}

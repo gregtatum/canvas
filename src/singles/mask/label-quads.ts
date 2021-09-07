@@ -58,7 +58,7 @@ export function createDrawLabelQuads(
 function createPickingRay(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
   const mouse: Tuple2 = [0, 0];
 
-  window.addEventListener("mousemove", event => {
+  window.addEventListener("mousemove", (event) => {
     const { canvas } = regl._gl;
     const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
     const dpi = canvas.width / rect.width;
@@ -106,7 +106,7 @@ function createPickingRay(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
 }
 
 function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
-  const { getContext } = accessors<LabelProps, SceneContext>();
+  const { getProp } = accessors<LabelProps, SceneContext>();
   const elements = quads.getElements(mesh, "lines");
   let lastQuadIndex: Index;
   let lastQuadElements: Index[];
@@ -142,7 +142,7 @@ function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
       normal: mesh.normals,
     },
     uniforms: {
-      model: getContext("headModel"),
+      model: getProp("model"),
     },
     elements: ({ quadIndex }: LabelQuadsContext) => {
       if (quadIndex === null) {
