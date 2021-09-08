@@ -3,7 +3,9 @@ import { Regl, DrawCommand } from "lib/regl";
 
 import * as quads from "lib/quads";
 import { accessors, composeDrawCommands, drawCommand } from "lib/regl-helpers";
-import { SceneContext } from "./scene";
+import { SceneContext } from "lib/draw/scene";
+import { mat4, vec3, vec4 } from "lib/vec-math";
+import { ensureExists } from "lib/utils";
 
 const POSITION_COLOR: Tuple3 = [0.5, 0, 0];
 const CELL_COLOR: Tuple3 = [0, 0.5, 0];
@@ -16,6 +18,7 @@ interface LabelProps {
   height?: number;
   color?: Tuple3;
   model: MatrixTuple4x4;
+  modelNormal: MatrixTuple3x3;
 }
 
 type LabelQuadsContext = SceneContext & { quadIndex: QuadIndex | null };
@@ -55,8 +58,89 @@ export function createDrawLabelQuads(
   };
 }
 
+function createHoveredQuadDisplay() {
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <div>Quad:</div>
+    <div></div>
+    <div></div>
+    <div></div>
+
+    <div>Point A:</div>
+    <div></div>
+    <div></div>
+    <div></div>
+
+    <div>Point B:</div>
+    <div></div>
+    <div></div>
+    <div></div>
+
+    <div>Point C:</div>
+    <div></div>
+    <div></div>
+    <div></div>
+
+    <div>Point D:</div>
+    <div></div>
+    <div></div>
+    <div></div>
+    </div>
+  `;
+  Object.assign(div.style, {
+    fontFamily: "'Courier New'",
+    position: "absolute",
+    top: 0,
+    right: 0,
+    fontSize: "13px",
+    color: "#fff",
+    visibility: "hidden",
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    columnGap: "15px",
+    rowGap: "2px",
+  });
+
+  document.body.appendChild(div);
+
+  const children = [...div.children] as HTMLDivElement[];
+  console.log(children);
+  const positionsDiv = children.slice(4);
+  if (positionsDiv.length !== 4 * 4) {
+    throw new Error(
+      "Positions div had the wrong number of divs: " + positionsDiv.length
+    );
+  }
+
+  for (let i = 0; i < children.length; i++) {
+    if (i % 4 === 0) {
+      Object.assign(children[i], {
+        textAlign: "right",
+      });
+    }
+  }
+
+  return {
+    div: div,
+    quadDiv: ensureExists(children[1], "quadDiv"),
+    positionsDiv,
+  };
+}
+
+function lowerPrecision(n: number, digits = 3) {
+  const units = Math.pow(10, digits);
+  n = Math.round(n * units) / units;
+  if (Object.is(n, -0)) {
+    // Remove -0.
+    n = 0;
+  }
+  return n;
+}
+
 function createPickingRay(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
-  const mouse: Tuple2 = [0, 0];
+  const mouse: Tuple2 = [-1000, -1000];
+
+  const hoveredQuadDisplay = createHoveredQuadDisplay();
 
   window.addEventListener("mousemove", (event) => {
     const { canvas } = regl._gl;
@@ -66,38 +150,74 @@ function createPickingRay(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
     mouse[1] = event.pageY * dpi;
   });
 
+  window.addEventListener("mouseout", (event) => {
+    mouse[0] = -1000;
+    mouse[1] = -1000;
+  });
+
   const _triangle: Tuple3 = [0, 0, 0];
   let lastQuadIndex: Index;
-
+  const _arr: Tuple3 = [0, 0, 0];
+  const positionsTransformed: Tuple3[] = [];
+  for (let i = 0; i < mesh.positions.length; i++) {
+    positionsTransformed.push(vec3.create());
+  }
   return drawCommand(regl, {
     name: "pickingRay",
     context: {
-      quadIndex: ({ camera }: SceneContext): QuadIndex | null => {
+      quadIndex: (
+        { camera }: SceneContext,
+        props: LabelProps
+      ): QuadIndex | null => {
         const ray = camera.createPickingRay(mouse);
         const { quads, positions } = mesh;
+        for (let i = 0; i < positions.length; i++) {
+          const pOriginal = positions[i];
+          const pTransformed = positionsTransformed[i];
+          vec3.transformMat4(pTransformed, pOriginal, props.model);
+        }
+
         let quadIndex = 0;
         for (; quadIndex < quads.length; quadIndex++) {
           const quad = quads[quadIndex];
           _triangle[0] = quad[0];
           _triangle[1] = quad[1];
           _triangle[2] = quad[2];
-          if (ray.intersectsTriangleCell(_triangle, positions)) {
+          if (ray.intersectsTriangleCell(_triangle, positionsTransformed)) {
             break;
           }
           _triangle[0] = quad[1];
           _triangle[1] = quad[2];
           _triangle[2] = quad[3];
-          ray.intersectsTriangleCell(_triangle, positions);
-          if (ray.intersectsTriangleCell(_triangle, positions)) {
+          if (ray.intersectsTriangleCell(_triangle, positionsTransformed)) {
             break;
           }
         }
         if (quadIndex < quads.length) {
           if (lastQuadIndex !== quadIndex) {
             // console.log({ quadIndex, quad: quads[quadIndex] });
+            hoveredQuadDisplay.quadDiv.innerText = String(quadIndex);
+            const quad = quads[quadIndex];
+            for (let i = 0; i < hoveredQuadDisplay.positionsDiv.length; i++) {
+              const div = hoveredQuadDisplay.positionsDiv[i];
+              if (i % 4 === 0) {
+                continue;
+              }
+              const positionIndex = quad[Math.floor((i - 1) / 4)];
+              const position = positions[positionIndex][(i - 1) % 4];
+              div.innerText = lowerPrecision(position).toString();
+            }
           }
           lastQuadIndex = quadIndex;
+          if (hoveredQuadDisplay.div.style.visibility !== "visible") {
+            hoveredQuadDisplay.div.style.visibility = "visible";
+          }
+
           return quadIndex;
+        }
+
+        if (hoveredQuadDisplay.div.style.visibility !== "hidden") {
+          hoveredQuadDisplay.div.style.visibility = "hidden";
         }
         return null;
       },

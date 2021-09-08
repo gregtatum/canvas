@@ -3,20 +3,19 @@ import { initRegl } from "lib/regl-helpers";
 import _regl from "lib/regl";
 import resl from "resl";
 
-import { createSetupScene, SceneContext } from "./scene";
+import { createSetupScene } from "lib/draw/scene";
 import { createMask } from "./mask";
-import _maskBody from "./mask-body";
-import _background from "./background";
-import _dust from "./background";
+import { createMaskBody } from "./mask-body";
+import { createDrawBackground } from "./background";
+import { createDrawDust } from "./dust";
 import { createDrawLabelQuads } from "./label-quads";
-import { Ray3d } from "perspective-camera";
 
 const regl = initRegl();
 const { withMaskModel, drawMask, maskMesh } = createMask(regl);
 const setupScene = createSetupScene(regl);
-// const { drawMaskBody, maskBodyQuads } = _maskBody(regl);
-const drawBackground = _background(regl);
-const drawDust = _dust(regl);
+const { drawMaskBody, maskBodyQuads } = createMaskBody(regl);
+const drawBackground = createDrawBackground(regl);
+const drawDust = createDrawDust(regl);
 const drawLabelQuads = createDrawLabelQuads(regl, maskMesh);
 const clear = { depth: 1.0, color: [0, 0, 0, 1] as Tuple4 };
 
@@ -40,13 +39,17 @@ resl({
         setupScene(() => {
           withMaskModel((ctx) => {
             drawMask(assets);
-            // drawMaskBody();
+            drawMaskBody();
             drawBackground();
             // eslint-disable-next-line no-constant-condition
             if (true) {
-              drawLabelQuads.drawLines({ model: ctx.headModel });
-              drawLabelQuads.drawCellIndices({ model: ctx.headModel });
-              // drawLabelQuads.drawPositionIndices({ model: ctx.headModel });
+              const props = {
+                model: ctx.headModel,
+                modelNormal: ctx.headModelNormal,
+              };
+              drawLabelQuads.drawLines(props);
+              drawLabelQuads.drawCellIndices(props);
+              drawLabelQuads.drawPositionIndices(props);
             }
             drawDust();
           });

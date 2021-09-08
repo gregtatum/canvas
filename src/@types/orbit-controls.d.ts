@@ -63,7 +63,7 @@ declare module "orbit-controls" {
     readonly pinching: boolean;
   }
 
-  interface Config {
+  export interface OrbitControlsConfig {
     //  the initial position of the camera, default [0, 0, 1]
     position: Tuple3;
     //  the initial direction of the camera, default [0, 1, 0]
@@ -106,7 +106,7 @@ declare module "orbit-controls" {
    * Generic controls for orbiting a target in 3D. Can be used to control a camera, a
    * 3D ray, or anything with { position, direction }.
    */
-  const createControls: (config: Partial<Config>) => OrbitControls;
+  const createControls: (config: Partial<OrbitControlsConfig>) => OrbitControls;
 
   export default createControls;
 }

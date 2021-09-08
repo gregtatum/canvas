@@ -3,10 +3,9 @@ import { Regl, DrawCommand } from "lib/regl";
 
 import * as quad from "lib/quads";
 import { accessors, drawCommand } from "lib/regl-helpers";
-import { SceneContext } from "./scene";
 import { MaskContext } from "./mask";
 
-export default function (regl: Regl) {
+export function createMaskBody(regl: Regl) {
   const quads = createGeometry();
   return {
     maskBodyQuads: quads,

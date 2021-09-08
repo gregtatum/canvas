@@ -5,7 +5,7 @@ import { simplex } from "lib/shaders";
 
 const DUST_COUNT = 3000;
 
-export default function drawDust(regl: Regl): DrawCommand {
+export function createDrawDust(regl: Regl): DrawCommand {
   return regl({
     name: "drawDust",
     vert: glsl`
@@ -32,9 +32,9 @@ export default function drawDust(regl: Regl): DrawCommand {
         vColor = vec3(0.1, 0.1, 0.1);
 
         float x = aspectRatio * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberA)
-          + 0.02 * noise(vec2(vParticleId, time * 0.1));
+          + 0.02 * simplex(vec2(vParticleId, time * 0.1));
         float z = aspectRatio * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberC)
-          + 0.02 * noise(vec2(vParticleId + 23.0, time * 0.1));
+          + 0.02 * simplex(vec2(vParticleId + 23.0, time * 0.1));
 
         float y = mod(POINT_SPEED * speed * time + uniqueNumberB, STAGE_SIZE) - HALF_STAGE_SIZE;
 
@@ -62,7 +62,7 @@ export default function drawDust(regl: Regl): DrawCommand {
       viewportHeight: ({ viewportHeight }) => viewportHeight,
     },
     attributes: {
-      position: fill(DUST_COUNT, i => [
+      position: fill(DUST_COUNT, (i) => [
         i,
         Math.random(),
         Math.random(),

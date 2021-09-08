@@ -71,7 +71,7 @@ declare module "perspective-camera" {
     up: Tuple3;
   }
 
-  interface Config {
+  export interface PerspectiveCameraConfig {
     // field of view in radians, default Math.PI / 4
     fov: Radian;
     // the far range, default 100
@@ -91,7 +91,7 @@ declare module "perspective-camera" {
   /**
    *
    */
-  const createCamera: (config: Partial<Config>) => PerspectiveCamera;
+  const createCamera: (config: Partial<PerspectiveCameraConfig>) => PerspectiveCamera;
 
   export default createCamera;
 }

@@ -1,7 +1,13 @@
 import { Regl, DefaultContext, DrawCommand } from "lib/regl";
 import { vec3, mat3, mat4 } from "lib/vec-math";
-import createControls, { OrbitControls } from "orbit-controls";
-import createCamera, { Ray3d, PerspectiveCamera } from "perspective-camera";
+import createControls, {
+  OrbitControls,
+  OrbitControlsConfig,
+} from "orbit-controls";
+import createCamera, {
+  PerspectiveCamera,
+  PerspectiveCameraConfig,
+} from "perspective-camera";
 
 const TAU = 6.283185307179586;
 const FOV = TAU * 0.1;
@@ -10,15 +16,11 @@ export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
   DefaultContext;
 
 interface SceneConfig {
-  onMouseMove?: (ray: Ray3d) => void;
+  orbit?: Partial<OrbitControlsConfig>;
+  perspective?: Partial<PerspectiveCameraConfig>;
 }
 
-function getUniforms(
-  camera: PerspectiveCamera,
-  controls: OrbitControls,
-  canvas: HTMLCanvasElement,
-  config: SceneConfig
-) {
+function getUniforms(camera: PerspectiveCamera, controls: OrbitControls) {
   let prevTick: Integer;
   function update<T>(callback: () => T) {
     return ({ tick, viewportWidth, viewportHeight }: DefaultContext): T => {
@@ -71,6 +73,7 @@ export function createSetupScene(
     near: 0.1,
     far: 10,
     position: [0, 0, 1],
+    ...(config.perspective || {}),
   });
 
   const controls = createControls({
@@ -82,16 +85,12 @@ export function createSetupScene(
     pinchSpeed: 0.00001,
     rotateSpeed: 0.0025,
     damping: 0.01,
+    ...(config.orbit || {}),
   });
 
   return regl({
     name: "setupScene",
-    uniforms: getUniforms(
-      camera,
-      controls,
-      regl._gl.canvas as HTMLCanvasElement,
-      config
-    ),
+    uniforms: getUniforms(camera, controls),
     context: getContext(camera, controls),
   });
 }

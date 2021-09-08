@@ -109,9 +109,9 @@ function createGeometry() {
   shapeMaskBack(mesh);
   quads.subdivide(mesh, 1);
   refineEyes(mesh);
-  // shapeNose(mesh);
-  // extrudeHair(mesh);
-  // quads.subdivide(mesh, 2);
+  shapeNose(mesh);
+  extrudeHair(mesh);
+  quads.subdivide(mesh, 2);
   return mesh;
 }
 
@@ -159,38 +159,48 @@ function createEyeHoles(mesh: QuadMesh, w: number, h: number, d: number) {
 }
 
 function refineEyes(mesh: QuadMesh): void {
-  [
-    { quadIndex: 48, opposite: false },
-    { quadIndex: 75, opposite: false },
-  ].forEach(({ quadIndex, opposite }) => {
+  for (const { quadIndex, quadIndex2 } of [
+    // Inner nose quad on the right side of the mask.
+    { quadIndex: 48, quadIndex2: 146 },
+    // Inner nose quad on the left side of the mask.
+    { quadIndex: 75, quadIndex2: 194 },
+  ]) {
     const quad = mesh.quads[quadIndex];
-    quads.insetLoop(mesh, quad, 0.05, opposite);
+    quads.insetLoopVertical(mesh, quad, 0.05);
 
     const ring = quads.getNewGeometry(mesh, "positions", () => {
-      quads.insetLoop(mesh, quad, 0.0, opposite);
-      quads.insetLoop(mesh, quad, 0.05, opposite);
+      quads.insetLoopVertical(mesh, quad, 0.0);
+      quads.insetLoopVertical(mesh, quad, 0.05);
     });
 
-    (quads.getLoopHorizontal(mesh, mesh.quads[146], "quads") as number[][])
+    // Move the eye loops forward a bit.
+    (
+      quads.getLoopHorizontal(
+        mesh,
+        mesh.quads[quadIndex2],
+        "quads"
+      ) as number[][]
+    )
       .reduce((a, b): number[] => a.concat(b))
       .map((i) => mesh.positions[i])
       .concat(ring)
       .filter(unique)
       .forEach((p) => (p[2] += 0.01));
-  });
+  }
 }
 
 function shapeNose(mesh: QuadMesh): void {
+  // Adjust some positions.
   [42, 43, 46].forEach((i) => {
     mesh.positions[i][2] -= 0.05;
   });
-
-  // quads.splitLoop(mesh, mesh.quads[25], 0.2, true);
-  // [230, 231, 232].forEach(i => {
-  //   mesh.positions[i][0] *= 2;
-  //   mesh.positions[i][1] += 0.05;
-  //   mesh.positions[i][2] += 0.05;
-  // });
+  const noseTip = mesh.quads[25];
+  quads.splitLoopHorizontal(mesh, noseTip, 0.2);
+  [230, 231, 232].forEach((i) => {
+    mesh.positions[i][0] *= 2;
+    mesh.positions[i][1] += 0.05;
+    mesh.positions[i][2] += 0.05;
+  });
 }
 
 function extrudeHair(mesh: QuadMesh): void {

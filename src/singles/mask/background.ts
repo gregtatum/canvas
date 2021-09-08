@@ -2,7 +2,7 @@ import glsl from "glslify";
 import { simplex } from "lib/shaders";
 import { Regl, DrawCommand } from "lib/regl";
 
-export default function drawBackground(regl: Regl): DrawCommand {
+export function createDrawBackground(regl: Regl): DrawCommand {
   return regl({
     name: "drawBackground",
     vert: glsl`
