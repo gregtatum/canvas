@@ -19,7 +19,7 @@ export function createDrawBackground(regl: Regl): DrawCommand {
       }
     `,
     frag: glsl`
-      precision mediump float;
+      precision highp float;
       ${simplex}
 
       uniform float time;
@@ -41,6 +41,7 @@ export function createDrawBackground(regl: Regl): DrawCommand {
           topLight * baseColor * vignette * noise,
           1.0
         );
+        // gl_FragColor = vec4(snoise(vec3(mod(time, 1.0))) * 0.4 + 0.55, 0.0, 0.0, 1.0);
       }
     `,
     attributes: {

@@ -9,7 +9,7 @@ export function createDrawDust(regl: Regl): DrawCommand {
   return regl({
     name: "drawDust",
     vert: glsl`
-      precision mediump float;
+      precision highp float;
       ${simplex}
       attribute vec4 position;
       uniform float time, viewportHeight, aspectRatio;
@@ -43,7 +43,7 @@ export function createDrawDust(regl: Regl): DrawCommand {
       }
     `,
     frag: glsl`
-      precision mediump float;
+      precision highp float;
       ${simplex}
       varying vec3 vColor;
       varying float vParticleId;

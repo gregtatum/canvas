@@ -111,7 +111,7 @@ function createGeometry() {
   refineEyes(mesh);
   shapeNose(mesh);
   extrudeHair(mesh);
-  quads.subdivide(mesh, 2);
+  quads.subdivide(mesh, 3);
   return mesh;
 }
 
