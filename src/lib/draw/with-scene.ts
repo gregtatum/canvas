@@ -64,7 +64,7 @@ function getContext(camera: PerspectiveCamera, controls: OrbitControls) {
   };
 }
 
-export function createSetupScene(
+export function createWithScene(
   regl: Regl,
   config: SceneConfig = {}
 ): DrawCommand {

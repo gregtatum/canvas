@@ -16,6 +16,9 @@ const { archiveTool } = require("./archive-tool");
  * @prop {string} pieceName
  * @prop {string} [pieceSlug]
  * @prop {string} filePath
+ * @prop {string} [htmlPath]
+ * @prop {string} [archive]
+ * @prop {number} [serveArchivePort]
  * @prop {unknown} [verbose]
  */
 
@@ -55,6 +58,21 @@ const args = yargs(process.argv.slice(2))
       description: "The path to the file to archive",
       type: "string",
       array: false,
+    },
+    htmlPath: {
+      description: "The path to the HTML to archive",
+      type: "string",
+      array: false,
+    },
+    archive: {
+      description: 'The archive type, either "png" or "html"',
+      choices: ["png", "html"],
+      default: "png",
+      array: false,
+    },
+    serveArchivePort: {
+      description: "Optionally serve up the art archive at the given port",
+      type: "number",
     },
     verbose: {
       description: "Display the verbose output of the underlying commands",

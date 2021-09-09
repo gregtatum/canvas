@@ -4,6 +4,7 @@
 
 This project consists of individual sessions of 2d canvas programming, with the goal of creating some kind of output. The code itself is licensed under MIT, but the designs of the individual sessions are released under Creative Commons Attribution Non-Commercial license. This means you can re-use the components of the code as you see fit, but if you copy and paste an entire session, please observe the Creative Commons license. File an issue for consideration if you would like to use these designs for commercial uses, or if you have any questions about usage.
 
+[![Session 014-alien-world](./014-alien-world/thumb.jpg)](https://gregtatum.com/canvas/014-alien-world)
 [![Session 013-synthwave-vibes](./013-synthwave-vibes/thumb.jpg)](https://gregtatum.com/canvas/013-synthwave-vibes)
 [![Session 012-draw-walkers](./012-draw-walkers/thumb.jpg)](https://gregtatum.com/canvas/012-draw-walkers)
 [![Session 011-draw-explosions](./011-draw-explosions/thumb.jpg)](https://gregtatum.com/canvas/011-draw-explosions)

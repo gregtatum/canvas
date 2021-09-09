@@ -3,7 +3,8 @@ import { initRegl } from "lib/regl-helpers";
 import _regl from "lib/regl";
 import resl from "resl";
 
-import { createSetupScene } from "lib/draw/scene";
+import "lib/shortcuts";
+import { createWithScene } from "lib/draw/with-scene";
 import { createMask } from "./mask";
 import { createMaskBody } from "./mask-body";
 import { createDrawBackground } from "./background";
@@ -12,7 +13,11 @@ import { createDrawLabelQuads } from "./label-quads";
 
 const regl = initRegl();
 const { withMaskModel, drawMask, maskMesh } = createMask(regl);
-const setupScene = createSetupScene(regl);
+const withScene = createWithScene(regl, {
+  orbit: {
+    distanceBounds: [0.5, 0.98],
+  },
+});
 const { drawMaskBody, maskBodyQuads } = createMaskBody(regl);
 const drawBackground = createDrawBackground(regl);
 const drawDust = createDrawDust(regl);
@@ -23,7 +28,8 @@ resl({
   manifest: {
     matcapTexture: {
       type: "image",
-      src: "html/matcap/Jade_Light.png",
+      // Ensure the art archiver can find the assets by defining them in the package.json.
+      src: "html/" + require("./package.json").htmlFiles[1],
       parser: (data) =>
         regl.texture({
           data: data as HTMLImageElement,
@@ -36,7 +42,7 @@ resl({
     const frameLoop = regl.frame(() => {
       try {
         regl.clear(clear);
-        setupScene(() => {
+        withScene(() => {
           withMaskModel((ctx) => {
             drawMask(assets);
             drawMaskBody();

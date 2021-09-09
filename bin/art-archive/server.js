@@ -4,9 +4,9 @@
 // @ts-check
 const http = require("http");
 const formidable = require("formidable");
-const { archiveTool } = require("./archive-tool");
+const { archiveTool, prefix } = require("./archive-tool");
 
-module.exports = { startServer };
+module.exports = { startArtArchiveServer };
 
 /**
  * @param {http.ServerResponse} res
@@ -22,9 +22,7 @@ function respondErr(res, status, error) {
   res.end(JSON.stringify({ error }));
 }
 
-console.log("bin/art-archive/server.js");
-
-function startServer({
+function startArtArchiveServer({
   port,
   projectName,
   projectPath,
@@ -32,17 +30,19 @@ function startServer({
   pieceName,
   pieceSlug,
   archivePath,
+  archive,
+  runBuild,
 }) {
-  console.log("start server");
+  console.log(prefix + "start server");
   const server = http.createServer((req, res) => {
-    console.log("request");
+    console.log(prefix + "received request");
     if (req.method === "POST") {
       const form = formidable({ multiples: true });
 
-      form.parse(req, (err, fields, files) => {
+      form.parse(req, async (err, fields, files) => {
         if (err) {
           respondErr(res, 404, "Error processing form data");
-          console.error("[art-archive]", err);
+          console.error(prefix, err);
           return;
         }
 
@@ -60,6 +60,12 @@ function startServer({
           return;
         }
 
+        let htmlPath = null;
+        if (archive === "html") {
+          htmlPath = await runBuild();
+          console.log(prefix + "HTML build complete: " + htmlPath);
+        }
+
         try {
           archiveTool({
             projectPath,
@@ -70,9 +76,12 @@ function startServer({
             pieceSlug,
             filePath: image.path,
             verbose: false,
+            archive,
+            htmlPath,
+            serveArchivePort: 5678,
           });
         } catch (error) {
-          console.error(error);
+          console.error(prefix, error);
           respondErr(res, 401, "Could not archive the art.");
           return;
         }
@@ -89,8 +98,6 @@ function startServer({
   });
 
   server.listen(port, () => {
-    console.log(
-      `[art-archive] 🏃  Server is running at http://localhost:${port}`
-    );
+    console.log(prefix + `🏃  Server is running at http://localhost:${port}`);
   });
 }

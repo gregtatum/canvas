@@ -69,6 +69,7 @@ function getWebpackConfig({
   outputPublicPath,
 }) {
   const HtmlWebpackPlugin = require("html-webpack-plugin");
+  console.log(templateParameters);
 
   return {
     entry,
