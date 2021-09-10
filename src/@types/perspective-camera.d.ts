@@ -63,6 +63,8 @@ declare module "perspective-camera" {
     // The inverted combined projection and view matrix.
     invProjView: MatrixTuple4x4;
 
+    // field of view in radians, default Math.PI / 4
+    fov: Radian;
     // The current position, direction, and up vectors.
     position: Tuple3;
     // The current position, direction, and up vectors.

@@ -48,26 +48,27 @@ function createDrawMask(regl: Regl, mesh: QuadMesh) {
     name: "drawMask",
     vert: glsl`
       precision mediump float;
+      uniform vec3 cameraPosition;
       attribute vec3 normal, position;
+      uniform mat3 viewNormal, modelNormal;
       uniform mat4 model, projView;
-      varying vec3 vNormal;
+      varying vec3 vNormal, vViewPosition;
 
       void main() {
-        vNormal = normal;
-        gl_Position = projView * model * vec4(position, 1.0);
+        vNormal = viewNormal * modelNormal * normal;
+        vec4 worldPosition = model * vec4(position, 1.0);
+        vViewPosition = cameraPosition - worldPosition.xyz;
+        gl_Position = projView * worldPosition;
       }
     `,
     frag: glsl`
       precision mediump float;
       ${matcap}
-      uniform vec3 cameraPosition;
-      uniform mat3 viewNormal;
       uniform sampler2D matcapTexture;
-      varying vec3 vNormal;
+      varying vec3 vNormal, vViewPosition;
 
       void main() {
-        vec3 normal = viewNormal * normalize(vNormal);
-        vec2 uv = matcap(cameraPosition, normal);
+        vec2 uv = matcap(normalize(vViewPosition), normalize(vNormal));
         vec3 color = texture2D(matcapTexture, uv).rgb;
         gl_FragColor = vec4(color, 1.0);
       }
@@ -79,6 +80,7 @@ function createDrawMask(regl: Regl, mesh: QuadMesh) {
     uniforms: {
       matcapTexture: getProp("matcapTexture"),
       model: getContext("headModel"),
+      modelNormal: getContext("headModelNormal"),
     },
     elements: quads.getElements(mesh, "triangle"),
     primitive: "triangles",

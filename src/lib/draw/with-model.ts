@@ -2,7 +2,7 @@ import { Regl, DefaultContext, DrawCommand } from "lib/regl";
 import { drawCommand, tickMemoized } from "lib/regl-helpers";
 import { ensureExists } from "lib/utils";
 import { mat4, mat3 } from "lib/vec-math";
-import { SceneContext } from "src/singles/mask/scene";
+import { SceneContext } from "lib/draw/with-scene";
 
 interface Matrices {
   // These are computed:

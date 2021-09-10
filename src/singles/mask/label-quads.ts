@@ -3,7 +3,7 @@ import { Regl, DrawCommand } from "lib/regl";
 
 import * as quads from "lib/quads";
 import { accessors, composeDrawCommands, drawCommand } from "lib/regl-helpers";
-import { SceneContext } from "lib/draw/scene";
+import { SceneContext } from "lib/draw/with-scene";
 import { mat4, vec3, vec4 } from "lib/vec-math";
 import { ensureExists } from "lib/utils";
 

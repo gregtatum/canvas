@@ -9,18 +9,32 @@ import createCamera, {
   PerspectiveCameraConfig,
 } from "perspective-camera";
 
-const TAU = 6.283185307179586;
-const FOV = TAU * 0.1;
-
 export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
   DefaultContext;
 
 interface SceneConfig {
+  cameraFOV?: number;
   orbit?: Partial<OrbitControlsConfig>;
   perspective?: Partial<PerspectiveCameraConfig>;
 }
 
-function getUniforms(camera: PerspectiveCamera, controls: OrbitControls) {
+function getCameraFOV(
+  config: SceneConfig,
+  width: number,
+  height: number
+): number {
+  const fov = config.cameraFOV || Math.PI * 0.2;
+  return width < height
+    ? // Adjust for narrow screens
+      Math.min(fov * 1.5, (fov * height) / width)
+    : fov;
+}
+
+function getUniforms(
+  config: SceneConfig,
+  camera: PerspectiveCamera,
+  controls: OrbitControls
+) {
   let prevTick: Integer;
   function update<T>(callback: () => T) {
     return ({ tick, viewportWidth, viewportHeight }: DefaultContext): T => {
@@ -29,6 +43,7 @@ function getUniforms(camera: PerspectiveCamera, controls: OrbitControls) {
         controls.copyInto(camera.position, camera.direction, camera.up);
         camera.viewport[2] = viewportWidth;
         camera.viewport[3] = viewportHeight;
+        camera.fov = getCameraFOV(config, viewportWidth, viewportHeight);
         camera.update();
         prevTick = tick;
       }
@@ -38,6 +53,7 @@ function getUniforms(camera: PerspectiveCamera, controls: OrbitControls) {
 
   return {
     projection: update(() => camera.projection),
+    fov: () => camera.fov,
     view: () => camera.view,
     projView: () => camera.projView,
     inverseProjection: () => mat4.invert([], camera.projection),
@@ -57,7 +73,6 @@ function getUniforms(camera: PerspectiveCamera, controls: OrbitControls) {
 
 function getContext(camera: PerspectiveCamera, controls: OrbitControls) {
   return {
-    fov: FOV,
     camera,
     controls,
     view: () => camera.view,
@@ -69,7 +84,6 @@ export function createWithScene(
   config: SceneConfig = {}
 ): DrawCommand {
   const camera = createCamera({
-    fov: FOV,
     near: 0.1,
     far: 10,
     position: [0, 0, 1],
@@ -90,7 +104,7 @@ export function createWithScene(
 
   return regl({
     name: "setupScene",
-    uniforms: getUniforms(camera, controls),
+    uniforms: getUniforms(config, camera, controls),
     context: getContext(camera, controls),
   });
 }

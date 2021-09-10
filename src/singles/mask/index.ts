@@ -15,7 +15,7 @@ const regl = initRegl();
 const { withMaskModel, drawMask, maskMesh } = createMask(regl);
 const withScene = createWithScene(regl, {
   orbit: {
-    distanceBounds: [0.5, 0.98],
+    distanceBounds: [0.5, 1.98],
   },
 });
 const { drawMaskBody, maskBodyQuads } = createMaskBody(regl);

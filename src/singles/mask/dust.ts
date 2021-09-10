@@ -12,7 +12,7 @@ export function createDrawDust(regl: Regl): DrawCommand {
       precision highp float;
       ${simplex}
       attribute vec4 position;
-      uniform float time, viewportHeight, aspectRatio;
+      uniform float time, viewportHeight, aspectRatio, fov;
       uniform mat4 projection, view;
       varying float speed, vParticleId;
       varying vec3 vColor;
@@ -31,9 +31,9 @@ export function createDrawDust(regl: Regl): DrawCommand {
         speed *= speed;
         vColor = vec3(0.1, 0.1, 0.1);
 
-        float x = aspectRatio * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberA)
+        float x = max(1.0, aspectRatio) * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberA)
           + 0.02 * simplex(vec2(vParticleId, time * 0.1));
-        float z = aspectRatio * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberC)
+        float z = max(1.0, aspectRatio) * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberC)
           + 0.02 * simplex(vec2(vParticleId + 23.0, time * 0.1));
 
         float y = mod(POINT_SPEED * speed * time + uniqueNumberB, STAGE_SIZE) - HALF_STAGE_SIZE;
