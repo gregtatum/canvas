@@ -49,23 +49,24 @@ function createDrawMask(regl: Regl, mesh: QuadMesh) {
     vert: glsl`
       precision mediump float;
       attribute vec3 normal, position;
-      uniform mat4 model, view, projection;
+      uniform mat4 model, projView;
       varying vec3 vNormal;
 
       void main() {
         vNormal = normal;
-        gl_Position = projection * view * model * vec4(position, 1.0);
+        gl_Position = projView * model * vec4(position, 1.0);
       }
     `,
     frag: glsl`
       precision mediump float;
       ${matcap}
       uniform vec3 cameraPosition;
+      uniform mat3 viewNormal;
       uniform sampler2D matcapTexture;
       varying vec3 vNormal;
 
       void main() {
-        vec3 normal = normalize(vNormal);
+        vec3 normal = viewNormal * normalize(vNormal);
         vec2 uv = matcap(cameraPosition, normal);
         vec3 color = texture2D(matcapTexture, uv).rgb;
         gl_FragColor = vec4(color, 1.0);
