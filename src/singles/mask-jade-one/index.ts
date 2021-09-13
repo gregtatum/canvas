@@ -5,23 +5,25 @@ import resl from "resl";
 
 import "lib/shortcuts";
 import { createWithScene } from "lib/draw/with-scene";
-import { createMask } from "./mask";
-import { createMaskBody } from "./mask-body";
-import { createDrawBackground } from "./background";
-import { createDrawDust } from "./dust";
-import { createDrawLabelQuads } from "./label-quads";
+import { createMask } from "lib/draw/mask";
+import { createDrawMaskBody } from "lib/draw/mask-body";
+import { createDrawBackground } from "lib/draw/background";
+import { createDrawDust } from "lib/draw/dust";
+import { createDrawLabelQuads } from "lib/draw/label-quads";
+import { createJadeOne } from "./geometry";
 
 const regl = initRegl();
-const { withMaskModel, drawMask, maskMesh } = createMask(regl);
+const { mask, body } = createJadeOne();
+const { withMaskModel, drawMask } = createMask(regl, mask);
 const withScene = createWithScene(regl, {
   orbit: {
     distanceBounds: [0.5, 1.98],
   },
 });
-const { drawMaskBody, maskBodyQuads } = createMaskBody(regl);
+const drawMaskBody = createDrawMaskBody(regl, body);
 const drawBackground = createDrawBackground(regl);
 const drawDust = createDrawDust(regl);
-const drawLabelQuads = createDrawLabelQuads(regl, maskMesh);
+const drawLabelQuads = createDrawLabelQuads(regl, mask);
 const clear = { depth: 1.0, color: [0, 0, 0, 1] as Tuple4 };
 
 resl({

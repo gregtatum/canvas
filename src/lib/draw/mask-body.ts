@@ -5,15 +5,7 @@ import * as quad from "lib/quads";
 import { accessors, drawCommand } from "lib/regl-helpers";
 import { MaskContext } from "./mask";
 
-export function createMaskBody(regl: Regl) {
-  const quads = createGeometry();
-  return {
-    maskBodyQuads: quads,
-    drawMaskBody: createDrawMaskBody(regl, quads),
-  };
-}
-
-function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
+export function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
   const { getContext } = accessors<{}, MaskContext>();
   return drawCommand(regl, {
     name: "drawMaskBody",
@@ -67,27 +59,4 @@ function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
     primitive: "triangles",
     cull: { enable: true },
   });
-}
-
-function createGeometry() {
-  // Create a box.
-  const w = 0.46;
-  const h = 1;
-  const d = 0.5;
-  const mesh = quad.createBox(w, h, d);
-  mesh.quads.splice(1, 1);
-  mesh.positions.forEach((p) => {
-    p[1] -= 0.4;
-    p[2] -= 0.13;
-  });
-  [0, 1, 2, 3].forEach((i) => {
-    const position = mesh.positions[i];
-    position[0] *= 3.75;
-    position[1] *= 1.5;
-    position[2] *= 1.5;
-    position[2] -= 0.5;
-  });
-  quad.splitLoopHorizontal(mesh, mesh.quads[2], 0.9);
-  quad.subdivide(mesh, 3);
-  return mesh;
 }

@@ -1,94 +1,15 @@
-import glsl from "glslify";
-import { DefaultContext, Regl, Texture } from "lib/regl";
-
-import { mat4, vec3 } from "lib/vec-math";
+import { vec3 } from "lib/vec-math";
 import * as quads from "lib/quads";
 import createRandom from "@tatumcreative/random";
-import { accessors, drawCommand } from "lib/regl-helpers";
-import { matcap } from "lib/shaders";
-import { createWithModel, ModelContext } from "lib/draw/with-model";
 
-const simplex = new (require("simplex-noise"))();
-
-export type MaskContext = ModelContext<"head">;
-
-export function createMask(regl: Regl) {
-  const maskMesh = createGeometry();
-
+export function createJadeOne() {
   return {
-    drawMask: createDrawMask(regl, maskMesh),
-    maskMesh,
-    withMaskModel: createWithMaskModel(regl),
+    mask: createMask(),
+    body: createMaskBody(),
   };
 }
 
-function createWithMaskModel(regl: Regl) {
-  const out = mat4.create();
-  const eye: Tuple3 = [0, 0, -1];
-  const center: Tuple3 = [0, 0, 0];
-  const up: Tuple3 = [0, 1, 0];
-
-  return createWithModel(regl, "head", ({ time }: DefaultContext) => {
-    center[0] = simplex.noise2D(time * 0.1, 0) * 0.05;
-    center[1] = simplex.noise2D(time * 0.1, 10) * 0.025;
-    up[0] = simplex.noise2D(time * 0.1, 10) * 0.25;
-    eye[0] = simplex.noise2D(time * 0.05, 0) * 0.25;
-    // return mat4.identity(out)
-    return mat4.lookAt(out, center, eye, up);
-  });
-}
-
-export interface MaskProps {
-  matcapTexture: Texture;
-}
-
-function createDrawMask(regl: Regl, mesh: QuadMesh) {
-  const { getProp, getContext } = accessors<MaskProps, MaskContext>();
-  return drawCommand<MaskProps, MaskContext>(regl, {
-    name: "drawMask",
-    vert: glsl`
-      precision mediump float;
-      uniform vec3 cameraPosition;
-      attribute vec3 normal, position;
-      uniform mat3 viewNormal, modelNormal;
-      uniform mat4 model, projView;
-      varying vec3 vNormal, vViewPosition;
-
-      void main() {
-        vNormal = viewNormal * modelNormal * normal;
-        vec4 worldPosition = model * vec4(position, 1.0);
-        vViewPosition = cameraPosition - worldPosition.xyz;
-        gl_Position = projView * worldPosition;
-      }
-    `,
-    frag: glsl`
-      precision mediump float;
-      ${matcap}
-      uniform sampler2D matcapTexture;
-      varying vec3 vNormal, vViewPosition;
-
-      void main() {
-        vec2 uv = matcap(normalize(vViewPosition), normalize(vNormal));
-        vec3 color = texture2D(matcapTexture, uv).rgb;
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `,
-    attributes: {
-      position: mesh.positions,
-      normal: mesh.normals,
-    },
-    uniforms: {
-      matcapTexture: getProp("matcapTexture"),
-      model: getContext("headModel"),
-      modelNormal: getContext("headModelNormal"),
-    },
-    elements: quads.getElements(mesh, "triangle"),
-    primitive: "triangles",
-    cull: { enable: true },
-  });
-}
-
-function createGeometry() {
+export function createMask(): QuadMesh {
   // Create a box.
   const w = 0.5;
   const h = 0.3;
@@ -270,4 +191,27 @@ function extrudeAndRotateCell(
 
 function unique(value: any, index: any, self: Array<any>) {
   return self.indexOf(value) === index;
+}
+
+function createMaskBody(): QuadMesh {
+  // Create a box.
+  const w = 0.46;
+  const h = 1;
+  const d = 0.5;
+  const mesh = quads.createBox(w, h, d);
+  mesh.quads.splice(1, 1);
+  mesh.positions.forEach((p) => {
+    p[1] -= 0.4;
+    p[2] -= 0.13;
+  });
+  [0, 1, 2, 3].forEach((i) => {
+    const position = mesh.positions[i];
+    position[0] *= 3.75;
+    position[1] *= 1.5;
+    position[2] *= 1.5;
+    position[2] -= 0.5;
+  });
+  quads.splitLoopHorizontal(mesh, mesh.quads[2], 0.9);
+  quads.subdivide(mesh, 3);
+  return mesh;
 }
