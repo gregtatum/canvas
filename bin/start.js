@@ -91,7 +91,6 @@ const reset = "\u001b[0m";
     disableHostCheck: true,
     contentBase: config.output.path,
     publicPath: config.output.publicPath,
-    noInfo: true,
     hot: process.env.NODE_ENV === "development" ? true : false,
     stats: { colors: true },
   };
