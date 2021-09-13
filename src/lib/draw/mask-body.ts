@@ -5,9 +5,13 @@ import * as quad from "lib/quads";
 import { accessors, drawCommand } from "lib/regl-helpers";
 import { MaskContext } from "./mask";
 
-export function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
-  const { getContext } = accessors<{}, MaskContext>();
-  return drawCommand(regl, {
+export interface MaskBodyProps {
+  color: Tuple3;
+}
+
+export function createDrawMaskBody(regl: Regl, mesh: QuadMesh) {
+  const { getContext, getProp } = accessors<MaskBodyProps, MaskContext>();
+  return drawCommand<MaskBodyProps, MaskContext>(regl, {
     name: "drawMaskBody",
     vert: glsl`
       precision mediump float;
@@ -31,19 +35,20 @@ export function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
     frag: glsl`
       precision mediump float;
       varying vec3 vNormal, vPosition;
+      uniform vec3 color;
 
       void main() {
         float brightness = max(0.0, 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0)));
         brightness = 0.5 * brightness * brightness;
 
-        vec3 green = vec3(0.0, 0.5, 0.0) *
+        vec3 baseColor = color *
           max(
             0.0,
             1.0 * distance(vPosition, vec3(0.0, 0.0, 0.0)) - 0.2
           );
 
         gl_FragColor = vec4(
-          vec3(brightness) + green,
+          vec3(brightness) + baseColor,
           1.0
         );
       }
@@ -54,6 +59,7 @@ export function createDrawMaskBody(regl: Regl, mesh: QuadMesh): DrawCommand {
     },
     uniforms: {
       model: getContext("headModel"),
+      color: getProp("color"),
     },
     elements: quad.getElements(mesh, "triangle"),
     primitive: "triangles",

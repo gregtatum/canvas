@@ -2129,8 +2129,8 @@ export namespace vec3 {
    */
   export function transformQuat(
     out: Tuple3 | [],
-    a: ReadonlyVec3,
-    q: ReadonlyQuat
+    point: ReadonlyVec3,
+    origin: ReadonlyQuat
   ): Tuple3;
   /**
    * Rotate a 3D vector around the x-axis
@@ -2142,8 +2142,8 @@ export namespace vec3 {
    */
   export function rotateX(
     out: Tuple3 | [],
-    a: ReadonlyVec3,
-    b: ReadonlyVec3,
+    point: ReadonlyVec3,
+    origin: ReadonlyVec3,
     rad: number
   ): Tuple3;
   /**
@@ -2156,8 +2156,8 @@ export namespace vec3 {
    */
   export function rotateY(
     out: Tuple3 | [],
-    a: ReadonlyVec3,
-    b: ReadonlyVec3,
+    point: ReadonlyVec3,
+    origin: ReadonlyVec3,
     rad: number
   ): Tuple3;
   /**
@@ -2170,8 +2170,8 @@ export namespace vec3 {
    */
   export function rotateZ(
     out: Tuple3 | [],
-    a: ReadonlyVec3,
-    b: ReadonlyVec3,
+    point: ReadonlyVec3,
+    origin: ReadonlyVec3,
     rad: number
   ): Tuple3;
   /**

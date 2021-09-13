@@ -104,7 +104,6 @@ function createHoveredQuadDisplay() {
   document.body.appendChild(div);
 
   const children = [...div.children] as HTMLDivElement[];
-  console.log(children);
   const positionsDiv = children.slice(4);
   if (positionsDiv.length !== 4 * 4) {
     throw new Error(

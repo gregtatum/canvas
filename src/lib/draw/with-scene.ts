@@ -50,6 +50,7 @@ function getUniforms(
       return callback();
     };
   }
+  Object.assign(window, { camera, controls });
 
   return {
     projection: update(() => camera.projection),

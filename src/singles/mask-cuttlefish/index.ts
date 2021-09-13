@@ -10,23 +10,28 @@ import { createDrawMaskBody, MaskBodyProps } from "lib/draw/mask-body";
 import { createDrawBackground } from "lib/draw/background";
 import { createDrawDust } from "lib/draw/dust";
 import { createDrawLabelQuads } from "lib/draw/label-quads";
-import { createJadeOne } from "./geometry";
+import { createCuttleFish, createWithMaskModel } from "./geometry";
 
 const regl = initRegl();
-const { mask, body } = createJadeOne();
-const { withMaskModel, drawMask } = createMask(regl, mask);
+const { mask, body } = createCuttleFish();
+const { drawMask } = createMask(regl, mask);
 const withScene = createWithScene(regl, {
   orbit: {
+    theta: Math.PI * 0.2,
+    position: [0, 0, 1.7],
     distanceBounds: [0.5, 1.98],
+    rotateSpeed: 0.025,
+    damping: 0.05,
   },
 });
 const drawMaskBody = createDrawMaskBody(regl, body);
+const withMaskModel = createWithMaskModel(regl);
 const drawBackground = createDrawBackground(regl);
 const drawDust = createDrawDust(regl);
 const drawLabelQuads = createDrawLabelQuads(regl, mask);
 const clear = { depth: 1.0, color: [0, 0, 0, 1] as Tuple4 };
-const bodyProps: MaskBodyProps = { color: [0, 1, 0] };
-const backgroundProps = { color: [0.35, 0.85, 0.8] };
+const bodyProps: MaskBodyProps = { color: [0.6, 0, 0.25] };
+const backgroundProps = { color: [0.5, 0.2, 0.9] as Tuple3 };
 
 resl({
   manifest: {
@@ -59,7 +64,7 @@ resl({
               };
               drawLabelQuads.drawLines(props);
               drawLabelQuads.drawCellIndices(props);
-              drawLabelQuads.drawPositionIndices(props);
+              // drawLabelQuads.drawPositionIndices(props);
             }
             drawDust();
           });
