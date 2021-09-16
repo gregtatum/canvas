@@ -10,7 +10,9 @@ import startRegl, {
 /**
  * Apply a nice error to the DOM when a regl error occurs.
  */
-export function initRegl(config: InitializationOptions = {}): Regl {
+export function initRegl(
+  config: InitializationOptions & { canvas?: HTMLCanvasElement } = {}
+): Regl {
   const baseConfig: InitializationOptions = {
     onDone: (...args) => {
       if (typeof config.onDone === "function") {
@@ -28,11 +30,16 @@ export function initRegl(config: InitializationOptions = {}): Regl {
       }
     },
   };
-
-  return startRegl({
+  const combinedConfig: InitializationOptions = {
     ...baseConfig,
     ...config,
-  } as InitializationOptions);
+  };
+  const { canvas } = combinedConfig;
+  if (canvas) {
+    delete combinedConfig.canvas;
+    return startRegl(canvas, combinedConfig);
+  }
+  return startRegl(combinedConfig);
 }
 
 /**
@@ -57,6 +64,9 @@ export function accessors<
     defaultValue?: Props[K]
   ): DynamicVariableFn<Props[K], Context, Props> {
     return (_, props) => {
+      if (!props && defaultValue !== undefined) {
+        return defaultValue;
+      }
       const value = props[key];
       if (value === undefined && defaultValue !== undefined) {
         return defaultValue;
@@ -117,3 +127,28 @@ export function tickMemoized<Context extends DefaultContext, T>(
     return lastT;
   };
 }
+
+/**
+ * Allow for tagging content using a template literal. This function passes through
+ * the template literal.
+ */
+function passThroughTemplateLiteral(
+  strings: TemplateStringsArray,
+  ...injections: any[]
+): string {
+  let output = "";
+  const length = Math.max(strings.length, injections.length);
+  for (let i = 0; i < length; i++) {
+    const string = strings[i];
+    const injection = injections[i];
+    if (i < strings.length) {
+      output += string;
+    }
+    if (i < injections.length) {
+      output += injection;
+    }
+  }
+  return output;
+}
+
+export const glsl = passThroughTemplateLiteral;

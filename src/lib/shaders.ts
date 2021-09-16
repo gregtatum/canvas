@@ -278,3 +278,72 @@ export const matcap = glsl`
     return reflected.xy / m + 0.5;
   }
 `;
+
+export const colorConversions = glsl`
+  // https://www.shadertoy.com/view/XljGzV
+  vec3 hslToRgb(in vec3 hsl) {
+      vec3 rgb = clamp(
+        abs(mod(hsl.x * 6.0 + vec3(0.0,4.0,2.0), 6.0) - 3.0) - 1.0,
+        0.0,
+        1.0
+      );
+
+      return hsl.z + hsl.y * (rgb - 0.5) * (1.0 - abs(2.0 * hsl.z - 1.0));
+  }
+
+  vec3 shiftHue(in vec3 rgb, in float amount) {
+      vec3 p = vec3(0.55735) * dot(vec3(0.55735), rgb);
+      vec3 u = rgb - p;
+      vec3 v = cross(vec3(0.55735),u);
+      return u * cos(amount * 6.2832) + v * sin(amount * 6.2832) + p;
+  }
+
+  vec3 rgbToHsl(in vec3 rgb) {
+    float h = 0.0;
+    float s = 0.0;
+    float l = 0.0;
+    float r = rgb.r;
+    float g = rgb.g;
+    float b = rgb.b;
+    float cMin = min( r, min( g, b ) );
+    float cMax = max( r, max( g, b ) );
+
+    l = ( cMax + cMin ) / 2.0;
+    if ( cMax > cMin ) {
+      float cDelta = cMax - cMin;
+
+      //s = l < .05 ? cDelta / ( cMax + cMin ) : cDelta / ( 2.0 - ( cMax + cMin ) ); Original
+      s = l < 0.0 ? cDelta / ( cMax + cMin ) : cDelta / ( 2.0 - ( cMax + cMin ) );
+
+      if ( r == cMax ) {
+        h = ( g - b ) / cDelta;
+      } else if ( g == cMax ) {
+        h = 2.0 + ( b - r ) / cDelta;
+      } else {
+        h = 4.0 + ( r - g ) / cDelta;
+      }
+
+      if ( h < 0.0) {
+        h += 6.0;
+      }
+      h = h / 6.0;
+    }
+    return vec3(h, s, l);
+  }
+
+  vec3 rgbToHsv(vec3 rgb) {
+      vec4 k = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+      vec4 p = mix(vec4(rgb.bg, k.wz), vec4(rgb.gb, k.xy), step(rgb.b, rgb.g));
+      vec4 q = mix(vec4(p.xyw, rgb.r), vec4(rgb.r, p.yzx), step(p.x, rgb.r));
+
+      float d = q.x - min(q.w, q.y);
+      float e = 1.0e-10;
+      return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+  }
+
+  vec3 hsvToRgb(vec3 hsv) {
+      vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+      vec3 p = abs(fract(hsv.xxx + k.xyz) * 6.0 - k.www);
+      return hsv.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), hsv.y);
+  }
+`;

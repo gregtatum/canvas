@@ -112,9 +112,11 @@ const reset = "\u001b[0m";
       const { networkInterfaces } = require("os");
       const nets = networkInterfaces();
       let external = "External IP not found.";
-      for (const { address } of nets.en0) {
-        if (address.match(/^192\./)) {
-          external = `http://${address}:${port}`;
+      if (nets.en0) {
+        for (const { address } of nets.en0) {
+          if (address.match(/^192\./)) {
+            external = `http://${address}:${port}`;
+          }
         }
       }
 

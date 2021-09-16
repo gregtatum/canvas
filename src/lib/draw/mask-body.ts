@@ -14,7 +14,7 @@ export function createDrawMaskBody(regl: Regl, mesh: QuadMesh) {
   return drawCommand<MaskBodyProps, MaskContext>(regl, {
     name: "drawMaskBody",
     vert: glsl`
-      precision mediump float;
+      precision highp float;
       attribute vec3 normal, position;
       uniform mat4 model, view, projection;
       uniform mat3 viewNormal;
@@ -28,12 +28,12 @@ export function createDrawMaskBody(regl: Regl, mesh: QuadMesh) {
           min(1.0, max(0.0, position.y + 1.0))
         );
         vNormal = viewNormal * normal;
-        vPosition = position;
+        vPosition = morphed.xyz;
         gl_Position = projection * view * morphed;
       }
     `,
     frag: glsl`
-      precision mediump float;
+      precision highp float;
       varying vec3 vNormal, vPosition;
       uniform vec3 color;
 

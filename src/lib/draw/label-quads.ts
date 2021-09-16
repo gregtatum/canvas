@@ -233,7 +233,7 @@ function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
   return drawCommand(regl, {
     name: "labelQuadsDrawLines",
     vert: glsl`
-      precision mediump float;
+      precision highp float;
       attribute vec3 normal, position;
       uniform mat4 model, view, projection;
       varying vec3 vNormal;
@@ -244,7 +244,7 @@ function createDrawLines(regl: Regl, mesh: QuadMesh): DrawLabelQuads {
       }
     `,
     frag: glsl`
-      precision mediump float;
+      precision highp float;
       varying vec3 vNormal;
 
       void main() {
@@ -284,7 +284,7 @@ function createDrawNumbers(regl: Regl): DrawLabelQuads {
   return drawCommand(regl, {
     name: "labelQuadsDrawNumbers",
     vert: glsl`
-      precision mediump float;
+      precision highp float;
       attribute vec3 normal, position;
       attribute vec3 digits;
       uniform mat4 model, view, projection;
@@ -297,7 +297,7 @@ function createDrawNumbers(regl: Regl): DrawLabelQuads {
       }
     `,
     frag: glsl`
-      precision mediump float;
+      precision highp float;
       uniform sampler2D numbersTexture;
       uniform vec3 color;
       varying vec3 vDigits;

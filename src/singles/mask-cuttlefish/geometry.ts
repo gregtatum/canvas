@@ -4,7 +4,6 @@ import createRandom from "@tatumcreative/random";
 import { Regl, DefaultContext } from "lib/regl";
 import { createWithModel, ModelContext } from "lib/draw/with-model";
 import lerp from "lerp";
-const simplex = new (require("simplex-noise"))();
 
 export function createCuttleFish() {
   return {
@@ -243,6 +242,7 @@ function rotateQuadsX(mesh: QuadMesh, quadList: Quad[], theta: number) {
   }
 }
 
+const quadRotationNoise = new (require("simplex-noise"))(8);
 function randomizeQuadRotation(
   mesh: QuadMesh,
   quadList: Quad[],
@@ -256,7 +256,7 @@ function randomizeQuadRotation(
         p,
         p,
         center,
-        simplex.noise3D(
+        quadRotationNoise.noise3D(
           p[0] * waveLength,
           p[1] * waveLength,
           p[2] * waveLength
@@ -309,6 +309,7 @@ export function createWithMaskModel(regl: Regl) {
   const eye: Tuple3 = [0, 0, -1];
   const center: Tuple3 = [0, 0, 0];
   const up: Tuple3 = [0, 1, 0];
+  const simplex = new (require("simplex-noise"))();
 
   return createWithModel(regl, "head", ({ time }: DefaultContext) => {
     center[0] = simplex.noise2D(time * 0.1, 0) * 0.05;

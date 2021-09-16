@@ -1,24 +1,35 @@
 import glsl from "glslify";
-import { Regl, DrawCommand } from "lib/regl";
+import { Regl } from "lib/regl";
 import { fill } from "lib/utils";
 import { simplex } from "lib/shaders";
+import { SceneContext } from "./with-scene";
+import { accessors, drawCommand } from "../regl-helpers";
 
-const DUST_COUNT = 3000;
+interface DustConfig {
+  dustCount: number;
+}
 
-export function createDrawDust(regl: Regl): DrawCommand {
-  return regl({
+interface DustProps {
+  dustSize: number;
+  dustSpeed: number;
+}
+
+export function createDrawDust(
+  regl: Regl,
+  config: DustConfig = { dustCount: 3000 }
+) {
+  const { getProp } = accessors<DustProps, SceneContext>();
+  return drawCommand<DustProps, SceneContext>(regl, {
     name: "drawDust",
     vert: glsl`
       precision highp float;
       ${simplex}
       attribute vec4 position;
-      uniform float time, viewportHeight, aspectRatio, fov;
-      uniform mat4 projection, view;
+      uniform float time, viewportHeight, aspectRatio, fov, dustSize, dustSpeed;
+      uniform mat4 projView;
       varying float speed, vParticleId;
       varying vec3 vColor;
 
-      float POINT_SIZE = 0.03;
-      float POINT_SPEED = -0.012;
       float STAGE_SIZE = 1.3;
       float HALF_STAGE_SIZE = STAGE_SIZE * 0.5;
 
@@ -36,10 +47,10 @@ export function createDrawDust(regl: Regl): DrawCommand {
         float z = max(1.0, aspectRatio) * (HALF_STAGE_SIZE - STAGE_SIZE * uniqueNumberC)
           + 0.02 * simplex(vec2(vParticleId + 23.0, time * 0.1));
 
-        float y = mod(POINT_SPEED * speed * time + uniqueNumberB, STAGE_SIZE) - HALF_STAGE_SIZE;
+        float y = mod(dustSpeed * speed * time + uniqueNumberB, STAGE_SIZE) - HALF_STAGE_SIZE;
 
-        gl_Position = projection * view * vec4(x, y, z, 1.0);
-        gl_PointSize = POINT_SIZE * speed * viewportHeight * (2.0 - gl_Position.z);
+        gl_Position = projView * vec4(x, y, z, 1.0);
+        gl_PointSize = dustSize * speed * viewportHeight * (2.0 - z);
       }
     `,
     frag: glsl`
@@ -56,13 +67,15 @@ export function createDrawDust(regl: Regl): DrawCommand {
       }
     `,
     uniforms: {
-      time: ({ time }) => time,
-      aspectRatio: ({ viewportHeight, viewportWidth }) =>
+      time: ({ time }: SceneContext) => time + 100,
+      aspectRatio: ({ viewportHeight, viewportWidth }: SceneContext) =>
         viewportWidth / viewportHeight,
-      viewportHeight: ({ viewportHeight }) => viewportHeight,
+      viewportHeight: ({ viewportHeight }: SceneContext) => viewportHeight,
+      dustSize: getProp("dustSize", 0.02),
+      dustSpeed: getProp("dustSpeed", -0.012),
     },
     attributes: {
-      position: fill(DUST_COUNT, (i) => [
+      position: fill(config.dustCount, (i) => [
         i,
         Math.random(),
         Math.random(),
@@ -71,6 +84,7 @@ export function createDrawDust(regl: Regl): DrawCommand {
     },
     depth: {
       enable: true,
+      mask: false,
     },
     blend: {
       enable: true,
@@ -86,6 +100,6 @@ export function createDrawDust(regl: Regl): DrawCommand {
       },
     },
     primitive: "points",
-    count: DUST_COUNT,
+    count: config.dustCount,
   });
 }
