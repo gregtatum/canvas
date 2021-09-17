@@ -298,9 +298,10 @@ async function processHTML({
   sourceImagePath,
   run,
 }) {
-  const folderName = `${pieceSlug}_${dateTag}_${hash}`;
+  const folderName = `${pieceSlug}-${hash.slice(0, 6)}`;
   const archiveProjectPath = path.join(archivePath, projectSlug);
-  const targetFolder = path.join(archiveProjectPath, folderName);
+  const targetFolderParent = path.join(archiveProjectPath, pieceSlug);
+  const targetFolder = path.join(targetFolderParent, folderName);
   await mkdirp(archiveProjectPath);
   await mkdirp(targetFolder);
   await run(`rsync -av --progress ${path.join(htmlPath, "/")} ${targetFolder}`);
@@ -308,6 +309,7 @@ async function processHTML({
   // Process and save out the imge.
   const image = await jimp.read(sourceImagePath);
   const mediumPath = path.join(targetFolder, "image.jpg");
+  const mediumPathParent = path.join(targetFolderParent, `${folderName}.jpg`);
   const imageWidth = image.bitmap.width;
   const imageHeight = image.bitmap.height;
   const size = 1200;
@@ -318,7 +320,13 @@ async function processHTML({
     mediumWidth = (imageHeight * size) / imageWidth;
   }
 
-  await image.resize(mediumWidth, mediumHeight).quality(90).write(mediumPath);
+  await image
+    .resize(mediumWidth, mediumHeight)
+    .quality(90)
+    // Put it in the folder.
+    .write(mediumPath)
+    // Put it in the and in the parent.
+    .write(mediumPathParent);
 
   console.log(prefix + "🌅  saved to: " + targetFolder);
   if (serveArchivePort) {
@@ -357,8 +365,8 @@ async function processImage({
   const image = await jimp.read(sourceImagePath);
   const sourceExt = "." + image.getExtension();
   const targetExt = ".jpg";
-  const fileName = (ext) => `${pieceSlug}_${dateTag}_${hash}${ext}`;
-  const archiveProjectPath = path.join(archivePath, projectSlug);
+  const fileName = (ext) => `${pieceSlug}-${hash.slice(0, 6)}${ext}`;
+  const archiveProjectPath = path.join(archivePath, projectSlug, pieceSlug);
   const imagePath = path.join(
     archiveProjectPath,
     "originals",
