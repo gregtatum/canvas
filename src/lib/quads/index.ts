@@ -537,7 +537,8 @@ export const extrudeDisjoint = (() => {
 /**
  * Computes the center of a quad.
  */
-export function getCenter(mesh: QuadMesh, quad: Quad, target: Tuple3 = [0, 0, 0]): Tuple3 {
+export function getCenter(mesh: QuadMesh, quad: Quad | QuadIndex, target: Tuple3 = [0, 0, 0]): Tuple3 {
+  quad = getQuad(mesh, quad);
   const a = mesh.positions[quad[0]];
   const b = mesh.positions[quad[1]];
   const c = mesh.positions[quad[2]];
@@ -799,11 +800,11 @@ export function createBoxDisjoint(
   optionalMesh?: QuadMesh
 ) {
   const { mesh, quad } = createQuad({ w: x, h: z }, optionalMesh);
-  for (const position of mesh.positions) {
-    position[1] -= y / 2;
+  for (let i = mesh.positions.length - 4; i < mesh.positions.length; i++) {
+    mesh.positions[i][1] -= y / 2;
   }
   clone(mesh, quad);
-  flip(mesh, mesh.quads[1]);
+  flip(mesh, mesh.quads[mesh.quads.length - 1]);
   extrudeDisjoint(mesh, quad, 0, y);
   return mesh;
 }
