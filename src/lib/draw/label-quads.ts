@@ -4,7 +4,7 @@ import { Regl, DrawCommand } from "lib/regl";
 import * as quads from "lib/quads";
 import { accessors, composeDrawCommands, drawCommand } from "lib/regl-helpers";
 import { SceneContext } from "lib/draw/with-scene";
-import { mat4, vec3, vec4 } from "lib/vec-math";
+import { vec3 } from "lib/vec-math";
 import { ensureExists } from "lib/utils";
 
 const POSITION_COLOR: Tuple3 = [0.5, 0, 0];
@@ -12,7 +12,7 @@ const CELL_COLOR: Tuple3 = [0, 0.5, 0];
 const DIGIT_LENGTH = 3;
 const POSITION_FONT_SIZE = 0.025;
 const CELL_FONT_SIZE = 0.03;
-const NOOP: DrawCommand = (() => {}) as any;
+const NOOP: any = () => {};
 
 interface LabelProps {
   height?: number;
@@ -32,13 +32,16 @@ interface LabelQuadsCommands {
 
 export function createDrawLabelQuads(
   regl: Regl,
-  mesh: QuadMesh
+  mesh: QuadMesh,
+  override = false
 ): LabelQuadsCommands {
-  if (mesh.positions.length > 999 || mesh.quads.length > 1000) {
+  const isMaxPositions = override ? false : mesh.positions.length > 999;
+  const isMaxQuads = override ? false : mesh.quads.length > 999;
+  if (isMaxPositions && isMaxQuads) {
     return {
-      drawLines: NOOP as any,
-      drawCellIndices: NOOP as any,
-      drawPositionIndices: NOOP as any,
+      drawLines: NOOP,
+      drawCellIndices: NOOP,
+      drawPositionIndices: NOOP,
     };
   }
 
@@ -47,14 +50,18 @@ export function createDrawLabelQuads(
   const drawNumbers = createDrawNumbers(regl);
   return {
     drawLines: composeDrawCommands(pickingRay, createDrawLines(regl, mesh)),
-    drawCellIndices: composeDrawCommands(
-      pickingRay,
-      createDrawCellIndices(regl, mesh, drawNumbers)
-    ),
-    drawPositionIndices: composeDrawCommands(
-      pickingRay,
-      createDrawPositionIndices(regl, mesh, drawNumbers)
-    ),
+    drawCellIndices: isMaxQuads
+      ? NOOP
+      : composeDrawCommands(
+          pickingRay,
+          createDrawCellIndices(regl, mesh, drawNumbers)
+        ),
+    drawPositionIndices: isMaxPositions
+      ? NOOP
+      : composeDrawCommands(
+          pickingRay,
+          createDrawPositionIndices(regl, mesh, drawNumbers)
+        ),
   };
 }
 
@@ -421,9 +428,9 @@ function createDrawPositionIndices(
 
 function toDigits(centers: Tuple3[]): Tuple3[] {
   if (centers.length > 999) {
-    throw new Error(
-      "This function only goes up to 999. Another digit needs to be added."
-    );
+    // throw new Error(
+    //   "This function only goes up to 999. Another digit needs to be added."
+    // );
   }
   const BLANK_DIGIT = 10;
   return centers.map((_, cellIndex) => {

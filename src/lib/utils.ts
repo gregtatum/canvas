@@ -35,3 +35,10 @@ export function fill<T>(size: number, fn: (i: number) => T): Array<T> {
   }
   return array;
 }
+
+/**
+ * Get a number in terms of Radians.
+ */
+export function rad(n: number) {
+  return n * Math.PI;
+}

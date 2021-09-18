@@ -4,6 +4,7 @@ import createRandom from "@tatumcreative/random";
 import { Regl, DefaultContext } from "lib/regl";
 import { createWithModel, ModelContext } from "lib/draw/with-model";
 import lerp from "lerp";
+import { rad } from "lib/utils";
 
 export function createCuttleFish() {
   return {
@@ -11,20 +12,35 @@ export function createCuttleFish() {
     body: createMaskBody(),
   };
 }
-const BOX_W = 0.2;
-const BOX_H = 0.1;
-const BOX_D = 0.4;
-const EYE_HOLE_SIZE = 0.5;
+
+const MASK_BOX_W = 0.2;
+const MASK_BOX_H = 0.1;
+const MASK_BOX_D = 0.4;
 const MASK_THICKNESS = 0.2;
-const SNOUT_WIDTH_SCALE = 0.7;
+const EYE_HOLE_SIZE = 0.5;
 const EYE_HEIGHT = 0.02;
 const EYE_INSET_SCALE = 0.7;
 const EYE_ROTATION = 0.3;
 const EYE_SCALE = 1;
+const SNOUT_WIDTH_SCALE = 0.7;
 const SNOUT_DIP_DOWN = 0.09;
 const CHEEK_WIDTH_SCALE = 1.2;
 const CHEEK_PULL_DOWN = 0.02;
-
+const HORN_BASE_WIDTH = 0.12;
+const HORN_BASE_HEIGHT = 0.02;
+const HORN_BASE_ROTATION_Z = rad(-0.3);
+const HORN_BASE_ROTATION_X = rad(0);
+const HORN_BASE_POSITION = [0.08, 0.07, -0.2] as Tuple3;
+const HORN_EXTRUSION_COUNT = 10;
+const HORN_EXTRUSION_INSET = 0.18;
+const HORN_EXTRUSION_EXTRUSION = 0.02;
+const HORN_ROTATION_X = rad(0.2);
+const HORN_ROTATION_Y = rad(0);
+const HORN_ROTATION_Z = rad(0);
+const HORN_PUFF = true;
+const HORN_PUFF_INSET = 0.2;
+const HORN_PUFF_SCALE = 1.2;
+const MODEL_ROTATE = rad(0.2);
 const BODY_W = 0.16;
 const BODY_H = 1.1;
 const BODY_D = 0.4;
@@ -36,7 +52,7 @@ const ORIGIN: Tuple3 = [0, 0, 0];
 
 export function createMask(): QuadMesh {
   // Create a box.
-  const mesh = quads.createBox(BOX_W, BOX_H, BOX_D);
+  const mesh = quads.createBox(MASK_BOX_W, MASK_BOX_H, MASK_BOX_D);
 
   // Front View: Inset the 2 outer sides to build this shape
   // *-*-*--------------*-*-*
@@ -56,7 +72,7 @@ export function createMask(): QuadMesh {
   // | | /              \ | |
   // *-*                  *-*
   for (const p of quads.getPositions(mesh, mesh.quads[19])) {
-    p[1] += BOX_H - BOX_H * MASK_THICKNESS;
+    p[1] += MASK_BOX_H - MASK_BOX_H * MASK_THICKNESS;
   }
 
   // Side View: Split this.
@@ -131,9 +147,9 @@ export function createMask(): QuadMesh {
     { quad: 20, inset: 0.5, extrude: 0.012, x: 1.2, y: 0.02, count: 2 },
     { quad: 58, inset: 0.5, extrude: 0.012, x: 1.2, y: 0.02, count: 2 },
     // Back of head, top/side
-    { quad: 107, inset: 0.5, extrude: 0.01, x: 1, y: 0.005, count: 2 },
+    { quad: 123, inset: 0.5, extrude: 0.01, x: 1, y: 0.005, count: 2 },
     { quad: 115, inset: 0.5, extrude: 0.01, x: 1, y: 0.005, count: 2 },
-    // Back of head, side
+    // // Back of head, side
     { quad: 111, inset: 0.5, extrude: 0.004, x: 1, y: 0.005, count: 2 },
     { quad: 119, inset: 0.5, extrude: 0.004, x: 1, y: 0.005, count: 2 },
   ]) {
@@ -172,8 +188,69 @@ export function createMask(): QuadMesh {
       p[1] -= CHEEK_PULL_DOWN;
     }
   }
+
+  createHorns(mesh);
+
   quads.subdivide(mesh, 3);
   return mesh;
+}
+
+function createHorns(mesh: QuadMesh) {
+  const quadList = quads.getNewGeometry(mesh, "quads", () => {
+    const positions = quads.getNewGeometry(mesh, "positions", () => {
+      quads.createBox(HORN_BASE_WIDTH, HORN_BASE_HEIGHT, HORN_BASE_WIDTH, mesh);
+    });
+    for (const p of positions) {
+      vec3.rotateZ(p, p, ORIGIN, HORN_BASE_ROTATION_Z);
+      vec3.rotateX(p, p, ORIGIN, HORN_BASE_ROTATION_X);
+      vec3.add(p, p, HORN_BASE_POSITION);
+    }
+    const baseQuad = mesh.quads.length - 6;
+    const baseCenter = vec3.create();
+    for (let i = 0; i < HORN_EXTRUSION_COUNT; i++) {
+      quads.getCenter(mesh, baseQuad, baseCenter);
+      quads.extrude(
+        mesh,
+        baseQuad,
+        HORN_EXTRUSION_INSET,
+        HORN_EXTRUSION_EXTRUSION
+      );
+      for (const p of quads.getPositions(mesh, baseQuad)) {
+        vec3.rotateX(p, p, baseCenter, HORN_ROTATION_X);
+        vec3.rotateY(p, p, baseCenter, HORN_ROTATION_Y);
+        vec3.rotateZ(p, p, baseCenter, HORN_ROTATION_Z);
+      }
+    }
+    // Ensure the last one is pointy
+    quads.centeredTransform(mesh, [baseQuad], (p) => {
+      p[0] *= 0.25;
+      p[1] *= 0.25;
+      p[2] *= 0.25;
+    });
+
+    if (!HORN_PUFF) {
+      return;
+    }
+    const loop = quads.getLoopHorizontal(mesh, baseQuad, "quads");
+    for (let i = 0; i < HORN_EXTRUSION_COUNT + 1; i++) {
+      const quad = loop[i];
+      if (quad === mesh.quads[baseQuad]) {
+        continue;
+      }
+      const insetPositions = quads.getNewGeometry(mesh, "positions", () => {
+        quads.insetLoopHorizontal(mesh, quad, HORN_PUFF_INSET);
+      });
+      quads.centeredPositionsTransform(insetPositions, (p) => {
+        p[0] *= HORN_PUFF_SCALE;
+        p[1] *= HORN_PUFF_SCALE;
+        p[2] *= HORN_PUFF_SCALE;
+      });
+    }
+
+    // quads.splitLoopHorizontal(mesh, baseQuad, 0.5);
+  });
+
+  quads.mirror(mesh, quadList, "x");
 }
 
 function createMaskBody(): QuadMesh {
@@ -206,13 +283,15 @@ export function createWithMaskModel(regl: Regl) {
   const center: Tuple3 = [0, 0, 0];
   const up: Tuple3 = [0, 1, 0];
   const simplex = new (require("simplex-noise"))();
+  const model = mat4.rotateX([], mat4.identity([]), MODEL_ROTATE);
 
   return createWithModel(regl, "head", ({ time }: DefaultContext) => {
     center[0] = simplex.noise2D(time * 0.1, 0) * 0.05;
     center[1] = simplex.noise2D(time * 0.1, 10) * 0.025 - 0.15;
     up[0] = simplex.noise2D(time * 0.1, 10) * 0.25;
     eye[0] = simplex.noise2D(time * 0.05, 0) * 0.25;
-    // return mat4.identity(out)
-    return mat4.lookAt(out, center, eye, up);
+    mat4.lookAt(out, center, eye, up);
+    mat4.multiply(out, model, out);
+    return out;
   });
 }

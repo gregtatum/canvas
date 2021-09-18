@@ -14,6 +14,7 @@ import { createDrawLabelQuads } from "lib/draw/label-quads";
 import { createCuttleFish, createWithMaskModel } from "./geometry";
 import { colorConversions } from "lib/shaders";
 import { hslToRgb } from "lib/color-conversion";
+import { rad } from "lib/utils";
 
 const regl = initRegl({ canvas: setupSquareCanvas() });
 const { mask, body } = createCuttleFish();
@@ -31,26 +32,29 @@ const { drawMask } = createMask(regl, mask, {
 });
 
 const withScene = createWithScene(regl, {
-  rememberControls: true,
-  // cameraFOV: 0.6,
+  // rememberControls: true,
+  cameraFOV: 0.5,
   orbit: {
-    target: [0, 0, 0],
-    // phi: Math.PI * 0.6,
-    theta: Math.PI * -0.3,
-    distance: 1.3,
+    target: [0, 0.05, 0],
+    phi: rad(0.52),
+    theta: rad(0.19),
+    distance: 1.5,
 
     distanceBounds: [0.5, 1.98],
-    thetaBounds: [-Infinity, Infinity],
-    phiBounds: [-Infinity, Infinity],
-    // rotateSpeed: 0.001,
-    rotateSpeed: 0.025,
-    damping: 0.05,
+    rotateSpeed: 0.001,
+    damping: 0.01,
+
+    // Debug parameters:
+    // thetaBounds: [-Infinity, Infinity],
+    // phiBounds: [-Infinity, Infinity],
+    // rotateSpeed: 0.025,
+    // damping: 0.05,
   },
 });
 const drawMaskBody = createDrawMaskBody(regl, body);
 const withMaskModel = createWithMaskModel(regl);
 const bodyProps: MaskBodyProps = { color: hslToRgb(0.0, 0.78, 0.55) };
-const drawLabelQuads = createDrawLabelQuads(regl, mask);
+const drawLabelQuads = createDrawLabelQuads(regl, mask, false);
 
 const drawBackground = createDrawBackground(regl);
 const backgroundProps = {
