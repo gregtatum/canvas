@@ -202,7 +202,7 @@ export function assertArt(
   skipWhiteSpace();
 
   function reportIsDifferent() {
-    let msg = "Art does not match.\n";
+    let msg = `Art does not match (${axis} axis).\n`;
     msg += "┌─────────────────────────────────────\n";
     msg += "│ Expected:\n";
     msg += "├─────────────────────────────────────\n";

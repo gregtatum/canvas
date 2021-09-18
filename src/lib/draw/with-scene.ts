@@ -14,6 +14,7 @@ export type SceneContext = ApplyDynamicConfig<ReturnType<typeof getContext>> &
 
 interface SceneConfig {
   cameraFOV?: number;
+  rememberControls?: boolean;
   orbit?: Partial<OrbitControlsConfig>;
   perspective?: Partial<PerspectiveCameraConfig>;
 }
@@ -41,6 +42,11 @@ function getUniforms(
       if (tick !== prevTick) {
         controls.update();
         controls.copyInto(camera.position, camera.direction, camera.up);
+        if (config.rememberControls) {
+          localStorage.phi = controls.phi;
+          localStorage.theta = controls.theta;
+          localStorage.distance = controls.distance;
+        }
         camera.viewport[2] = viewportWidth;
         camera.viewport[3] = viewportHeight;
         camera.fov = getCameraFOV(config, viewportWidth, viewportHeight);
@@ -91,7 +97,7 @@ export function createWithScene(
     ...(config.perspective || {}),
   });
 
-  const controls = createControls({
+  const controlsConfig: Partial<OrbitControlsConfig> = {
     phi: Math.PI * 0.4,
     theta: 0.2,
     distanceBounds: [0.5, 1.5],
@@ -101,7 +107,21 @@ export function createWithScene(
     rotateSpeed: 0.0025,
     damping: 0.01,
     ...(config.orbit || {}),
-  });
+  };
+
+  if (config.rememberControls) {
+    if (localStorage.phi) {
+      controlsConfig.phi = Number(localStorage.phi);
+      controlsConfig.theta = Number(localStorage.theta);
+      controlsConfig.distance = Number(localStorage.distance);
+    }
+  } else {
+    delete localStorage.phi;
+    delete localStorage.theta;
+    delete localStorage.distance;
+  }
+
+  const controls = createControls(controlsConfig);
 
   return regl({
     name: "setupScene",

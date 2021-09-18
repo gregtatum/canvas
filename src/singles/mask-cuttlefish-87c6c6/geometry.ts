@@ -225,7 +225,7 @@ function extrudeTentacles(mesh: QuadMesh): void {
 }
 
 function rotateQuadsX(mesh: QuadMesh, quadList: Quad[], theta: number) {
-  const topLoopPositions = quads.getPositionsSet(mesh, quadList);
+  const topLoopPositions = quads.getPositionsSet(mesh, ...quadList);
   const topLoopCenter = vec3.create();
   for (const p of topLoopPositions) {
     vec3.add(topLoopCenter, topLoopCenter, p);
