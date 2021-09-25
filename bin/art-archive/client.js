@@ -2,8 +2,10 @@
 
 /* eslint-disable @typescript-eslint/explicit-function-return-type */ // This appears to be broken
 /* eslint-disable no-console */
+import { GIF } from "./gif";
 
 let apiUrl = "http://localhost:" + 55123;
+const workerScript = "html/gif.worker.js";
 
 console.log("bin/art-archive/client.js");
 export function addKeyboardShortcuts() {
@@ -12,12 +14,16 @@ export function addKeyboardShortcuts() {
       "[art-archive] Shortcuts:",
       "  ⌘+s: save the current image to art archive",
       "  ⌘+d: save the current image with a name",
+      "  ⌘+g: save a gif",
     ].join("\n")
   );
 
+  let finishGif = null;
+  checkForGifWorker();
+
   document.addEventListener(
     "keydown",
-    event => {
+    (event) => {
       let key = event.key;
       if (event.metaKey) {
         key = "cmd-" + key;
@@ -35,12 +41,24 @@ export function addKeyboardShortcuts() {
       switch (key) {
         case "cmd-d":
         case "ctr-d": {
-          postCanvas({ requestName: true });
+          postCanvas(getCanvas(), { requestName: true });
           break;
         }
         case "cmd-s":
         case "ctr-s": {
-          postCanvas();
+          postCanvas(getCanvas());
+          break;
+        }
+        case "cmd-g":
+        case "ctr-g": {
+          if (finishGif) {
+            finishGif().then((blob) => {
+              console.log("Gif processed:", blob);
+            });
+            finishGif = null;
+          } else {
+            finishGif = recordGif(getCanvas());
+          }
           break;
         }
         default:
@@ -54,25 +72,28 @@ export function addKeyboardShortcuts() {
   );
 }
 
-/**
- * @param {{ requestName?: boolean }} [options]
- * @returns {Promise<void>}
- */
-export async function postCanvas(options = {}) {
+function getCanvas() {
   const canvases = document.querySelectorAll("canvas");
   if (canvases.length !== 1) {
     throw new Error(
       "[art-archive] More than one canvas was found when saving."
     );
   }
-  const [canvas] = canvases;
+  return canvases[0];
+}
 
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {{ requestName?: boolean }} [options]
+ * @returns {Promise<void>}
+ */
+export async function postCanvas(canvas, options = {}) {
   // WebGL clears the canvas, so this needs to happen during a rAF.
-  await new Promise(resolve => {
+  await new Promise((resolve) => {
     requestAnimationFrame(resolve);
   });
 
-  const blob = await new Promise(resolve => {
+  const blob = await new Promise((resolve) => {
     canvas.toBlob(resolve, "image/png");
   });
   const formData = new FormData();
@@ -208,5 +229,71 @@ async function _processFetchResponse(responsePromise, method, url, payload) {
   } catch (error) {
     console.log("[art-archive] Request failed:", error);
     throw error;
+  }
+}
+
+/**
+ * @typedef {Object} GifOptions
+ * @prop {number} [repeat]       (default: 0)     repeat count, -1 = no repeat, 0 = forever
+ * @prop {number} [quality]      (default: 10)    pixel sample interval, lower is better
+ * @prop {number} [workers]      (default: 2)     number of web workers to spawn
+ * @prop {string} [background]   (default: #fff)  background color where source image is transparent
+ * @prop {number} [width]        (default: null)  output image width
+ * @prop {number} [height]       (default: null)  output image height
+ * @prop {string} [transparent]  (default: null)  transparent hex color, 0x00FF00 = green
+ * @prop {boolean} [dither]      (default: false) dithering method, e.g. FloydSteinberg-serpentine
+ * @prop {string} [workerScript] (default: "gif.worker.js")   url to load worker script from
+ * @prop {boolean} [debug]       (default: false)
+ */
+
+/**
+ * @typedef {Object} GifJsExports
+ * @prop {any} NeuQuant
+ * @prop {any} TypedNeuQuant
+ * @prop {any} GIFEncoder
+ * @prop {any} LZWEncoder
+ */
+
+/**
+ * @param {HTMLCanvasElement} canvas
+ */
+function recordGif(canvas) {
+  let isDone = false;
+  const result = new Promise((resolve) => {
+    const gif = new GIF({
+      workers: 2,
+      quality: 10,
+      verbose: true,
+      workerScript,
+    });
+
+    function rAF() {
+      gif.addFrame(window.ctx, { copy: true });
+      if (isDone) {
+        gif.on("finished", function (blob) {
+          resolve(blob);
+          window.open(URL.createObjectURL(blob));
+        });
+        gif.render();
+      } else {
+        requestAnimationFrame(rAF);
+      }
+    }
+    requestAnimationFrame(rAF);
+  });
+
+  return () => {
+    isDone = true;
+    return result;
+  };
+}
+
+async function checkForGifWorker() {
+  const response = await fetch(workerScript);
+  if (!response.ok) {
+    console.error(
+      `Could not find the gif worker script: ${workerScript}`,
+      response
+    );
   }
 }

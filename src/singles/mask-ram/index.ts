@@ -55,6 +55,7 @@ const drawMaskBody = createDrawMaskBody(regl, body);
 const withMaskModel = createWithMaskModel(regl);
 const bodyProps: MaskBodyProps = { color: hslToRgb(0.0, 0.78, 0.55) };
 const drawLabelQuads = createDrawLabelQuads(regl, mask, false);
+window.ctx = regl._gl;
 
 const drawBackground = createDrawBackground(regl);
 const backgroundProps = {
