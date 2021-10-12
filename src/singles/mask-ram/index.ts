@@ -21,21 +21,22 @@ const { mask, body } = createCuttleFish();
 const { drawMask } = createMask(regl, mask, {
   vertBody: glsl`
     morphed = morphed.xyz;
+    morphed.y += 0.009 * sin(time * -4.0 + abs(position.x) * 50.0)
+      * clamp(position.z * -2.0, 0.0, 1.0);
   `,
   fragHeader: colorConversions,
   fragBody: glsl`
     float comp = (sin(vPosition.z * -30.0 + time * 10.0) * 0.5 + 0.5) +
       (sin(vPosition.z * -80.0 + time * 17.0) * 0.5 + 0.5);
     color = color + vec3(0.0, comp * 0.05, 0.0);
-    color *= 1.2;
   `,
 });
 
 const withScene = createWithScene(regl, {
-  // rememberControls: true,
+  rememberControls: true,
   cameraFOV: 0.5,
   orbit: {
-    target: [0, 0.05, 0],
+    target: [0.1, 0.05, 0],
     phi: rad(0.52),
     theta: rad(0.19),
     distance: 1.5,
@@ -53,15 +54,15 @@ const withScene = createWithScene(regl, {
 });
 const drawMaskBody = createDrawMaskBody(regl, body);
 const withMaskModel = createWithMaskModel(regl);
-const bodyProps: MaskBodyProps = { color: hslToRgb(0.0, 0.78, 0.55) };
+const bodyProps: MaskBodyProps = { color: hslToRgb(0.05, 0.9, 0.55) };
 const drawLabelQuads = createDrawLabelQuads(regl, mask, false);
 
 const drawBackground = createDrawBackground(regl);
 const backgroundProps = {
-  topColor: hslToRgb(0.15, 1, 0.5),
-  bottomColor: hslToRgb(0.9, 0.78, 0.55),
+  topColor: hslToRgb(0.05, 0.5, 0.5),
+  bottomColor: hslToRgb(0.7, 0.5, 0.55),
   colorOffset: 0.4,
-  colorScale: 0.3,
+  colorScale: 0.7,
 };
 
 const drawDust = createDrawDust(regl, { dustCount: 1000 });
