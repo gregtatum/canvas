@@ -1716,3 +1716,75 @@ export function centeredTransform(
   }
   return centeredPositionsTransform(positions, fn);
 }
+
+const _extrudeEdgeVec1 = vec3.create();
+/**
+ * The unit interval `t` is in terms of the length of the edge.
+ */
+export function extrudeEdge(mesh: QuadMesh, quad: Quad | QuadIndex, edge: Edge, t: UnitInterval): Edge {
+
+  // Given edge: [a, b]
+  //
+  // <------> distance: t * dist(b, a)
+  //
+  // b2 <-- b --- c
+  // |      |     |
+  // a1 <-- a --- d
+  quad = getQuad(mesh, quad);
+  const edgeAIndexIntoQuad = quad.indexOf(edge[0]);
+  const edgeBIndexIntoQuad = quad.indexOf(edge[1]);
+  let edgeCIndexIntoQuad;
+  let edgeDIndexIntoQuad;
+  if ((edgeAIndexIntoQuad + 1) % 4 === edgeBIndexIntoQuad) {
+    edgeCIndexIntoQuad = (edgeAIndexIntoQuad + 2) % 4;
+    edgeDIndexIntoQuad = (edgeAIndexIntoQuad + 3) % 4;
+  } else if ((edgeBIndexIntoQuad + 1) % 4 === edgeAIndexIntoQuad) {
+    edgeCIndexIntoQuad = (edgeBIndexIntoQuad + 2) % 4;
+    edgeDIndexIntoQuad = (edgeBIndexIntoQuad + 3) % 4;
+  } else {
+    throw new Error("Attempting to extruding an edge that is not a valid edge in the quad.");
+  }
+  const aPositionIndex = quad[edgeAIndexIntoQuad];
+  const bPositionIndex = quad[edgeBIndexIntoQuad];
+  const cPositionIndex = quad[edgeCIndexIntoQuad];
+  const dPositionIndex = quad[edgeDIndexIntoQuad];
+
+  const aPosition = mesh.positions[aPositionIndex];
+  const bPosition = mesh.positions[bPositionIndex];
+  const cPosition = mesh.positions[cPositionIndex];
+  const dPosition = mesh.positions[dPositionIndex];
+
+  let distance;
+  {
+    const normal = _extrudeEdgeVec1;
+    // Create a normal by averaging the diff of the two points.
+    normal[0] = ((aPosition[0] - dPosition[0]) + (bPosition[0] - cPosition[0])) / 2;
+    normal[1] = ((aPosition[1] - dPosition[1]) + (bPosition[1] - cPosition[1])) / 2;
+    normal[2] = ((aPosition[2] - dPosition[2]) + (bPosition[2] - cPosition[2])) / 2;
+    vec3.normalize(normal, normal);
+    distance = vec3.scale(normal, normal, t * vec3.distance(aPosition, bPosition));
+  }
+
+  const a2 = vec3.clone(aPosition);
+  const b2 = vec3.clone(bPosition);
+  vec3.add(a2, a2, distance);
+  vec3.add(b2, b2, distance);
+  const a2PositionIndex = mesh.positions.length;
+  const b2PositionIndex = a2PositionIndex + 1;
+
+  // Update the QuadMesh.
+  const { normals, positions, quads } = mesh;
+  positions.push(a2);
+  positions.push(b2);
+  const newQuad: Tuple4 = [
+    a2PositionIndex, b2PositionIndex, bPositionIndex, aPositionIndex
+  ]
+  quads.push(newQuad)
+
+  if (normals) {
+    const normal = getQuadNormal(mesh, newQuad)
+    normals.push(normal);
+    normals.push(vec3.clone(normal));
+  }
+  return [mesh.positions.length - 2, mesh.positions.length - 1];
+}
