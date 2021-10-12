@@ -1834,6 +1834,32 @@ describe("QuadMesh", () => {
     );
   });
 
+  it("can inset an edge when extruding an edge", () => {
+    const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
+    const leftEdge: Edge = [0, 1];
+    const rightEdge: Edge = [2, 3];
+    Quads.extrudeEdge(mesh, 0, leftEdge, 0.5, 0.5);
+    Quads.extrudeEdge(mesh, 0, rightEdge, 0.5, 1.5);
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·━━◆  ·  ·
+      │ -2  ·  ·  ·  ·━━◆━━━━━◆━━━  ┃  ·  ·
+      │ -1  ·  ·  ◆━━━  ┃  ┊  ┃  ·  ┃  ·  ·
+      │  0 ┈┈┈┈┈┈┈┃┈┈┈┈┈┃┈┈┊┈┈┃┈┈┈┈┈┃┈┈┈┈┈┈┈
+      │  1  ·  ·  ◆━━·  ┃  ┊  ┃  ·  ┃  ·  ·
+      │  2  ·  ·  ·  ━━━◆━━━━━◆━━·  ┃  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ━━━◆  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
   it("computes normals when extruding an edge", () => {
     const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
     expect(mesh.normals).toEqual([

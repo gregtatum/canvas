@@ -1718,10 +1718,21 @@ export function centeredTransform(
 }
 
 const _extrudeEdgeVec1 = vec3.create();
+const _extrudeEdgeVec2 = vec3.create();
+const _extrudeEdgeVec3 = vec3.create();
+const _extrudeEdgeVec4 = vec3.create();
+
 /**
+ * Extrude an edge out from a quad..
  * The unit interval `t` is in terms of the length of the edge.
  */
-export function extrudeEdge(mesh: QuadMesh, quad: Quad | QuadIndex, edge: Edge, t: UnitInterval): Edge {
+export function extrudeEdge(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  edge: Edge,
+  extrudeT: UnitInterval,
+  insetT: UnitInterval = 1
+): Edge {
 
   // Given edge: [a, b]
   //
@@ -1753,8 +1764,11 @@ export function extrudeEdge(mesh: QuadMesh, quad: Quad | QuadIndex, edge: Edge, 
   const bPosition = mesh.positions[bPositionIndex];
   const cPosition = mesh.positions[cPositionIndex];
   const dPosition = mesh.positions[dPositionIndex];
+  const a2 = vec3.clone(aPosition);
+  const b2 = vec3.clone(bPosition);
+  const abDist = vec3.distance(aPosition, bPosition);
 
-  let distance;
+  // Apply the extrude distance.
   {
     const normal = _extrudeEdgeVec1;
     // Create a normal by averaging the diff of the two points.
@@ -1762,13 +1776,31 @@ export function extrudeEdge(mesh: QuadMesh, quad: Quad | QuadIndex, edge: Edge, 
     normal[1] = ((aPosition[1] - dPosition[1]) + (bPosition[1] - cPosition[1])) / 2;
     normal[2] = ((aPosition[2] - dPosition[2]) + (bPosition[2] - cPosition[2])) / 2;
     vec3.normalize(normal, normal);
-    distance = vec3.scale(normal, normal, t * vec3.distance(aPosition, bPosition));
+    const extrudeDist = vec3.scale(normal, normal, extrudeT * abDist);
+    vec3.add(a2, a2, extrudeDist);
+    vec3.add(b2, b2, extrudeDist);
   }
 
-  const a2 = vec3.clone(aPosition);
-  const b2 = vec3.clone(bPosition);
-  vec3.add(a2, a2, distance);
-  vec3.add(b2, b2, distance);
+  // Apply the inset if there is one.
+  if (insetT !== 1) {
+    const insetDistance = abDist * insetT;
+    const insetDelta = (abDist - insetDistance) * 0.5;
+    const inset = _extrudeEdgeVec2;
+
+    // Get the normal.
+    const normal = _extrudeEdgeVec3;
+    vec3.subtract(_extrudeEdgeVec3, bPosition, aPosition);
+    vec3.normalize(normal, normal);
+
+    // Apply for point a.
+    vec3.scale(inset, normal, insetDelta);
+    vec3.add(a2, a2, inset);
+
+    // Apply for point b by flipping the inset.
+    vec3.scale(inset, normal, -insetDelta);
+    vec3.add(b2, b2, inset);
+  }
+
   const a2PositionIndex = mesh.positions.length;
   const b2PositionIndex = a2PositionIndex + 1;
 
