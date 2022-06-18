@@ -1,7 +1,7 @@
 // /* eslint-disable @typescript-eslint/no-var-requires */
 import { glsl, initRegl } from "lib/regl-helpers";
 import _regl from "lib/regl";
-import { setupSquareCanvas } from "lib/draw";
+import { setupCanvasFrame } from "lib/draw";
 import resl from "resl";
 
 import "lib/shortcuts";
@@ -14,8 +14,11 @@ import { createDrawLabelQuads } from "lib/draw/label-quads";
 import { createCuttleFish, createWithMaskModel } from "./geometry";
 import { colorConversions } from "lib/shaders";
 import { hslToRgb } from "lib/color-conversion";
+import initializeShortcuts from "lib/shortcuts";
 
-const regl = initRegl({ canvas: setupSquareCanvas() });
+initializeShortcuts();
+
+const regl = initRegl({ canvas: setupCanvasFrame() });
 const { mask, body } = createCuttleFish();
 const { drawMask } = createMask(regl, mask, {
   vertBody: glsl`

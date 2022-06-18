@@ -1,0 +1,11 @@
+{
+  "name": "Sea Masked Youngling",
+  "date": "2021-09-15 00:00:00",
+  "archive": "html",
+  "template": "frame.template.html",
+  "description": "",
+  "htmlFiles": [
+    "style.css",
+    "matcap/purple-mat.png"
+  ]
+}
