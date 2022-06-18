@@ -31,7 +31,9 @@
   "dependencies": {
     "@tatumcreative/color": "^1.2.2",
     "@tatumcreative/random": "^1.1.3",
+    "@types/d3-quadtree": "^3.0.2",
     "babel-plugin-glslify": "^2.0.0",
+    "d3-quadtree": "^3.0.1",
     "delaunay-triangulate": "^1.1.6",
     "eases": "^1.0.8",
     "formdata-node": "^4.0.1",
