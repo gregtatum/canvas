@@ -1,10 +1,10 @@
 {
-  "name": "Sea Masked Youngling",
+  "name": "The Masked Sea Elder",
   "date": "2021-09-15 00:00:00",
   "archive": "html",
   "template": "frame.template.html",
   "htmlFiles": [
     "style.css",
-    "matcap/purple-mat.png"
+    "matcap/foliage.png"
   ]
 }
