@@ -45,6 +45,7 @@ module.exports = {
     "@typescript-eslint/no-empty-function": 0,
     "@typescript-eslint/no-non-null-assertion": 0,
     "no-inner-declarations": 0,
+    "@typescript-eslint/no-empty-interface": 0,
 
     // Use typescript's
     'no-unused-vars': 0,
