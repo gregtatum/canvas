@@ -202,6 +202,18 @@ function getPackageJson(sessionSlug) {
   return JSON.parse(fs.readFileSync(packageDestination, { encoding: "utf8" }));
 }
 
+/**
+ * @param {string} sessionSlug
+ * @returns {Record<string, string>}
+ */
+function getSessionDetails(sessionSlug) {
+  try {
+    return require(path.join(getPathToSession(sessionSlug), "package.json"));
+  } catch (error) {
+    return {};
+  }
+}
+
 module.exports = {
   findSessionFromCli,
   getAllSessions,
@@ -210,4 +222,5 @@ module.exports = {
   getTemplateParameters,
   isSeries,
   getPackageJson,
+  getSessionDetails,
 };

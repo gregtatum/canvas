@@ -6,6 +6,7 @@ const {
   getAllSessions,
   getWebpackConfig,
   getTemplateParameters,
+  getSessionDetails,
 } = require("./common");
 const path = require("path");
 const webpack = require("webpack");
@@ -52,13 +53,7 @@ const reset = "\u001b[0m";
   const pathToSession = maybePathToSession;
 
   const sessionSlug = path.basename(pathToSession);
-
-  let sessionDetails = {};
-  try {
-    sessionDetails = require(path.join(pathToSession, "package.json"));
-  } catch (error) {
-    //
-  }
+  const sessionDetails = getSessionDetails(sessionSlug);
 
   if (!sessionDetails.name) {
     throw new Error("Please add a name to the package.json for this piece.");

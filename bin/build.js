@@ -14,6 +14,7 @@ const {
   isSeries,
   getPackageJson,
   getTemplateParameters,
+  getSessionDetails,
 } = require("./common");
 const mkdirp = require("mkdirp");
 
@@ -236,9 +237,11 @@ function getSessionTitle(sessionSlug) {
 async function webpackBundle(sessions, sessionSlug) {
   const sessionPath = getPathToSession(sessionSlug);
   const entry = path.resolve(sessionPath, "index.ts");
-  const template = isSeries(sessionSlug)
-    ? "series.template.html"
-    : "single.template.html";
+
+  const template =
+    getSessionDetails(sessionSlug)?.template ??
+    (isSeries(sessionSlug) ? "series.template.html" : "single.template.html");
+
   /** @type {any} */
   const config = getWebpackConfig({
     title: getSessionTitle(sessionSlug),
