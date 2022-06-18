@@ -15,6 +15,10 @@ type PrefixKeys<Prefix extends string, T> = {
   [K in keyof Matrices as `${Prefix}${K}`]: Matrices[K];
 };
 
+/**
+ * Create a model context, and provide a prefix string that will wire up the prefix
+ * to the matrices. See the code below for the names.
+ */
 export interface ModelContext<Prefix extends string>
   extends PrefixKeys<Prefix, Matrices>,
     SceneContext,

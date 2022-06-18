@@ -1746,6 +1746,9 @@ export function extrudeEdge(
   const edgeBIndexIntoQuad = quad.indexOf(edge[1]);
   let edgeCIndexIntoQuad;
   let edgeDIndexIntoQuad;
+  if (edgeAIndexIntoQuad === -1 || edgeBIndexIntoQuad === -1) {
+    throw new Error("The edge was not part of the quad.")
+  }
   if ((edgeAIndexIntoQuad + 1) % 4 === edgeBIndexIntoQuad) {
     edgeCIndexIntoQuad = (edgeAIndexIntoQuad + 2) % 4;
     edgeDIndexIntoQuad = (edgeAIndexIntoQuad + 3) % 4;

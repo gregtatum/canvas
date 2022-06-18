@@ -34,6 +34,7 @@ type BoundsTuple3D<T = number> = [T, T, T];
 type BoundsTuple4D<T = number> = [T, T, T, T];
 
 type Quad = Tuple4<PositionIndex>;
+type Edge = Tuple2<PositionIndex>;
 
 interface QuadMesh {
   positions: Tuple3[];
