@@ -8,22 +8,22 @@ const Jimp = require("jimp");
 const rimraf = require("rimraf");
 const { ncp } = require("ncp");
 const touch = require("touch");
-const removeMarkdown = require("remove-markdown");
 const { spawn } = require("child_process");
-const { getPathToSession } = require("./common");
+const {
+  getPathToSession,
+  isSeries,
+  getPackageJson,
+  getTemplateParameters,
+} = require("./common");
 const mkdirp = require("mkdirp");
 
 const { getAllSessions, getWebpackConfig } = require("./common");
 
-const url = "https://gregtatum.com/category/interactive/";
+module.exports = { runBuild };
 
 /**
- * @typedef {object} Session;
- * @prop {string} fileName
- * @prop {string} pathToSession
- */
-
-module.exports = { runBuild };
+ * @typedef {import("./common").Session} Session
+ * /
 
 /**
  * Run the build script
@@ -46,7 +46,7 @@ async function runBuild(sessionPath) {
     copySingleFiles(sessionSlug);
     await webpackBundle(sessions, sessionSlug);
     await webpackBundleNeighboringSessions(sessions, sessionSlug);
-    await generateThumbnail(sessions, sessionSlug);
+    await generateThumbnail(sessionSlug);
     copyProjectFiles(sessionSlug);
     buildGregTatumDotCom(sessionSlug);
     reportBundleSize(sessionSlug);
@@ -56,7 +56,7 @@ async function runBuild(sessionPath) {
     for (const { fileName: sessionSlug } of sessions) {
       removeDistFolder(sessionSlug);
       await webpackBundle(sessions, sessionSlug);
-      await generateThumbnail(sessions, sessionSlug);
+      await generateThumbnail(sessionSlug);
       copyProjectFiles(sessionSlug);
       buildGregTatumDotCom(sessionSlug);
       reportBundleSize(sessionSlug);
@@ -118,7 +118,7 @@ function buildGregTatumDotCom(sessionSlug) {
 
   return new Promise((resolve, reject) => {
     command.on("exit", (code) => {
-      if (code.toString() === "0") {
+      if (code?.toString() === "0") {
         resolve();
       } else {
         reject(new Error(`Exiting with a non-zero exit code`));
@@ -171,6 +171,9 @@ function copyProjectFiles(sessionSlug) {
   }
 }
 
+/**
+ * @returns {Promise<void>}
+ */
 function copyHtmlFolder() {
   const source = path.resolve(__dirname, "../html");
   const destination = path.resolve(__dirname, "../dist/html");
@@ -222,18 +225,6 @@ function updateReadme(sessions) {
   console.log("Updated README at: " + readmeDistDestination);
 }
 
-/**
- * @param {string} sessionSlug
- */
-function getPackageJson(sessionSlug) {
-  const packageDestination = path.resolve(
-    getPathToSession(sessionSlug),
-    "package.json"
-  );
-  // Don't use require, as it caches the result.
-  return JSON.parse(fs.readFileSync(packageDestination, { encoding: "utf8" }));
-}
-
 function getSessionTitle(sessionSlug) {
   const { name } = getPackageJson(sessionSlug);
   if (!name) {
@@ -242,58 +233,40 @@ function getSessionTitle(sessionSlug) {
   return name;
 }
 
-/**
- * @param {string} sessionSlug
- * @returns {string}
- */
-function getSessionReadmeDescription(sessionSlug) {
-  const sessionPath = getPathToSession(sessionSlug);
-  const markdown = fs.readFileSync(path.join(sessionPath, "README.md"), "utf8");
-  if (!markdown) {
-    throw new Error("No REAMDE.md was written for the session.");
-  }
-  const text = removeMarkdown(markdown);
-  return text.split("\n")[0];
-}
-
-/**
- * @param {string} sessionSlug
- */
-function isSeries(sessionSlug) {
-  return Boolean(sessionSlug.match(/\d\d\d/));
-}
-
 async function webpackBundle(sessions, sessionSlug) {
   const sessionPath = getPathToSession(sessionSlug);
   const entry = path.resolve(sessionPath, "index.ts");
+  const template = isSeries(sessionSlug)
+    ? "series.template.html"
+    : "single.template.html";
   /** @type {any} */
   const config = getWebpackConfig({
     title: getSessionTitle(sessionSlug),
     entry,
     isDevelopment: false,
-    template: isSeries(sessionSlug)
-      ? "series.template.html"
-      : "single.template.html",
-    templateParameters: getTemplateParameters(sessions, sessionSlug),
+    template,
+    templateParameters: getTemplateParameters(template, sessions, sessionSlug),
     outputPath: path.resolve(__dirname, "../dist", sessionSlug),
     outputPublicPath: isSeries(sessionSlug) ? "../" + sessionSlug : undefined,
   });
 
   console.log(`Start bundling: "${entry}"`);
-  await new Promise((resolve, reject) => {
-    webpack(config, (error, stats) => {
-      console.log(
-        stats.toString({
-          // Add console colors
-          colors: true,
-        })
-      );
-      if (error) {
-        reject(error);
-      }
-      resolve();
-    });
-  });
+  await /** @type {Promise<void>} */ (
+    new Promise((resolve, reject) => {
+      webpack(config, (error, stats) => {
+        console.log(
+          stats.toString({
+            // Add console colors
+            colors: true,
+          })
+        );
+        if (error) {
+          reject(error);
+        }
+        resolve();
+      });
+    })
+  );
 }
 
 function reportBundleSize(sessionSlug) {
@@ -318,7 +291,10 @@ function getBundlePath(sessionSlug) {
   throw new Error("Unable to find the bundle path.");
 }
 
-async function generateThumbnail(sessions, sessionSlug) {
+/**
+ * @param {string} sessionSlug
+ */
+async function generateThumbnail(sessionSlug) {
   const sessionPath = getPathToSession(sessionSlug);
   const fullImagePath = path.resolve(sessionPath, "image.jpg");
   const thumbPath = path.resolve(sessionPath, "thumb.jpg");
@@ -342,35 +318,4 @@ async function generateThumbnail(sessions, sessionSlug) {
   console.log(`Resizing the screenshot to the thumb size ${width}x${height}`);
   await screenshot.resize(width, height).write(thumbPath);
   console.log(`Thumb outputed at: ${thumbPath}`);
-}
-
-/**
- * @param {Session[]} sessions
- * @param {string} sessionSlug
- */
-function getTemplateParameters(sessions, sessionSlug) {
-  const projectIndex = sessions.findIndex(
-    (session) => session.fileName === sessionSlug
-  );
-  const previous = sessions[projectIndex - 1];
-  const next = sessions[projectIndex + 1];
-  const packageJson = getPackageJson(sessionSlug);
-
-  let sessionNumber = null;
-  const sessionNumberResult = sessionSlug.match(/\d\d\d/);
-  if (sessionNumberResult) {
-    sessionNumber = sessionNumberResult[0];
-  }
-  const prevLink = previous ? `../${previous.fileName}` : url;
-  const nextLink = next ? `../${next.fileName}` : url;
-
-  return {
-    sessionNumber,
-    previous: `<a id="prev" href='${prevLink}'>←</a>`,
-    next: `<a id="next" href='${nextLink}'>→</a>`,
-    name: packageJson.name,
-    description: isSeries(sessionSlug)
-      ? getSessionReadmeDescription(sessionSlug)
-      : null,
-  };
 }

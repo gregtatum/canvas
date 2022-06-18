@@ -1,6 +1,7 @@
 // @ts-check
 const path = require("path");
 const fs = require("fs");
+const removeMarkdown = require("remove-markdown");
 
 /**
  * @param {string} slug
@@ -37,6 +38,9 @@ function findSessionFromCli() {
   return null;
 }
 
+/**
+ * @return {Array<{ fileName: string, pathToSession: string }>}
+ */
 function getAllSessions() {
   const dir = path.join(__dirname, "../src/series");
   const sessions = [];
@@ -69,7 +73,6 @@ function getWebpackConfig({
   outputPublicPath,
 }) {
   const HtmlWebpackPlugin = require("html-webpack-plugin");
-  console.log(templateParameters);
 
   return {
     entry,
@@ -117,9 +120,94 @@ function getWebpackConfig({
   };
 }
 
+const url = "https://gregtatum.com/category/interactive/";
+
+/**
+ * @typedef {object} Session;
+ * @prop {string} fileName
+ * @prop {string} pathToSession
+ */
+
+/**
+ * @param {string} template
+ * @param {Session[] | null} sessions
+ * @param {string} sessionSlug
+ */
+function getTemplateParameters(template, sessions, sessionSlug) {
+  let prevSession;
+  let nextSession;
+  if (sessions) {
+    const projectIndex = sessions.findIndex(
+      (session) => session.fileName === sessionSlug
+    );
+    prevSession = sessions[projectIndex - 1];
+    nextSession = sessions[projectIndex + 1];
+  }
+  const packageJson = getPackageJson(sessionSlug);
+
+  let sessionNumber = null;
+  const sessionNumberResult = sessionSlug.match(/\d\d\d/);
+  if (sessionNumberResult) {
+    sessionNumber = sessionNumberResult[0];
+  }
+  const prevLink = prevSession ? `../${prevSession.fileName}` : url;
+  const nextLink = nextSession ? `../${nextSession.fileName}` : url;
+
+  let previous = `<a id="prev" href='${prevLink}'>←</a>`;
+  let next = `<a id="next" href='${nextLink}'>→</a>`;
+  if (template === "frame.template.html") {
+    previous = `<a id="prev" href='${prevLink}'><img src="../html/arrow-left.svg" alt="Back" /></a>`;
+    next = `<a id="next" href='${nextLink}'><img src="../html/arrow-right.svg" alt="Next" /></a>`;
+  }
+
+  return {
+    sessionNumber,
+    previous,
+    next,
+    name: packageJson.name,
+    description: getSessionReadmeDescription(sessionSlug),
+  };
+}
+
+/**
+ * @param {string} sessionSlug
+ * @returns {string}
+ */
+function getSessionReadmeDescription(sessionSlug) {
+  const sessionPath = getPathToSession(sessionSlug);
+  const markdown = fs.readFileSync(path.join(sessionPath, "README.md"), "utf8");
+  if (!markdown) {
+    throw new Error("No README.md was written for the session.");
+  }
+  const text = removeMarkdown(markdown);
+  return text.split("\n")[0];
+}
+
+/**
+ * @param {string} sessionSlug
+ */
+function isSeries(sessionSlug) {
+  return Boolean(sessionSlug.match(/\d\d\d/));
+}
+
+/**
+ * @param {string} sessionSlug
+ */
+function getPackageJson(sessionSlug) {
+  const packageDestination = path.resolve(
+    getPathToSession(sessionSlug),
+    "package.json"
+  );
+  // Don't use require, as it caches the result.
+  return JSON.parse(fs.readFileSync(packageDestination, { encoding: "utf8" }));
+}
+
 module.exports = {
   findSessionFromCli,
   getAllSessions,
   getWebpackConfig,
   getPathToSession,
+  getTemplateParameters,
+  isSeries,
+  getPackageJson,
 };

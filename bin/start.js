@@ -5,6 +5,7 @@ const {
   findSessionFromCli,
   getAllSessions,
   getWebpackConfig,
+  getTemplateParameters,
 } = require("./common");
 const path = require("path");
 const webpack = require("webpack");
@@ -25,8 +26,8 @@ const reset = "\u001b[0m";
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
 (async () => {
-  let pathToSession = findSessionFromCli();
-  if (!pathToSession) {
+  let maybePathToSession = findSessionFromCli();
+  if (!maybePathToSession) {
     const sessions = getAllSessions();
 
     const answers = await inquirer.prompt([
@@ -38,16 +39,17 @@ const reset = "\u001b[0m";
       },
     ]);
 
-    pathToSession = sessions.find(
-      (session) => session.fileName === answers.fileName
-    ).pathToSession;
+    maybePathToSession =
+      sessions.find((session) => session.fileName === answers.fileName)
+        ?.pathToSession ?? null;
   }
 
-  if (!pathToSession) {
+  if (!maybePathToSession) {
     throw new Error(
       "Could not find a path to the session. This is a programming error."
     );
   }
+  const pathToSession = maybePathToSession;
 
   const sessionSlug = path.basename(pathToSession);
 
@@ -74,19 +76,22 @@ const reset = "\u001b[0m";
     runBuild: () => runBuild(pathToSession),
   });
 
+  const template = sessionDetails.template ?? "dev.template.html";
+
   // TODO - Type this:
   /** @type {any} */
   const config = getWebpackConfig({
     title: sessionSlug,
-    entry: path.join(pathToSession, "index.ts"),
+    entry: path.join(maybePathToSession, "index.ts"),
     isDevelopment: true,
-    template: "dev.template.html",
-    templateParameters: { name: sessionDetails.name },
+    template,
+    templateParameters: getTemplateParameters(template, null, sessionSlug),
     outputPath: path.resolve(__dirname, "../"),
     outputPublicPath: "/",
   });
 
-  /** @type {import("webpack-dev-server").Configuration} */
+  // TODO - Type this:
+  /** @type {any} */
   const serverConfig = {
     disableHostCheck: true,
     contentBase: config.output.path,

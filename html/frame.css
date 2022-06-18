@@ -1,0 +1,144 @@
+body {
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  overflow: hidden;
+  inset: 0;
+  background-color: #ddd;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none;
+  flex-direction: column;
+}
+
+@keyframes fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.frame-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.frame {
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  overflow: hidden;
+  --size: calc(min(90vh, 90vw) - 65px);
+  box-shadow:
+    #0243 3px 3px 14px,
+    #0243 2px 3px 5px,
+    #0242 0px 3px 30px;
+  border: 10px solid #fff;
+  line-height: 0;
+  background-color: #555;
+}
+
+.frame-canvas {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  display: none;
+  animation: fadein 300ms;
+}
+
+.frame-inset-shadow {
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset #0248 0 5px 30px,
+    inset #0248 0 2px 5px,
+    inset #0248 0 1px 3px;
+}
+
+.title {
+  color: #000;
+  font-family: sans-serif;
+  font-weight: 100;
+  vertical-align: middle;
+  text-align: center;
+  opacity: 1;
+  margin: 1em;
+}
+
+.title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1;
+}
+
+.title-nav {
+  display: flex;
+  line-height: 1;
+  margin-bottom: 0.1em
+}
+
+.hide-ui .title {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 300ms, visibility 300ms 300ms;
+  pointer-events: none;
+}
+
+.title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: lighter;
+}
+.title h2 {
+  margin: 0;
+  font-size: 1em;
+  font-weight: lighter;
+}
+
+.title h2 {
+  margin: 0;
+}
+
+.title a {
+  color: transparent;
+  text-decoration: none;
+  padding: 0 7px;
+  line-height: 0;
+  font-weight: bold;
+  user-select: none;
+  margin: 0;
+  position: relative;
+}
+
+.title a > img {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  top: -3px;
+}
+
+.download-link {
+  position: absolute;
+  z-index: 1;
+  right: 10px;
+  bottom: 10px;
+  font-family: sans-serif;
+  background: #333;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #fff;
+  box-shadow: 0 0 10px #0003;
+}
+
+@media (max-width:700px) {
+  .frame {
+    --size: calc(min(100vh - 65px, 100vw));
+    border: none;
+  }
+  .frame-inset-shadow {
+    display: none;
+  }
+}
