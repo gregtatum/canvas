@@ -1,4 +1,5 @@
 import lerp from "lerp";
+import { ensureExists } from "./utils";
 
 type SetupCanvasConfig = Partial<{
   alpha: boolean;
@@ -96,64 +97,38 @@ export function lerpTheta(a: number, b: number, t: number): number {
   return lerp(a, b, t);
 }
 
-type SetupSquareCanvasConfig = {
+type setupCanvasFrameConfig = {
   container: HTMLElement;
   toleranceRatio: [number, number];
   margin: number;
   style: Partial<CSSStyleDeclaration>;
 };
 
-export function setupSquareCanvas(
-  config: Partial<SetupSquareCanvasConfig> = {}
-): HTMLCanvasElement {
-  const resolvedConfig: SetupSquareCanvasConfig = {
-    ...config,
-    container: document.body,
-    toleranceRatio: [0.8, 1.9],
-    margin: 0.05,
-    style: {
-      zIndex: "-1",
-      boxShadow: "3px 3px 14px #0003",
-      outline: "1px solid #444",
-      borderRadius: "3px",
-    },
-  };
+export function setupCanvasFrame(): HTMLCanvasElement {
+  const frame = ensureExists(
+    document.querySelector<HTMLDivElement>(".frame")
+  );
 
-  const canvas = document.createElement("canvas");
-  const container = resolvedConfig.container;
-  container.appendChild(canvas);
+  const canvas = ensureExists(
+    document.querySelector<HTMLCanvasElement>(".frame-canvas")
+  );
 
   const params = new URLSearchParams(window.location.search);
   const dpi = params.has("dpi") ? Number(params.get("dpi")) : null;
   console.log(["Url API:", "  http://localhost:9966/?dpi=10"].join("\n"));
 
-  function resize(): void {
+  const observer = new ResizeObserver(([{contentRect}]: ResizeObserverEntry[]) => {
     const scale = dpi ? dpi : devicePixelRatio;
-    const ratio = window.innerWidth / window.innerHeight;
-    if (
-      ratio > resolvedConfig.toleranceRatio[0] && ratio < resolvedConfig.toleranceRatio[1]
-    ) {
-      canvas.width = window.innerWidth * scale;
-      canvas.height = window.innerHeight * scale;
-      canvas.style.width = "";
-      canvas.style.height = "";
-    } else {
-      const cssSize =
-        Math.min(window.innerHeight, window.innerWidth) *
-        (1.0 - resolvedConfig.margin);
-      const deviceSize = cssSize * scale;
-      canvas.width = deviceSize;
-      canvas.height = deviceSize;
-      canvas.style.width = `${cssSize}px`;
-      canvas.style.height = `${cssSize}px`;
-      Object.assign(canvas.style, resolvedConfig.style);
-    }
-
+    canvas.width = contentRect.width * scale;
+    canvas.height = contentRect.height * scale;;
     console.log(`Resolution: ${canvas.width}x${canvas.height}`);
-  }
+  });
 
-  resize();
-  window.addEventListener("resize", resize, false);
+  observer.observe(frame);
+
+  requestAnimationFrame(() => {
+    canvas.style.display = 'block';
+  });
 
   return canvas;
 }

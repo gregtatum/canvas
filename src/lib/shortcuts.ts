@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === "development") {
   artArchive.addKeyboardShortcuts();
 }
 
-export default function shortcuts(seed: string, restart?: () => void): void {
+export default function shortcuts(seed?: string, restart?: () => void): void {
   console.log(
     [
       "Available shortcuts:",
@@ -24,7 +24,7 @@ export default function shortcuts(seed: string, restart?: () => void): void {
   );
   window.addEventListener(
     "keydown",
-    event => {
+    (event) => {
       let key = event.key;
       if (event.metaKey) {
         key = "cmd-" + key;
@@ -48,9 +48,8 @@ export default function shortcuts(seed: string, restart?: () => void): void {
             console.log("Could not find a canvas element to screenshot");
             break;
           }
-          let a: HTMLAnchorElement | null = document.querySelector(
-            ".download-link"
-          );
+          let a: HTMLAnchorElement | null =
+            document.querySelector(".download-link");
           if (!a) {
             a = document.createElement("a");
             a.className = "download-link";

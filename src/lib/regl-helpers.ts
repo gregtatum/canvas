@@ -35,9 +35,14 @@ export function initRegl(
     ...config,
   };
   const { canvas } = combinedConfig;
-  if (canvas) {
-    delete combinedConfig.canvas;
-    return startRegl(canvas, combinedConfig);
+  if (canvas && canvas instanceof HTMLCanvasElement) {
+    const gl = canvas.getContext("webgl", {
+      preserveDrawingBuffer: true,
+    });
+    if (gl) {
+      combinedConfig.gl = gl;
+    }
+    return startRegl(combinedConfig);
   }
   return startRegl(combinedConfig);
 }
