@@ -150,8 +150,15 @@ function getTemplateParameters(template, sessions, sessionSlug) {
   if (sessionNumberResult) {
     sessionNumber = sessionNumberResult[0];
   }
-  const prevLink = prevSession ? `../${prevSession.fileName}` : url;
-  const nextLink = nextSession ? `../${nextSession.fileName}` : url;
+  let prevLink = prevSession ? `../${prevSession.fileName}` : url;
+  let nextLink = nextSession ? `../${nextSession.fileName}` : url;
+
+  if (packageJson.next) {
+    nextLink = packageJson.next;
+  }
+  if (packageJson.prev) {
+    prevLink = packageJson.prev;
+  }
 
   let previous = `<a id="prev" href='${prevLink}'>←</a>`;
   let next = `<a id="next" href='${nextLink}'>→</a>`;
