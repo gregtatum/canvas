@@ -11,15 +11,18 @@ import { createDrawBackground } from "lib/draw/background";
 import { createDrawDust } from "lib/draw/dust";
 import { createDrawLabelQuads } from "lib/draw/label-quads";
 import { createJadeOne } from "./geometry";
+import { setupCanvasFrame } from "lib/draw";
 
 initializeShortcuts();
 
-const regl = initRegl();
+const regl = initRegl({ canvas: setupCanvasFrame() });
 const { mask, body } = createJadeOne();
 const { withMaskModel, drawMask } = createMask(regl, mask);
 const withScene = createWithScene(regl, {
   orbit: {
     distanceBounds: [0.5, 1.98],
+    distance: 1.3,
+    theta: 0.4,
   },
 });
 const drawMaskBody = createDrawMaskBody(regl, body);

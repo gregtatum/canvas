@@ -1,7 +1,10 @@
 {
-  "name": "Masked One",
-  "date": "2017-01-30 00:00:00",
+  "name": "Jade Masked One",
+  "date": "2021-09-18 00:00:00",
   "archive": "html",
+  "template": "frame.template.html",
+  "prev": "../mask-sea-elder",
+  "next": "https://gregtatum.com/",
   "htmlFiles": [
     "style.css",
     "matcap/Glass-Jade-Mine.png"
