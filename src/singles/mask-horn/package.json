@@ -1,0 +1,12 @@
+{
+  "name": "Horn Masked One",
+  "date": "2019-09-18 00:00:00",
+  "archive": "html",
+  "template": "frame.template.html",
+  "prev": "../mask-sea-elder",
+  "next": "https://gregtatum.com/",
+  "htmlFiles": [
+    "style.css",
+    "matcap/orange.png"
+  ]
+}

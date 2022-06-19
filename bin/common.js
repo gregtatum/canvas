@@ -44,7 +44,6 @@ function findSessionFromCli() {
 function getAllSessions(type = "series") {
   const dir = path.join(__dirname, "../src/", type);
   const sessions = [];
-  console.log(`!!! dir`, dir);
 
   // Go through the root directory and get all of the projects
   // that start with numbers.

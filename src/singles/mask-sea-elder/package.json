@@ -4,7 +4,7 @@
   "archive": "html",
   "template": "frame.template.html",
   "prev": "../mask-sea-youngling",
-  "next": "https://gregtatum.com/",
+  "next": "../mask-horn",
   "htmlFiles": [
     "style.css",
     "matcap/foliage.png"
