@@ -4,7 +4,7 @@ import _regl from "lib/regl";
 import { setupCanvasFrame } from "lib/draw";
 import resl from "resl";
 
-import "lib/shortcuts";
+import initializeShortcuts from "lib/shortcuts";
 import { createWithScene } from "lib/draw/with-scene";
 import { createMask } from "lib/draw/mask";
 import { createDrawMaskBody, MaskBodyProps } from "lib/draw/mask-body";
@@ -14,6 +14,8 @@ import { createDrawLabelQuads } from "lib/draw/label-quads";
 import { createCuttleFish, createWithMaskModel } from "./geometry";
 import { colorConversions } from "lib/shaders";
 import { hslToRgb } from "lib/color-conversion";
+
+initializeShortcuts();
 
 const regl = initRegl({ canvas: setupCanvasFrame() });
 const { mask, body } = createCuttleFish();
@@ -34,16 +36,16 @@ const { drawMask } = createMask(regl, mask, {
 
     // Get a nice color as it fades out to the tentacles.
     vec3 hsl = vec3(0.8 + d * 0.4, 1.0, 0.5);
-    float edge = clamp(0.0, 1.0, dot(vNormal, vec3(0.0, 0.0, 1.0)));
-    color = mix(vec3(1.0), mix(hslToRgb(hsl), color, t), edge);
+
+    color = mix(hslToRgb(hsl), color, t);
   `,
 });
 const withScene = createWithScene(regl, {
   orbit: {
-    target: [-0.1, -0.1, 0],
+    target: [-0.1, 0, 0],
     // position: [0, 0, 1.8],
-    phi: Math.PI * 0.6,
-    theta: Math.PI * -0.05,
+    phi: Math.PI * 0.45,
+    theta: Math.PI * 0.21,
     distance: 1.8,
 
     distanceBounds: [0.5, 1.98],
@@ -55,13 +57,13 @@ const withScene = createWithScene(regl, {
 });
 const drawMaskBody = createDrawMaskBody(regl, body);
 const withMaskModel = createWithMaskModel(regl);
-const bodyProps: MaskBodyProps = { color: hslToRgb(0.0, 0.78, 0.55) };
+const bodyProps: MaskBodyProps = { color: [0.6, 0, 0.25] };
 const drawLabelQuads = createDrawLabelQuads(regl, mask);
 
 const drawBackground = createDrawBackground(regl);
 const backgroundProps = {
-  topColor: hslToRgb(0.3, 0.78, 0.55),
-  bottomColor: hslToRgb(0.0, 0.78, 0.55),
+  topColor: hslToRgb(0.9, 0.78, 0.55),
+  bottomColor: hslToRgb(0.6, 0.78, 0.55),
   colorOffset: 0.4,
   colorScale: 0.3,
 };

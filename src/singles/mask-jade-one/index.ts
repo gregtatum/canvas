@@ -3,7 +3,7 @@ import { initRegl } from "lib/regl-helpers";
 import _regl from "lib/regl";
 import resl from "resl";
 
-import "lib/shortcuts";
+import initializeShortcuts from "lib/shortcuts";
 import { createWithScene } from "lib/draw/with-scene";
 import { createMask } from "lib/draw/mask";
 import { createDrawMaskBody, MaskBodyProps } from "lib/draw/mask-body";
@@ -11,6 +11,8 @@ import { createDrawBackground } from "lib/draw/background";
 import { createDrawDust } from "lib/draw/dust";
 import { createDrawLabelQuads } from "lib/draw/label-quads";
 import { createJadeOne } from "./geometry";
+
+initializeShortcuts();
 
 const regl = initRegl();
 const { mask, body } = createJadeOne();

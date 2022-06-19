@@ -4,7 +4,7 @@ import _regl from "lib/regl";
 import { setupCanvasFrame } from "lib/draw";
 import resl from "resl";
 
-import "lib/shortcuts";
+import initializeShortcuts from "lib/shortcuts";
 import { createWithScene } from "lib/draw/with-scene";
 import { createMask } from "lib/draw/mask";
 import { createDrawMaskBody, MaskBodyProps } from "lib/draw/mask-body";
@@ -15,6 +15,8 @@ import { createCuttleFish, createWithMaskModel } from "./geometry";
 import { colorConversions } from "lib/shaders";
 import { hslToRgb } from "lib/color-conversion";
 import { rad } from "lib/utils";
+
+initializeShortcuts();
 
 const regl = initRegl({ canvas: setupCanvasFrame() });
 const { mask, body } = createCuttleFish();

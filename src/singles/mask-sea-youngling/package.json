@@ -3,6 +3,8 @@
   "date": "2021-09-15 00:00:00",
   "archive": "html",
   "template": "frame.template.html",
+  "prev": "../mask-sea-one",
+  "next": "../mask-sea-elder",
   "htmlFiles": [
     "style.css",
     "matcap/purple-mat.png"

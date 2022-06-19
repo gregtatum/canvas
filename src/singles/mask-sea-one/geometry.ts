@@ -14,9 +14,9 @@ export function createCuttleFish() {
 
 export function createMask(): QuadMesh {
   // Create a box.
-  const w = 0.4;
+  const w = 0.5;
   const h = 0.3;
-  const d = 0.2;
+  const d = 0.1;
   const mesh = quads.createBox(w, h, d);
 
   // Split the box in half.
@@ -35,27 +35,18 @@ export function createMask(): QuadMesh {
   shapeEyes(mesh);
   shapeMaskBack(mesh);
   quads.subdivide(mesh, 1);
-  refineForehead(mesh);
   refineEyes(mesh);
-  quads.subdivide(mesh, 1);
+  // shapeNose(mesh);
   extrudeTentacles(mesh);
-  quads.subdivide(mesh, 1);
+  quads.subdivide(mesh, 2);
   return mesh;
-}
-function refineForehead(mesh: QuadMesh) {
-  [2, 37, 38, 21].forEach((quad) => {
-    for (const p of quads.getPositions(mesh, quad)) {
-      p[1] += 0.03;
-      p[2] -= 0.05;
-    }
-  });
 }
 
 function shapeEyes(mesh: QuadMesh): void {
   // Make the eyes glare.
   [27, 19, 20, 28].forEach((i) => {
-    mesh.positions[i][0] *= 0.2;
-    mesh.positions[i][1] += 0.0;
+    mesh.positions[i][0] *= 0.5;
+    mesh.positions[i][1] -= 0.1;
   });
   const leftEyePositions = quads.getLoopHorizontal(
     mesh,
@@ -162,28 +153,40 @@ function refineEyes(mesh: QuadMesh): void {
 function extrudeTentacles(mesh: QuadMesh): void {
   quads.computeSmoothNormals(mesh);
 
-  const random = createRandom(11);
   const lowerThanY = -0.1;
   // For the bottom row of tentacles.
-  const bottomLoopQuads = mesh.quads.filter(
-    (quad) =>
-      mesh.positions[quad[0]][1] +
-        mesh.positions[quad[1]][1] +
-        mesh.positions[quad[2]][1] +
-        mesh.positions[quad[3]][1] <
-      lowerThanY * 4
-  );
-  const bothLoops = [...bottomLoopQuads];
+  const bottomLoopQuads = quads
+    .getLoopVertical(mesh, mesh.quads[30], "quads")
+    .filter(unique)
+    .filter(
+      (quad) =>
+        mesh.positions[quad[0]][1] +
+          mesh.positions[quad[1]][1] +
+          mesh.positions[quad[2]][1] +
+          mesh.positions[quad[3]][1] <
+        lowerThanY * 4
+    );
+
+  // Generate the top row of tentacles
+  const topLoopQuads = [
+    // Right eye's bottom ones.
+    45, 46, 50,
+    // The two quads in the middle.
+    25, 26,
+    // The left eye's bottom ones.
+    73, 77, 78,
+  ].map((quad) => mesh.quads[quad]);
+  const bothLoops = [...topLoopQuads, ...bottomLoopQuads];
 
   rotateQuadsX(mesh, bothLoops, Math.PI * 0.3);
   rotateQuadsX(mesh, bottomLoopQuads, Math.PI * -0.2);
   randomizeQuadRotation(mesh, bothLoops, 3.0, Math.PI * 0.15);
 
-  const INITIAL_ROTATE = -0.2;
-  const EXTRUDE_INSET = 0.25;
-  const EXTRUDE_LENGTH = 0.02;
-  const ROTATE_GROWTH = 0.1;
-  const SEGMENTS = 12;
+  const INITIAL_ROTATE = -0.4;
+  const EXTRUDE_INSET = 0.15;
+  const EXTRUDE_LENGTH = 0.012;
+  const ROTATE_GROWTH = 0.2;
+  const SEGMENTS = 10;
 
   function recursiveExtrude(
     quad: Quad,
@@ -290,7 +293,7 @@ function createMaskBody(): QuadMesh {
   });
   [0, 1, 2, 3].forEach((i) => {
     const position = mesh.positions[i];
-    position[0] *= 6.75;
+    position[0] *= 3.75;
     position[1] *= 1.5;
     position[2] *= 1.5;
     position[2] -= 0.5;

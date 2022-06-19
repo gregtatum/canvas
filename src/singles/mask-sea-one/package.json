@@ -3,8 +3,10 @@
   "date": "2021-09-15 00:00:00",
   "archive": "html",
   "template": "frame.template.html",
+  "prev": "https://gregtatum.com",
+  "next": "../mask-sea-youngling",
   "htmlFiles": [
     "style.css",
-    "matcap/foliage.png"
+    "matcap/mask-purple-mine.png"
   ]
 }
