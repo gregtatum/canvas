@@ -29,14 +29,18 @@ const reset = "\u001b[0m";
 (async () => {
   let maybePathToSession = findSessionFromCli();
   if (!maybePathToSession) {
-    const sessions = getAllSessions();
+    const sessions = [
+      ...getAllSessions("singles"),
+      ...getAllSessions("series").reverse(),
+    ];
 
     const answers = await inquirer.prompt([
       {
         type: "list",
         name: "fileName",
         message: "Which session do you want to run?",
-        choices: sessions.map((session) => session.fileName).reverse(),
+        choices: sessions.map((session) => session.fileName),
+        pageSize: 20,
       },
     ]);
 
@@ -54,6 +58,8 @@ const reset = "\u001b[0m";
 
   const sessionSlug = path.basename(pathToSession);
   const sessionDetails = getSessionDetails(sessionSlug);
+
+  console.log(cyan, `\n> npm start ${sessionSlug}`, reset);
 
   if (!sessionDetails.name) {
     throw new Error("Please add a name to the package.json for this piece.");
