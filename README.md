@@ -23,11 +23,11 @@ This project consists of individual sessions of 2d canvas programming, with the 
 
 ```
 # Build a single session.
-yarn build 001-tick-tock
+npm run build 001-tick-tock
 
 # Re-build all sessions.
-yarn build all
+npm run build all
 
 # Add an image
-yarn add-image 001-tick-tock /path/to/screenshot.png
+npm run add-image 001-tick-tock /path/to/screenshot.png
 ```

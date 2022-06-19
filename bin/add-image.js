@@ -6,7 +6,8 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 
 {
-  const usage = "Usage: yarn add-image 001-tick-tock /path/to/screenshot.png";
+  const usage =
+    "Usage: npm run add-image 001-tick-tock /path/to/screenshot.png";
   const sessionPath = findSessionFromCli();
   if (!sessionPath) {
     console.error("No session was specified");
@@ -34,7 +35,7 @@ const fs = require("fs");
     process.exit();
   }
 
-  addJpegImage(imagePath, sessionPath).catch(error => {
+  addJpegImage(imagePath, sessionPath).catch((error) => {
     throw error;
   });
 }
