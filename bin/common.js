@@ -131,22 +131,22 @@ const url = "https://gregtatum.com/category/interactive/";
 /**
  * @param {string} template
  * @param {Session[] | null} sessions
- * @param {string} sessionSlug
+ * @param {string} slug
  */
-function getTemplateParameters(template, sessions, sessionSlug) {
+function getTemplateParameters(template, sessions, slug) {
   let prevSession;
   let nextSession;
   if (sessions) {
     const projectIndex = sessions.findIndex(
-      (session) => session.fileName === sessionSlug
+      (session) => session.fileName === slug
     );
     prevSession = sessions[projectIndex - 1];
     nextSession = sessions[projectIndex + 1];
   }
-  const packageJson = getPackageJson(sessionSlug);
+  const packageJson = getPackageJson(slug);
 
   let sessionNumber = null;
-  const sessionNumberResult = sessionSlug.match(/\d\d\d/);
+  const sessionNumberResult = slug.match(/\d\d\d/);
   if (sessionNumberResult) {
     sessionNumber = sessionNumberResult[0];
   }
@@ -171,8 +171,9 @@ function getTemplateParameters(template, sessions, sessionSlug) {
     sessionNumber,
     previous,
     next,
+    slug,
     name: packageJson.name,
-    description: getSessionReadmeDescription(sessionSlug),
+    description: getSessionReadmeDescription(slug),
   };
 }
 
