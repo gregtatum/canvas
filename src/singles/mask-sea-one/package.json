@@ -5,6 +5,7 @@
   "template": "frame.template.html",
   "prev": "https://gregtatum.com",
   "next": "../mask-sea-youngling",
+  "skipDescription": true,
   "htmlFiles": [
     "style.css",
     "matcap/mask-purple-mine.png"

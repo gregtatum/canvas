@@ -5,6 +5,7 @@
   "template": "frame.template.html",
   "prev": "../mask-horn",
   "next": "https://gregtatum.com/",
+  "skipDescription": true,
   "htmlFiles": [
     "style.css",
     "matcap/Glass-Jade-Mine.png"

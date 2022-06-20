@@ -5,6 +5,7 @@
   "template": "frame.template.html",
   "prev": "../mask-sea-one",
   "next": "../mask-sea-elder",
+  "skipDescription": true,
   "htmlFiles": [
     "style.css",
     "matcap/purple-mat.png"

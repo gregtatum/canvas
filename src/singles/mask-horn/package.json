@@ -5,6 +5,7 @@
   "template": "frame.template.html",
   "prev": "../mask-sea-elder",
   "next": "../mask-jade-one",
+  "skipDescription": true,
   "htmlFiles": [
     "style.css",
     "matcap/orange.png"
