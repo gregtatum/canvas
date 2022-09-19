@@ -1559,15 +1559,14 @@ export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
 /**
  * Apply catmull clark subdivision to a quad mesh.
  */
-export function subdivide(mesh: QuadMesh, count: number): QuadMesh {
+export function subdivide(mesh: QuadMesh, count: number): QuadMeshNormals {
   let meshNew = mesh;
   for (let i = 0; i < count; i++) {
     meshNew = catmullClarkSubdivision(mesh);
     mesh.positions = meshNew.positions;
     mesh.quads = meshNew.quads;
   }
-  computeSmoothNormals(mesh);
-  return mesh;
+  return computeSmoothNormals(mesh);
 }
 
 function getQuad(
@@ -1822,4 +1821,32 @@ export function extrudeEdge(
     normals.push(vec3.clone(normal));
   }
   return [mesh.positions.length - 2, mesh.positions.length - 1];
+}
+
+export function toBufferGeometry(
+  mesh: QuadMeshNormals,
+  BufferGeometry: typeof import("three").BufferGeometry,
+  BufferAttribute: typeof import("three").BufferAttribute
+) {
+  const geometry = new BufferGeometry()
+  const positions = new Float32Array(mesh.positions.length * 3)
+  const normals = new Float32Array(mesh.normals.length * 3)
+  const indices = getElements(mesh)
+
+  for (let i = 0; i < mesh.positions.length; i++) {
+    const position = mesh.positions[i]
+    const normal = mesh.normals[i]
+    positions[i * 3] = position[0]
+    positions[i * 3 + 1] = position[1]
+    positions[i * 3 + 2] = position[2]
+    normals[i * 3] = normal[0]
+    normals[i * 3 + 1] = normal[1]
+    normals[i * 3 + 2] = normal[2]
+  }
+
+  geometry.setIndex(new BufferAttribute(indices, 1))
+  geometry.setAttribute('position', new BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new BufferAttribute(normals, 3))
+
+  return geometry
 }
