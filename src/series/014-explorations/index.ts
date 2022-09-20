@@ -32,7 +32,6 @@ import {
   addGeometryToTriangleMesh,
   getEmptyTriangleMesh,
 } from "lib/triangle-meshes";
-import { addCSS } from "lib/utils";
 
 const ORIGIN = vec3.create();
 
@@ -203,7 +202,10 @@ function setupBasicScene(root: HTMLDivElement) {
   camera.position.z = 1;
 
   const scene = new Scene();
-  const renderer = new WebGLRenderer({ antialias: true });
+  const renderer = new WebGLRenderer({
+    antialias: true,
+    preserveDrawingBuffer: true,
+  });
 
   // renderer.shadowMap.enabled = true;
   // renderer.shadowMap.type = THREE.PCFSoftShadowMap;

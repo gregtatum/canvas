@@ -107,7 +107,7 @@ function buildGregTatumDotCom(sessionSlug) {
     return Promise.resolve();
   }
   const cwd = path.join(__dirname, "../../greg");
-  const command = spawn("npm", ["run", "add-session-2d", sessionSlug], { cwd });
+  const command = spawn("npm", ["run", "add-canvas", sessionSlug], { cwd });
 
   command.stdout.on("data", function (data) {
     console.log(data.toString());
