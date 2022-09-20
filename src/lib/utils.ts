@@ -42,3 +42,9 @@ export function fill<T>(size: number, fn: (i: number) => T): Array<T> {
 export function rad(n: number) {
   return n * Math.PI;
 }
+
+export function addCSS(text: string): void {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = text;
+  document.head.appendChild(styleSheet);
+}

@@ -10,15 +10,29 @@ import {
   DirectionalLight,
   CanvasTexture,
 } from "three";
+import { simplex } from "lib/shaders";
 import * as THREE from "three";
 import lerp from "lerp";
 import * as quads from "lib/quads";
 import { vec3 } from "gl-matrix";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 
-import { generateSeed, setupCanvas } from "lib/draw";
+import { generateSeed } from "lib/draw";
 import setupRandom from "@tatumcreative/random";
 import initializeShortcuts from "lib/shortcuts";
 import Simplex from "simplex-noise";
+import geoArc from "geo-arc";
+import {
+  quadMeshToBufferGeometry,
+  triangleMeshToBufferGeometry,
+} from "lib/three";
+import {
+  addGeometryToTriangleMesh,
+  getEmptyTriangleMesh,
+} from "lib/triangle-meshes";
+import { addCSS } from "lib/utils";
 
 const ORIGIN = vec3.create();
 
@@ -36,9 +50,12 @@ type Current = ReturnType<typeof getCurrent>;
     current.dt = Math.min(now - current.time, 100);
     current.time = now;
 
+    current.copyShader.uniforms.time.value = now;
+
+    updateCamera(config, current);
     updateMeshes(config, current);
 
-    current.renderer.render(current.scene, current.camera);
+    current.composer.render();
   });
 }
 
@@ -92,6 +109,13 @@ function getConfig() {
       { scale: 0.05, twist: 1, noisePeriod: [3.0, 10.0, 3.0] },
       { scale: 0.2, twist: 1, noisePeriod: [3.0, 10.0, 3.0] },
     ],
+    arcs: [
+      { count: 3, sweep: 0.1, offset: 0, radius: [0.45, 0.005] },
+      { count: 2, sweep: 0.4, offset: 0.1, radius: [0.55, 0.05] },
+      { count: 11, sweep: 0.5, offset: 0.1, radius: [0.48, 0.005] },
+      { count: 4, sweep: 0.4, offset: 0.3, radius: [0.65, 0.05] },
+      { count: 15, sweep: 0.4, offset: 0.3, radius: [0.8, 0.1] },
+    ],
   };
 }
 
@@ -101,6 +125,14 @@ function getCurrent(config: Config) {
   document.body.appendChild(root);
 
   const { camera, scene, renderer } = setupBasicScene(root);
+  const composer = new EffectComposer(renderer);
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+  const copyShader = new ShaderPass(getCopyShader());
+  composer.addPass(copyShader);
+  composer.setPixelRatio(window.devicePixelRatio);
+  scene.background = new THREE.Color("#91b596");
+
   camera.rotation.x = 0.4;
 
   addLights(scene);
@@ -113,18 +145,31 @@ function getCurrent(config: Config) {
     camera,
     renderer,
     root,
+    composer,
+    copyShader,
     background: addBackground(config, scene),
     rockMeshes: addRock(config, scene),
     terrain: addTerrain(config, scene),
     sun: addSun(scene),
+    arc: addArc(config, scene),
   };
 
   return current;
 }
 
+function updateCamera(config: Config, current: Current): void {
+  const { camera } = current;
+  const cameraShakeIntensity = 0.03;
+  const cameraShakePeriod = 0.0001;
+  camera.position.x =
+    config.simplex2(Date.now() * cameraShakePeriod, 0) * cameraShakeIntensity;
+  camera.position.y =
+    config.simplex2(Date.now() * cameraShakePeriod, 100) * cameraShakeIntensity;
+}
+
 function updateMeshes(config: Config, current: Current): void {
   const { simplex2, rocks, sphereNoiseScale, sphereNoiseSpeed } = config;
-  const { time, rockMeshes, sun } = current;
+  const { time, rockMeshes, sun, arc } = current;
 
   for (let i = 0; i < rocks.length; i++) {
     const rock = rocks[i];
@@ -140,14 +185,18 @@ function updateMeshes(config: Config, current: Current): void {
     mesh.rotation.z += rock.rotation[2];
   }
 
+  arc.rotation.y += 0.001;
+
   const t = simplex2(time * 5, 0) * 0.5 + 1;
   (sun.material as THREE.Material).opacity = lerp(0.9, 1.0, t);
 }
 
 function setupBasicScene(root: HTMLDivElement) {
+  const fov = 70;
+  const { width, height } = root.getBoundingClientRect();
   const camera = new PerspectiveCamera(
-    70, // fov
-    window.innerWidth / window.innerHeight, // aspect
+    fov,
+    width / height, // aspect
     0.01, // near
     20 //
   );
@@ -156,12 +205,13 @@ function setupBasicScene(root: HTMLDivElement) {
   const scene = new Scene();
   const renderer = new WebGLRenderer({ antialias: true });
 
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // renderer.shadowMap.enabled = true;
+  // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   function resize(): void {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const { width, height } = root.getBoundingClientRect();
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
   }
 
@@ -379,13 +429,7 @@ function addRock(config: Config, scene: Scene): Mesh[] {
       quads.subdivide(mesh, 1);
     }
 
-    const geometry = quads.toBufferGeometry(
-      mesh as QuadMeshNormals,
-      THREE.BufferGeometry,
-      THREE.BufferAttribute
-    );
-
-    const rockMesh = new Mesh(geometry, material);
+    const rockMesh = new Mesh(quadMeshToBufferGeometry(mesh), material);
     rockMesh.position.x = position[0];
     rockMesh.position.y = groundPosition + rockSize + position[1];
     rockMesh.position.z = position[2];
@@ -546,4 +590,97 @@ function createCanvasTexture(
 
   callback(ctx);
   return texture;
+}
+
+function getCopyShader() {
+  return {
+    uniforms: {
+      tDiffuse: {
+        value: null,
+      },
+      time: {
+        value: 1,
+      },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      precision highp float;
+      uniform float time;
+      uniform sampler2D tDiffuse;
+      varying vec2 vUv;
+
+      ${simplex}
+
+      void main() {
+        vec2 uv = vUv;
+        vec3 color = texture2D( tDiffuse, uv ).rgb;
+        float d = distance(vec2(0.5, 0.5), uv) * 2.0;
+
+        float aberration = 0.0025 * (d);
+        color.r = texture2D(tDiffuse, uv + vec2(aberration, 0.0)).r;
+        color.b = texture2D(tDiffuse, uv - vec2(aberration, 0.0)).b;
+
+        float vignette = 1.0 - length(uv - vec2(0.5, 0.6));
+        vignette = min(1.0, vignette * 2.0);
+
+        float glow = max(0.0, 1.0 - length(uv * 2.0 - vec2(1.0, 2.0))) * ((1.0 + sin(time * 10.0)) + (1.0 + sin(time * 7.0))) * 0.02;
+
+        // Noise
+        color += simplex(vec3(uv * 1000.0, time)) * 0.05;
+
+        gl_FragColor = vec4(color * vignette + glow, 1.0);
+      }
+    `,
+  };
+}
+
+function addArc(config: Config, scene: Scene) {
+  const mesh = getEmptyTriangleMesh();
+  const { arcs } = config;
+
+  for (const { count, sweep, offset, radius } of arcs) {
+    for (let i = 0; i < count; i++) {
+      const ratio = i / count;
+      const tau = Math.PI * 2;
+      const startRadian = offset * tau + tau * ratio;
+      addGeometryToTriangleMesh(
+        mesh,
+        geoArc({
+          cellSize: 3,
+          startRadian: startRadian,
+          endRadian: startRadian + (tau / count) * sweep,
+          numSlices: 80,
+          numBands: 2,
+          innerRadius: radius[0],
+          outerRadius: radius[0] + radius[1],
+        })
+      );
+    }
+  }
+
+  const material = new MeshBasicMaterial({
+    color: "#e9ffef",
+    side: THREE.DoubleSide,
+  });
+
+  material.depthWrite = false;
+
+  const arcMesh = new Mesh(triangleMeshToBufferGeometry(mesh), material);
+  arcMesh.position.x = 0;
+  arcMesh.position.y = 2;
+  arcMesh.position.z = -7;
+  arcMesh.scale.multiplyScalar(15);
+  arcMesh.rotation.z = 0.25;
+
+  arcMesh.rotation.order = "ZYX";
+
+  scene.add(arcMesh);
+
+  return arcMesh;
 }

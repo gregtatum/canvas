@@ -51,6 +51,7 @@ interface QuadMeshNormals {
 interface TriangleMesh {
   positions: Tuple3[];
   cells: Tuple3<Index>[];
+  normals?: Tuple3[];
 }
 
 interface TriangleMeshNormals {

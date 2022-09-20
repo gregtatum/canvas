@@ -1,5 +1,11 @@
-import { CanvasTexture, MeshPhysicalMaterial } from "three";
+import {
+  CanvasTexture,
+  MeshPhysicalMaterial,
+  BufferGeometry,
+  BufferAttribute,
+} from "three";
 import { GUI } from "dat.gui";
+import * as quads from "lib/quads";
 
 export function createCanvasTexture(
   canvasWidth: number,
@@ -63,4 +69,72 @@ export function guiAddMesh(gui: GUI, mesh: THREE.Mesh, range = 10): void {
   gui.add(mesh.position, "x", -range, range);
   gui.add(mesh.position, "y", -range, range);
   gui.add(mesh.position, "z", -range, range);
+}
+
+export function quadMeshToBufferGeometry(mesh: QuadMesh | QuadMeshNormals) {
+  const geometry = new BufferGeometry();
+  const positions = new Float32Array(mesh.positions.length * 3);
+  const indices = quads.getElements(mesh);
+
+  for (let i = 0; i < mesh.positions.length; i++) {
+    const position = mesh.positions[i];
+    positions[i * 3] = position[0];
+    positions[i * 3 + 1] = position[1];
+    positions[i * 3 + 2] = position[2];
+  }
+
+  geometry.setIndex(new BufferAttribute(indices, 1));
+  geometry.setAttribute("position", new BufferAttribute(positions, 3));
+
+  let normals;
+  if (mesh.normals) {
+    normals = new Float32Array(mesh.normals.length * 3);
+    for (let i = 0; i < mesh.normals.length; i++) {
+      const normal = mesh.normals[i];
+      normals[i * 3] = normal[0];
+      normals[i * 3 + 1] = normal[1];
+      normals[i * 3 + 2] = normal[2];
+    }
+    geometry.setAttribute("normal", new BufferAttribute(normals, 3));
+  }
+
+  return geometry;
+}
+
+export function triangleMeshToBufferGeometry(
+  mesh: TriangleMesh | TriangleMeshNormals
+) {
+  const geometry = new BufferGeometry();
+
+  const elements = new Uint16Array(mesh.cells.length * 3);
+  for (let i = 0; i < mesh.cells.length; i++) {
+    const offset = i * 3;
+    const [a, b, c] = mesh.cells[i];
+    elements[offset + 0] = a;
+    elements[offset + 1] = b;
+    elements[offset + 2] = c;
+  }
+  geometry.setIndex(new BufferAttribute(elements, 1));
+
+  const positions = new Float32Array(mesh.positions.length * 3);
+  for (let i = 0; i < mesh.positions.length; i++) {
+    const position = mesh.positions[i];
+    positions[i * 3] = position[0];
+    positions[i * 3 + 1] = position[1];
+    positions[i * 3 + 2] = position[2];
+  }
+  geometry.setAttribute("position", new BufferAttribute(positions, 3));
+
+  if ("normals" in mesh && mesh.normals) {
+    const normals = new Float32Array(mesh.normals.length * 3);
+    for (let i = 0; i < mesh.normals.length; i++) {
+      const normal = mesh.normals[i];
+      normals[i * 3] = normal[0];
+      normals[i * 3 + 1] = normal[1];
+      normals[i * 3 + 2] = normal[2];
+    }
+    geometry.setAttribute("normal", new BufferAttribute(normals, 3));
+  }
+
+  return geometry;
 }

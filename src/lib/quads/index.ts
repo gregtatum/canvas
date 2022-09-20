@@ -1822,31 +1822,3 @@ export function extrudeEdge(
   }
   return [mesh.positions.length - 2, mesh.positions.length - 1];
 }
-
-export function toBufferGeometry(
-  mesh: QuadMeshNormals,
-  BufferGeometry: typeof import("three").BufferGeometry,
-  BufferAttribute: typeof import("three").BufferAttribute
-) {
-  const geometry = new BufferGeometry()
-  const positions = new Float32Array(mesh.positions.length * 3)
-  const normals = new Float32Array(mesh.normals.length * 3)
-  const indices = getElements(mesh)
-
-  for (let i = 0; i < mesh.positions.length; i++) {
-    const position = mesh.positions[i]
-    const normal = mesh.normals[i]
-    positions[i * 3] = position[0]
-    positions[i * 3 + 1] = position[1]
-    positions[i * 3 + 2] = position[2]
-    normals[i * 3] = normal[0]
-    normals[i * 3 + 1] = normal[1]
-    normals[i * 3 + 2] = normal[2]
-  }
-
-  geometry.setIndex(new BufferAttribute(indices, 1))
-  geometry.setAttribute('position', new BufferAttribute(positions, 3))
-  geometry.setAttribute('normal', new BufferAttribute(normals, 3))
-
-  return geometry
-}
