@@ -1,4 +1,7 @@
-import { toBeDeepCloseTo, toMatchCloseTo } from "jest-matcher-deep-close-to";
+// TypeScript was complaining about these types, so use CommonJS loading to skip them.
+const { toBeDeepCloseTo, toMatchCloseTo } = (require as any)(
+  "jest-matcher-deep-close-to"
+);
 expect.extend({ toBeDeepCloseTo, toMatchCloseTo });
 
 import * as Physics from "..";
@@ -94,12 +97,12 @@ describe("intersect", () => {
       return { draw };
     }
 
-    it("does not intersect", function() {
+    it("does not intersect", function () {
       const box = new Physics.Box({ x: -3, y: 0 }, 3, 4);
       const sphere = new Physics.Sphere({ x: 2, y: 0 }, 2);
       const { draw } = setup(box, sphere);
       expect(draw()).toMatchInlineSnapshot(`
-        Array [
+        [
           "                              ",
           "                              ",
           "                              ",
@@ -115,12 +118,12 @@ describe("intersect", () => {
       expect(Physics.intersect.box.sphere(box, sphere)).toEqual(false);
     });
 
-    it("intersects when the sphere is over the box", function() {
+    it("intersects when the sphere is over the box", function () {
       const box = new Physics.Box({ x: -3, y: 0 }, 3, 4);
       const sphere = new Physics.Sphere({ x: 0, y: 0 }, 2);
       const { draw } = setup(box, sphere);
       expect(draw()).toMatchInlineSnapshot(`
-        Array [
+        [
           "                              ",
           "                              ",
           "                              ",
@@ -136,12 +139,12 @@ describe("intersect", () => {
       expect(Physics.intersect.box.sphere(box, sphere)).toEqual(true);
     });
 
-    it("does not intersect even when the bounding boxes do", function() {
+    it("does not intersect even when the bounding boxes do", function () {
       const box = new Physics.Box({ x: -3, y: -2 }, 3, 4);
       const sphere = new Physics.Sphere({ x: 0, y: 2 }, 2);
       const { draw } = setup(box, sphere);
       expect(draw()).toMatchInlineSnapshot(`
-        Array [
+        [
           "                              ",
           "    X  X  X                   ",
           "    X  X  X                   ",
@@ -204,11 +207,11 @@ describe("intersect", () => {
 });
 
 describe("intersectRaySphere", () => {
-  it("draws a sphere", function() {
+  it("draws a sphere", function () {
     const stage = new Stage(10);
     stage.drawSphere("S", new Physics.Sphere({ x: 0, y: 0 }, 4));
     expect(stage.output()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                              ",
         "                S             ",
         "          S  S  S  S  S       ",
@@ -223,7 +226,7 @@ describe("intersectRaySphere", () => {
     `);
   });
 
-  xit("intersects coming from the bottom right", function() {
+  xit("intersects coming from the bottom right", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -258,7 +261,7 @@ describe("intersectRaySphere", () => {
     `);
   });
 
-  it("intersects coming from the bottom right, but shifted left a bit", function() {
+  it("intersects coming from the bottom right, but shifted left a bit", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -276,7 +279,7 @@ describe("intersectRaySphere", () => {
     stage.drawPoint("0", new Physics.Point(intersection));
 
     expect(stage.output()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -293,7 +296,7 @@ describe("intersectRaySphere", () => {
     `);
   });
 
-  it("intersects coming from the bottom right, but shifted right a bit", function() {
+  it("intersects coming from the bottom right, but shifted right a bit", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -311,7 +314,7 @@ describe("intersectRaySphere", () => {
     stage.drawPoint("0", new Physics.Point(intersection));
 
     expect(stage.output()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -328,7 +331,7 @@ describe("intersectRaySphere", () => {
     `);
   });
 
-  it("errors when the ray misses the sphere", function() {
+  it("errors when the ray misses the sphere", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -340,7 +343,7 @@ describe("intersectRaySphere", () => {
     stage.drawPoint("↑", point);
 
     expect(stage.output()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -418,7 +421,7 @@ class Stage {
 
   // Output so that it's nice for a test assertion.
   output(): string[] {
-    return this.data.map(row => row.join(""));
+    return this.data.map((row) => row.join(""));
   }
 
   clear(): void {
@@ -430,8 +433,8 @@ class Stage {
   }
 }
 
-describe("collisions between point and sphere", function() {
-  it("intersects coming from the bottom right", function() {
+describe("collisions between point and sphere", function () {
+  it("intersects coming from the bottom right", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -452,7 +455,7 @@ describe("collisions between point and sphere", function() {
     world.addToAllGroup(sphere);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -471,7 +474,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -490,7 +493,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -509,7 +512,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -528,7 +531,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -545,7 +548,7 @@ describe("collisions between point and sphere", function() {
     `);
   });
 
-  xit("intersects coming from the bottom right at more of an angle", function() {
+  xit("intersects coming from the bottom right at more of an angle", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 5, y: 5 });
     const sphere = new Physics.Sphere({ x: 0, y: -3 }, 4);
@@ -639,7 +642,7 @@ describe("collisions between point and sphere", function() {
     `);
   });
 
-  xit("handles points that are inside of spheres on their way in", function() {
+  xit("handles points that are inside of spheres on their way in", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 1, y: 1 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -715,7 +718,7 @@ describe("collisions between point and sphere", function() {
     `);
   });
 
-  it("handles points that are inside of spheres on their way out", function() {
+  it("handles points that are inside of spheres on their way out", function () {
     const stage = new Stage(12);
     const point = new Physics.Point({ x: 2, y: 2 });
     const sphere = new Physics.Sphere({ x: 0, y: 0 }, 4);
@@ -736,7 +739,7 @@ describe("collisions between point and sphere", function() {
     world.addToAllGroup(sphere);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -755,7 +758,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",
@@ -774,7 +777,7 @@ describe("collisions between point and sphere", function() {
     world.integrate(1);
 
     expect(draw()).toMatchInlineSnapshot(`
-      Array [
+      [
         "                                    ",
         "                                    ",
         "                   .                ",

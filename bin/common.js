@@ -113,8 +113,8 @@ function getWebpackConfig({
     output: {
       path: outputPath,
       publicPath: outputPublicPath,
-      filename: "[hash].bundle.js",
-      chunkFilename: "[id].[hash].bundle.js",
+      filename: "[contenthash].bundle.js",
+      chunkFilename: "[id].[contenthash].bundle.js",
     },
     mode: isDevelopment ? "development" : "production",
   };

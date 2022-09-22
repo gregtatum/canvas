@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 import startRegl, {
   DrawCommand,
   InitializationOptions,
@@ -51,7 +52,7 @@ export function initRegl(
  * A utility to apply the TypeScript types to the regl command in a minimalist way.
  */
 export function drawCommand<
-  Props,
+  Props extends {},
   Context extends DefaultContext = DefaultContext
 >(
   regl: Regl,
@@ -61,7 +62,7 @@ export function drawCommand<
 }
 
 export function accessors<
-  Props = {},
+  Props extends {} = {},
   Context extends DefaultContext = DefaultContext
 >() {
   function getProp<K extends keyof Props>(
@@ -101,7 +102,7 @@ export function accessors<
  */
 export function composeDrawCommands<
   Context extends DefaultContext = DefaultContext,
-  Props = {}
+  Props extends {} = {}
 >(
   drawA: DrawCommand<Context, Props>,
   drawB: DrawCommand<Context, Props>

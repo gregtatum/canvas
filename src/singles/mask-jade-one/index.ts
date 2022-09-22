@@ -32,8 +32,8 @@ const drawLabelQuads = createDrawLabelQuads(regl, mask);
 const clear = { depth: 1.0, color: [0, 0, 0, 1] as Tuple4 };
 const bodyProps: MaskBodyProps = { color: [0, 1, 0] };
 const backgroundProps = {
-  bottomColor: [0.35, 0.85, 0.8],
-  topColor: [0.35, 0.85, 0.8],
+  bottomColor: [0.35, 0.85, 0.8] as Tuple3,
+  topColor: [0.35, 0.85, 0.8] as Tuple3,
 };
 
 resl({
@@ -41,6 +41,7 @@ resl({
     matcapTexture: {
       type: "image",
       // Ensure the art archiver can find the assets by defining them in the package.json.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       src: "html/" + require("./package.json").htmlFiles[1],
       parser: (data) =>
         regl.texture({

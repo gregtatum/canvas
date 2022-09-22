@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-const inquirer = require("inquirer");
+let loadInquirer = import("inquirer");
 const {
   findSessionFromCli,
   getAllSessions,
@@ -27,6 +27,7 @@ const reset = "\u001b[0m";
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
 (async () => {
+  const inquirer = (await loadInquirer).default;
   let maybePathToSession = findSessionFromCli();
   if (!maybePathToSession) {
     const sessions = [
@@ -94,11 +95,14 @@ const reset = "\u001b[0m";
   // TODO - Type this:
   /** @type {any} */
   const serverConfig = {
-    disableHostCheck: true,
-    contentBase: config.output.path,
-    publicPath: config.output.publicPath,
+    allowedHosts: "all",
+    static: [
+      {
+        directory: config.output.path,
+        publicPath: config.output.publicPath,
+      }
+    ],
     hot: process.env.NODE_ENV === "development" ? true : false,
-    stats: { colors: true },
   };
 
   const port = 9966;
@@ -106,7 +110,7 @@ const reset = "\u001b[0m";
   /** @type {any} */
   const configuredWebpack = webpack(config);
 
-  new WebpackDevServer(configuredWebpack, serverConfig).listen(
+  new WebpackDevServer(serverConfig, configuredWebpack).listen(
     port,
     "0.0.0.0",
     (err) => {
