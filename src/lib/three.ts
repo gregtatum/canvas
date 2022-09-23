@@ -85,9 +85,9 @@ export function guiAddMesh(gui: GUI, mesh: THREE.Mesh, range = 10): void {
   const folder = gui.addFolder(name);
   const position = folder.addFolder("position");
   position.open();
-  position.add(mesh.position, "x", -range, range).step(0.1);
-  position.add(mesh.position, "y", -range, range).step(0.1);
-  position.add(mesh.position, "z", -range, range).step(0.1);
+  position.add(mesh.position, "x", -range, range).step(0.01);
+  position.add(mesh.position, "y", -range, range).step(0.01);
+  position.add(mesh.position, "z", -range, range).step(0.01);
 
   const rotation = folder.addFolder("rotation");
   rotation.open();
@@ -113,7 +113,7 @@ export function guiAddMesh(gui: GUI, mesh: THREE.Mesh, range = 10): void {
 let lightCount = 1;
 export function guiAddLight(
   gui: GUI,
-  light: THREE.DirectionalLight,
+  light: THREE.DirectionalLight | THREE.PointLight,
   range = 10
 ): void {
   let name = light.name;
@@ -124,7 +124,11 @@ export function guiAddLight(
   folder.add(light.position, "x", -range, range).step(0.1);
   folder.add(light.position, "y", -range, range).step(0.1);
   folder.add(light.position, "z", -range, range).step(0.1);
-  folder.add(light, "intensity", 0, 1);
+  folder.add(light, "intensity", 0, 2);
+
+  if (light.type === "PointLight") {
+    folder.add(light, "distance", 0, 20).step(0.01);
+  }
   const proxyData = {
     color: "#" + light.color.getHexString(),
   };
@@ -228,19 +232,25 @@ function insertTextAfter(
 
 interface ShaderInjectionPoints {
   uniforms: Record<string, any>;
-  gl_FragColor: string;
-  // The normal in object space, in the vertex shader.
-  objectNormal: string;
-  // A vec3 which represents the point. It will be transformed, but this is a hook
-  // to be able to modify it first.
-  transformed: string;
-  vertHeader: string;
-  fragHeader: string;
+  vert: Partial<{
+    header: string;
+    // The normal in object space, in the vertex shader.
+    objectNormal: string;
+    // A vec3 which represents the point. It will be transformed, but this is a hook
+    // to be able to modify it first.
+    transformed: string;
+  }>;
+  frag: Partial<{
+    header: string;
+    gl_FragColor: string;
+  }>;
 }
 
 export class ShaderInjector {
   config: any = null;
   current: any = null;
+
+  static generation = 1;
 
   update(config: any, current: any) {
     this.config = config;
@@ -272,47 +282,47 @@ export class ShaderInjector {
         }
       }
 
-      if (injections.gl_FragColor) {
+      if (injections.frag?.gl_FragColor) {
         shader.fragmentShader = insertTextAfter(
           shader.fragmentShader,
           "\n\tgl_FragColor = ",
-          injections.gl_FragColor,
+          injections.frag.gl_FragColor,
           "fragment shader"
         );
       }
 
-      if (injections.transformed) {
+      if (injections.vert?.transformed) {
         shader.vertexShader = insertTextAfter(
           shader.vertexShader,
           "\n\t#include <begin_vertex>",
-          injections.transformed,
+          injections.vert.transformed,
           "vertex shader"
         );
       }
 
-      if (injections.vertHeader) {
+      if (injections.vert?.header) {
         shader.vertexShader = insertTextAfter(
           shader.vertexShader,
           "\n#include <common>",
-          injections.vertHeader,
+          injections.vert.header,
           "vertex shader"
         );
       }
 
-      if (injections.fragHeader) {
+      if (injections.frag?.header) {
         shader.fragmentShader = insertTextAfter(
           shader.fragmentShader,
           "\n#include <common>",
-          injections.fragHeader,
+          injections.frag.header,
           "vertex shader"
         );
       }
 
-      if (injections.objectNormal) {
+      if (injections.vert?.objectNormal) {
         shader.vertexShader = insertTextAfter(
           shader.vertexShader,
           "\n\t#include <morphnormal_vertex>",
-          injections.objectNormal,
+          injections.vert.objectNormal,
           "objectNormal in the vertex shader"
         );
       }
@@ -332,11 +342,9 @@ export class ShaderInjector {
       }
     };
 
+    const generation = ShaderInjector.generation++;
     material.customProgramCacheKey = () => {
-      if (shader) {
-        return shader.vertexShader + shader.fragmentShader;
-      }
-      return "invalid cache";
+      return "Custom Shader " + generation;
     };
   }
 }

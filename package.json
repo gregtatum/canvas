@@ -37,6 +37,7 @@
     "eases": "^1.0.8",
     "formdata-node": "^5.0.0",
     "formidable": "^1.2.2",
+    "geo-piecering": "^1.0.2",
     "lerp": "^1.0.3",
     "rtree": "^1.4.2",
     "simplex-noise": "^2.2.0",

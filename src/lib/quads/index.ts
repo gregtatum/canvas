@@ -181,7 +181,7 @@ export function splitHorizontalDisjoint(
  */
 export const inset = (() => {
   const center: Tuple3 = [0, 0, 0];
-  return function(mesh: QuadMesh, targetQuad: Quad | QuadIndex, t = 0) {
+  return function (mesh: QuadMesh, targetQuad: Quad | QuadIndex, t = 0) {
     targetQuad = getQuad(mesh, targetQuad);
     const { positions, quads, normals } = mesh;
     const [a, b, c, d] = targetQuad;
@@ -234,8 +234,13 @@ export const extrude = (() => {
   const toTranslate: number[] = [];
   const translation: Tuple3 = [0, 0, 0];
   const targetQuadNormal: Tuple3 = [0, 0, 0];
-  return function(mesh: QuadMesh, targetQuad: Quad | QuadIndex, insetT = 0, extrude = 0) {
-    targetQuad = getQuad(mesh, targetQuad)
+  return function (
+    mesh: QuadMesh,
+    targetQuad: Quad | QuadIndex,
+    insetT = 0,
+    extrude = 0
+  ) {
+    targetQuad = getQuad(mesh, targetQuad);
     const { positions, normals } = mesh;
     const ring = inset(mesh, targetQuad, insetT);
     const [qL, qT, qR, qB] = ring;
@@ -379,7 +384,7 @@ export var averageNormalForPosition = (() => {
  */
 export const insetDisjoint = (() => {
   const center = [0, 0, 0] as Tuple3;
-  return function(mesh: QuadMesh, targetQuad: Quad, t = 0) {
+  return function (mesh: QuadMesh, targetQuad: Quad, t = 0) {
     const { positions, quads, normals } = mesh;
     const [a, b, c, d] = targetQuad;
     const positionA = positions[a];
@@ -492,7 +497,7 @@ export const insetDisjoint = (() => {
 export const extrudeDisjoint = (() => {
   const toTranslate: Index[] = [];
   const translation: Tuple3 = [0, 0, 0];
-  return function(mesh: QuadMesh, targetQuad: Quad, insetT = 0, extrude = 0) {
+  return function (mesh: QuadMesh, targetQuad: Quad, insetT = 0, extrude = 0) {
     const { positions, normals } = mesh;
     const ring = insetDisjoint(mesh, targetQuad, insetT);
     const [qL, qT, qR, qB] = ring;
@@ -537,7 +542,11 @@ export const extrudeDisjoint = (() => {
 /**
  * Computes the center of a quad.
  */
-export function getCenter(mesh: QuadMesh, quad: Quad | QuadIndex, target: Tuple3 = [0, 0, 0]): Tuple3 {
+export function getCenter(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  target: Tuple3 = [0, 0, 0]
+): Tuple3 {
   quad = getQuad(mesh, quad);
   const a = mesh.positions[quad[0]];
   const b = mesh.positions[quad[1]];
@@ -584,7 +593,7 @@ export function cloneQuads(mesh: QuadMesh, quads: Quad[]): void {
       positions[positionIndex] = positionIndex;
     }
   }
-  const indices = positions.filter(i => i !== undefined);
+  const indices = positions.filter((i) => i !== undefined);
 
   // Clone the quads.
   const quadIndexOffset = mesh.positions.length;
@@ -593,7 +602,7 @@ export function cloneQuads(mesh: QuadMesh, quads: Quad[]): void {
     const quad = quads[i];
     mesh.quads.push(
       quad.map(
-        quadIndex => indices.indexOf(quadIndex) + quadIndexOffset
+        (quadIndex) => indices.indexOf(quadIndex) + quadIndexOffset
       ) as Tuple4
     );
   }
@@ -654,15 +663,15 @@ export var getQuadNormal = (() => {
  * Update a quad's normal in the mesh.
  */
 function updateQuadNormal(mesh: QuadMesh, quad: Quad): void {
-  const {normals} = mesh;
+  const { normals } = mesh;
   if (normals) {
     const [a, b, c, d] = quad;
-    const normal: Tuple3 = normals[a] || [0, 0, 0]
+    const normal: Tuple3 = normals[a] || [0, 0, 0];
     getQuadNormal(mesh, quad, normal);
     normals[a] = normal;
-    normals[b] = vec3.copy(normals[b] || [0, 0, 0], normal)
-    normals[c] = vec3.copy(normals[c] || [0, 0, 0], normal)
-    normals[d] = vec3.copy(normals[d] || [0, 0, 0], normal)
+    normals[b] = vec3.copy(normals[b] || [0, 0, 0], normal);
+    normals[c] = vec3.copy(normals[c] || [0, 0, 0], normal);
+    normals[d] = vec3.copy(normals[d] || [0, 0, 0], normal);
   }
 }
 
@@ -957,7 +966,11 @@ export function computeSmoothNormals(mesh: QuadMesh): QuadMeshNormals {
  * *--------*--------*--------*--------*--------*--------*--------*
  * ```
  */
-export function splitLoopHorizontal(mesh: QuadMesh, quad: Quad | QuadIndex, t = 0.5): void {
+export function splitLoopHorizontal(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  t = 0.5
+): void {
   splitLoop(mesh, quad, t, true);
 }
 
@@ -978,7 +991,11 @@ export function splitLoopHorizontal(mesh: QuadMesh, quad: Quad | QuadIndex, t = 
  * *---------*
  * ```
  */
-export function splitLoopVertical(mesh: QuadMesh, quad: Quad | QuadIndex, t = 0.5): void {
+export function splitLoopVertical(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  t = 0.5
+): void {
   splitLoop(mesh, quad, t);
 }
 
@@ -1213,7 +1230,7 @@ export function getQuadFromEdge(
   // A quad that will not be matched against.
   ignoreQuad?: Quad
 ): Quad | void {
-  return mesh.quads.find(quad => {
+  return mesh.quads.find((quad) => {
     if (quad === ignoreQuad) {
       return false;
     }
@@ -1258,7 +1275,7 @@ export function getNewGeometry<K extends keyof QuadMesh>(
  * Computes all of the centers of all the quads.
  */
 export function computeCenterPositions(mesh: QuadMesh): Tuple3[] {
-  return mesh.quads.map(quad => computeQuadCenter(mesh, quad));
+  return mesh.quads.map((quad) => computeQuadCenter(mesh, quad));
 }
 
 /**
@@ -1299,7 +1316,11 @@ export function computeQuadCenter(
  * *----------------*
  * ```
  */
-export function insetLoopVertical(mesh: QuadMesh, quad: Quad | QuadIndex, t = 0.5): void {
+export function insetLoopVertical(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  t = 0.5
+): void {
   insetLoop(mesh, quad, t, false);
 }
 
@@ -1317,7 +1338,11 @@ export function insetLoopVertical(mesh: QuadMesh, quad: Quad | QuadIndex, t = 0.
  * *----*----*----*----*----*----*----*----*----*
  * ```
  */
-export function insetLoopHorizontal(mesh: QuadMesh, quad: Quad | QuadIndex, t = 0.5): void {
+export function insetLoopHorizontal(
+  mesh: QuadMesh,
+  quad: Quad | QuadIndex,
+  t = 0.5
+): void {
   insetLoop(mesh, quad, t, true);
 }
 
@@ -1399,7 +1424,7 @@ function getLoop<K extends "positions" | "normals" | "quads">(
       positionIndexALB,
       positionIndexARB
     ),
-    ...quad.map(i => mesh2[type][i]),
+    ...quad.map((i) => mesh2[type][i]),
     ..._getLoopOneDirection(
       mesh2,
       quad,
@@ -1528,8 +1553,8 @@ export function mirror(mesh: QuadMesh, quads: Quad[], axis: "x" | "y" | "z") {
   }
 
   const { positions, normals } = mesh;
-  quads.forEach(quad => {
-    const mirrorQuad = quad.map(positionIndex => {
+  quads.forEach((quad) => {
+    const mirrorQuad = quad.map((positionIndex) => {
       let mirrorIndex = mirrorMap[positionIndex];
       if (mirrorIndex === undefined) {
         mirrorIndex = positions.length;
@@ -1569,10 +1594,7 @@ export function subdivide(mesh: QuadMesh, count: number): QuadMeshNormals {
   return computeSmoothNormals(mesh);
 }
 
-function getQuad(
-  mesh: QuadMesh,
-  quad: Quad | QuadIndex,
-): Quad {
+function getQuad(mesh: QuadMesh, quad: Quad | QuadIndex): Quad {
   if (typeof quad === "number") {
     const quadIndex = quad;
     quad = mesh.quads[quadIndex];
@@ -1615,30 +1637,35 @@ export function getPositionsSet(
       positions.add(p);
     }
   }
-  return positions
+  return positions;
 }
 
-export function tunnel(mesh: QuadMesh, quadA: Quad, quadB: Quad, t: number): Quad[] {
+export function tunnel(
+  mesh: QuadMesh,
+  quadA: Quad,
+  quadB: Quad,
+  t: number
+): Quad[] {
   const { positions, quads, normals } = mesh;
-  let l = mesh.positions.length;
+  const l = mesh.positions.length;
   inset(mesh, quadA, t);
   inset(mesh, quadB, t);
   if (mesh.positions.length - l !== 8) {
-    throw new Error("Expected 8 new points made by the inset operation.")
+    throw new Error("Expected 8 new points made by the inset operation.");
   }
   const positionIndexesA = [l + 0, l + 1, l + 2, l + 3];
   const positionIndexesB = [l + 4, l + 5, l + 6, l + 7];
-  const neighbors = positionIndexesA.map(positionIndexA => {
+  const neighbors = positionIndexesA.map((positionIndexA) => {
     let closest = null;
     let closestDistSq = 0;
     const positionA = mesh.positions[positionIndexA];
     for (let i = 0; i < 4; i++) {
       const positionIndexB = positionIndexesB[i];
       const positionB = mesh.positions[positionIndexB];
-      const distSq = vec3.sqrDist(positionA, positionB)
+      const distSq = vec3.sqrDist(positionA, positionB);
       if (closest === null || distSq < closestDistSq) {
         closest = positionIndexB;
-        closestDistSq = distSq
+        closestDistSq = distSq;
       }
     }
     return closest as number;
@@ -1646,18 +1673,13 @@ export function tunnel(mesh: QuadMesh, quadA: Quad, quadB: Quad, t: number): Qua
   const quadC: Quad = [0, 0, 0, 0];
   const quadD: Quad = [0, 0, 0, 0];
   mesh.quads.push(quadC, quadD);
-  const newQuads: Quad[] = [
-    quadA,
-    quadB,
-    quadC,
-    quadD,
-  ]
+  const newQuads: Quad[] = [quadA, quadB, quadC, quadD];
   for (let i = 0; i < 4; i++) {
-    const quad = newQuads[i]
-    quad[0] = positionIndexesA[i]
-    quad[1] = positionIndexesA[(i+1) % 4]
-    quad[2] = neighbors[(i+1) % 4]
-    quad[3] = neighbors[i]
+    const quad = newQuads[i];
+    quad[0] = positionIndexesA[i];
+    quad[1] = positionIndexesA[(i + 1) % 4];
+    quad[2] = neighbors[(i + 1) % 4];
+    quad[3] = neighbors[i];
     if (normals) {
       updateQuadNormal(mesh, quad);
     }
@@ -1668,14 +1690,17 @@ export function tunnel(mesh: QuadMesh, quadA: Quad, quadB: Quad, t: number): Qua
 /**
  * Computes the center of some geometry.
  */
-export function getPositionsCenter(positions: Array<Tuple3> | Set<Tuple3>, target: Tuple3 = [0,0,0]) {
-  target[0] = 0
-  target[1] = 0
-  target[2] = 0
+export function getPositionsCenter(
+  positions: Array<Tuple3> | Set<Tuple3>,
+  target: Tuple3 = [0, 0, 0]
+) {
+  target[0] = 0;
+  target[1] = 0;
+  target[2] = 0;
   for (const [x, y, z] of positions) {
-    target[0] += x
-    target[1] += y
-    target[2] += z
+    target[0] += x;
+    target[1] += y;
+    target[2] += z;
   }
   const len = Array.isArray(positions) ? positions.length : positions.size;
   target[0] /= len;
@@ -1685,27 +1710,27 @@ export function getPositionsCenter(positions: Array<Tuple3> | Set<Tuple3>, targe
   return target;
 }
 
-const _center: Tuple3 = [0, 0, 0]
+const _center: Tuple3 = [0, 0, 0];
 export function centeredPositionsTransform(
   positions: Array<Tuple3> | Set<Tuple3>,
-  fn: (position:Tuple3) => void
+  fn: (position: Tuple3) => void
 ): void {
   const [x, y, z] = getPositionsCenter(positions, _center);
   for (const p of positions) {
-    p[0] -= x
-    p[1] -= y
-    p[2] -= z
-    fn(p)
-    p[0] += x
-    p[1] += y
-    p[2] += z
+    p[0] -= x;
+    p[1] -= y;
+    p[2] -= z;
+    fn(p);
+    p[0] += x;
+    p[1] += y;
+    p[2] += z;
   }
 }
 
 export function centeredTransform(
   mesh: QuadMesh,
   quads: Array<QuadIndex | Quad> | Set<QuadIndex | Quad>,
-  fn: (position:Tuple3) => void
+  fn: (position: Tuple3) => void
 ): void {
   const positions = new Set<Tuple3>();
   for (const quad of quads) {
@@ -1732,7 +1757,6 @@ export function extrudeEdge(
   extrudeT: UnitInterval,
   insetT: UnitInterval = 1
 ): Edge {
-
   // Given edge: [a, b]
   //
   // <------> distance: t * dist(b, a)
@@ -1746,7 +1770,7 @@ export function extrudeEdge(
   let edgeCIndexIntoQuad;
   let edgeDIndexIntoQuad;
   if (edgeAIndexIntoQuad === -1 || edgeBIndexIntoQuad === -1) {
-    throw new Error("The edge was not part of the quad.")
+    throw new Error("The edge was not part of the quad.");
   }
   if ((edgeAIndexIntoQuad + 1) % 4 === edgeBIndexIntoQuad) {
     edgeCIndexIntoQuad = (edgeAIndexIntoQuad + 2) % 4;
@@ -1755,7 +1779,9 @@ export function extrudeEdge(
     edgeCIndexIntoQuad = (edgeBIndexIntoQuad + 2) % 4;
     edgeDIndexIntoQuad = (edgeBIndexIntoQuad + 3) % 4;
   } else {
-    throw new Error("Attempting to extruding an edge that is not a valid edge in the quad.");
+    throw new Error(
+      "Attempting to extruding an edge that is not a valid edge in the quad."
+    );
   }
   const aPositionIndex = quad[edgeAIndexIntoQuad];
   const bPositionIndex = quad[edgeBIndexIntoQuad];
@@ -1774,9 +1800,12 @@ export function extrudeEdge(
   {
     const normal = _extrudeEdgeVec1;
     // Create a normal by averaging the diff of the two points.
-    normal[0] = ((aPosition[0] - dPosition[0]) + (bPosition[0] - cPosition[0])) / 2;
-    normal[1] = ((aPosition[1] - dPosition[1]) + (bPosition[1] - cPosition[1])) / 2;
-    normal[2] = ((aPosition[2] - dPosition[2]) + (bPosition[2] - cPosition[2])) / 2;
+    normal[0] =
+      (aPosition[0] - dPosition[0] + (bPosition[0] - cPosition[0])) / 2;
+    normal[1] =
+      (aPosition[1] - dPosition[1] + (bPosition[1] - cPosition[1])) / 2;
+    normal[2] =
+      (aPosition[2] - dPosition[2] + (bPosition[2] - cPosition[2])) / 2;
     vec3.normalize(normal, normal);
     const extrudeDist = vec3.scale(normal, normal, extrudeT * abDist);
     vec3.add(a2, a2, extrudeDist);
@@ -1811,12 +1840,15 @@ export function extrudeEdge(
   positions.push(a2);
   positions.push(b2);
   const newQuad: Tuple4 = [
-    a2PositionIndex, b2PositionIndex, bPositionIndex, aPositionIndex
-  ]
-  quads.push(newQuad)
+    a2PositionIndex,
+    b2PositionIndex,
+    bPositionIndex,
+    aPositionIndex,
+  ];
+  quads.push(newQuad);
 
   if (normals) {
-    const normal = getQuadNormal(mesh, newQuad)
+    const normal = getQuadNormal(mesh, newQuad);
     normals.push(normal);
     normals.push(vec3.clone(normal));
   }
