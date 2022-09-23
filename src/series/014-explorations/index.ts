@@ -49,7 +49,7 @@ type Current = ReturnType<typeof getCurrent>;
     current.dt = Math.min(now - current.time, 100);
     current.time = now;
 
-    current.copyShader.uniforms.time.value = now;
+    current.screenShader.uniforms.time.value = now;
 
     updateCamera(config, current);
     updateMeshes(config, current);
@@ -127,8 +127,8 @@ function getCurrent(config: Config) {
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
-  const copyShader = new ShaderPass(getCopyShader());
-  composer.addPass(copyShader);
+  const screenShader = new ShaderPass(getScreenShader());
+  composer.addPass(screenShader);
   composer.setPixelRatio(window.devicePixelRatio);
   scene.background = new THREE.Color("#91b596");
 
@@ -145,7 +145,7 @@ function getCurrent(config: Config) {
     renderer,
     root,
     composer,
-    copyShader,
+    screenShader,
     background: addBackground(config, scene),
     rockMeshes: addRock(config, scene),
     terrain: addTerrain(config, scene),
@@ -594,7 +594,7 @@ function createCanvasTexture(
   return texture;
 }
 
-function getCopyShader() {
+function getScreenShader() {
   return {
     uniforms: {
       tDiffuse: {

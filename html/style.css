@@ -11,7 +11,8 @@ body {
   touch-action: none;
 }
 
-.title {
+/* This selector is more complicated since it clashes with dat.gui's naming. */
+body > .title {
   position: absolute;
   bottom: 0.3em;
   color: #fff;
