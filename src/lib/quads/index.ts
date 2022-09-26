@@ -1,3 +1,4 @@
+/* eslint-disable no-var */
 import { vec3 } from "../vec-math";
 import { ensureExists, UnhandledCaseError } from "../utils";
 import { catmullClarkSubdivision } from "./catmull-clark";
@@ -308,6 +309,12 @@ export function _calculatePositionIndexToQuads(
         toQuads.set(index, quads);
       }
       quads.push(quad);
+    }
+  }
+  for (let i = 0; i < mesh.positions.length; i++) {
+    if (!toQuads.has(i)) {
+      // Positions aren't required to be attached to a quad.
+      toQuads.set(i, []);
     }
   }
   return toQuads;
@@ -637,7 +644,6 @@ export function updateNormalsForQuad(mesh: QuadMesh, quad: Quad) {
   }
 }
 
-// eslint-disable-next-line no-var
 /**
  * Compute a quad's normal regardless of it's neighboring quads.
  */
@@ -712,7 +718,7 @@ export function flip(mesh: QuadMesh, quad: Quad): void {
   }
 }
 
-type Facing = "x+" | "x-" | "y+" | "y-" | "z+" | "z-";
+export type Facing = "x+" | "x-" | "y+" | "y-" | "z+" | "z-";
 
 type QuadOptions =
   | { positions: [Tuple3, Tuple3, Tuple3, Tuple3] }
@@ -1642,15 +1648,17 @@ export function getPositionsSet(
 
 export function tunnel(
   mesh: QuadMesh,
-  quadA: Quad,
-  quadB: Quad,
+  quadA: Quad | QuadIndex,
+  quadB: Quad | QuadIndex,
   t: number
 ): Quad[] {
+  quadA = getQuad(mesh, quadA);
+  quadB = getQuad(mesh, quadB);
   const { positions, quads, normals } = mesh;
-  const l = mesh.positions.length;
+  const l = positions.length;
   inset(mesh, quadA, t);
   inset(mesh, quadB, t);
-  if (mesh.positions.length - l !== 8) {
+  if (positions.length - l !== 8) {
     throw new Error("Expected 8 new points made by the inset operation.");
   }
   const positionIndexesA = [l + 0, l + 1, l + 2, l + 3];
@@ -1658,10 +1666,10 @@ export function tunnel(
   const neighbors = positionIndexesA.map((positionIndexA) => {
     let closest = null;
     let closestDistSq = 0;
-    const positionA = mesh.positions[positionIndexA];
+    const positionA = positions[positionIndexA];
     for (let i = 0; i < 4; i++) {
       const positionIndexB = positionIndexesB[i];
-      const positionB = mesh.positions[positionIndexB];
+      const positionB = positions[positionIndexB];
       const distSq = vec3.sqrDist(positionA, positionB);
       if (closest === null || distSq < closestDistSq) {
         closest = positionIndexB;
@@ -1672,7 +1680,49 @@ export function tunnel(
   });
   const quadC: Quad = [0, 0, 0, 0];
   const quadD: Quad = [0, 0, 0, 0];
-  mesh.quads.push(quadC, quadD);
+  quads.push(quadC, quadD);
+  const newQuads: Quad[] = [quadA, quadB, quadC, quadD];
+  for (let i = 0; i < 4; i++) {
+    const quad = newQuads[i];
+    quad[0] = positionIndexesA[i];
+    quad[1] = positionIndexesA[(i + 1) % 4];
+    quad[2] = neighbors[(i + 1) % 4];
+    quad[3] = neighbors[i];
+    if (normals) {
+      updateQuadNormal(mesh, quad);
+    }
+  }
+  return newQuads;
+}
+
+export function tunnelNoInset(
+  mesh: QuadMesh,
+  quadA: Quad | QuadIndex,
+  quadB: Quad | QuadIndex
+): Quad[] {
+  quadA = getQuad(mesh, quadA);
+  quadB = getQuad(mesh, quadB);
+  const { positions, quads, normals } = mesh;
+  const positionIndexesA = quadA.slice();
+  const positionIndexesB = quadB.slice();
+  const neighbors = positionIndexesA.map((positionIndexA) => {
+    let closest = null;
+    let closestDistSq = 0;
+    const positionA = positions[positionIndexA];
+    for (let i = 0; i < 4; i++) {
+      const positionIndexB = positionIndexesB[i];
+      const positionB = positions[positionIndexB];
+      const distSq = vec3.sqrDist(positionA, positionB);
+      if (closest === null || distSq < closestDistSq) {
+        closest = positionIndexB;
+        closestDistSq = distSq;
+      }
+    }
+    return closest as number;
+  });
+  const quadC: Quad = [0, 0, 0, 0];
+  const quadD: Quad = [0, 0, 0, 0];
+  quads.push(quadC, quadD);
   const newQuads: Quad[] = [quadA, quadB, quadC, quadD];
   for (let i = 0; i < 4; i++) {
     const quad = newQuads[i];
