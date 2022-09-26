@@ -185,7 +185,8 @@ function getSessionReadmeDescription(sessionSlug) {
   const sessionPath = getPathToSession(sessionSlug);
   const markdown = fs.readFileSync(path.join(sessionPath, "README.md"), "utf8");
   if (!markdown) {
-    throw new Error("No README.md was written for the session.");
+    console.warn("No README.md was written for the session.");
+    return "";
   }
   const text = removeMarkdown(markdown);
   return text.split("\n")[0];
