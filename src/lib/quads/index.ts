@@ -842,52 +842,67 @@ export function createBox(
 }
 
 /**
- * Combine all positions together and recompute the normals.
+ * This function is a little weird in the implementation since it proved to be too slow
+ * when there were too many positions in the mesh, as the function was originally O(n^2).
+ * The algorithmic complexity is lowered to whatever it takes to do Map lookups.
  */
 export function mergePositions(mesh: QuadMesh): QuadMesh {
-  const { positions, normals, quads } = mesh;
+  const { positions: oldPositions, normals: oldNormals, quads } = mesh;
+
+  // Create all the new arrays, and name them so it's not ambiguous.
+  const newPositions: Tuple3[] = [];
+  let newNormals: Tuple3[] | null = null;
+  mesh.positions = newPositions;
+  if (oldNormals) {
+    newNormals = [];
+    mesh.normals = newNormals;
+  }
+
+  // Create a string primitive that represents the underlying data for the position
+  // struct. This may seem inefficient, but due to JS string handling, this is
+  // the quickest way to check for position equality.
+  const keys = oldPositions.map(([x, y, z]) => x + "," + y + "," + z);
+
+  // Map from the serialized key to an index.
+  const keysToNewIndex = new Map();
+
   // Go through each position.
-  for (let aIndex = 0; aIndex < positions.length; aIndex++) {
-    const a = positions[aIndex];
+  for (let index = 0; index < oldPositions.length; index++) {
+    const key = keys[index];
+    if (keysToNewIndex.has(key)) {
+      // Since this key was already in the map, this position was already added,
+      // so we can skip it here.
+      continue;
+    }
 
-    // Compare this position to the rest of the position.
-    for (let bIndex = aIndex + 1; bIndex < positions.length; bIndex++) {
-      const b = positions[bIndex];
+    // Remember the new index.
+    keysToNewIndex.set(key, newPositions.length);
 
-      // If the positions match, then remove "a" from positions.
-      if (a[0] === b[0] && a[1] === b[1] && a[2] === b[2]) {
-        // Update the quads to point to the bIndex.
-        for (let k = 0; k < quads.length; k++) {
-          const quad = quads[k];
-          for (let l = 0; l < quad.length; l++) {
-            const index = quad[l];
-            if (index === aIndex) {
-              quad[l] = bIndex - 1;
-            } else if (index > aIndex) {
-              quad[l]--;
-            }
-          }
-        }
-
-        // Remove the position and continue
-        positions.splice(aIndex, 1);
-        if (normals) {
-          normals.splice(aIndex, 1);
-        }
-        aIndex--;
-        break;
-      }
+    // Push on to the new arrays.
+    newPositions.push(oldPositions[index]);
+    if (newNormals && oldNormals) {
+      newNormals.push(oldNormals[index]);
     }
   }
 
-  if (normals) {
+  // Map the old quad indexes to the new.
+  for (const quad of quads) {
+    quad[0] = keysToNewIndex.get(keys[quad[0]]);
+    quad[1] = keysToNewIndex.get(keys[quad[1]]);
+    quad[2] = keysToNewIndex.get(keys[quad[2]]);
+    quad[3] = keysToNewIndex.get(keys[quad[3]]);
+  }
+
+  if (newNormals) {
     const normalCache = new Map();
-    for (let i = 0; i < positions.length; i++) {
-      averageNormalForPosition(mesh, i, normals[i], normalCache);
+    for (let i = 0; i < newPositions.length; i++) {
+      averageNormalForPosition(mesh, i, newNormals[i], normalCache);
     }
   }
+
   return mesh;
 }
+
 /**
  * Returns an elements array using the given `ArrayType`, which can be used by WebGL.
  */

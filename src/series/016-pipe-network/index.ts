@@ -298,7 +298,7 @@ function addPipeNetwork(
     seed: config.pipeSeed,
   });
 
-  // Quads.mergePositions(network.mesh);
+  Quads.mergePositions(network.mesh);
   Quads.subdivide(network.mesh, 1);
   Quads.computeSmoothNormals(network.mesh);
 
