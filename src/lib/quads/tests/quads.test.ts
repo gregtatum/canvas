@@ -1474,6 +1474,61 @@ describe("QuadMesh", () => {
     );
   });
 
+  it("tunnels with no inset", () => {
+    const mesh = Quads.createBox(2, 2, 2);
+    Quads.tunnelNoInset(mesh, mesh.quads[0], mesh.quads[1]);
+    const separation = 3;
+    for (const p of mesh.positions) {
+      p[0] += separation * 2;
+    }
+    Quads.createBox(2, 2, 2, mesh);
+    for (const p of mesh.positions) {
+      p[0] -= separation;
+    }
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -1  ·  ◆━━━━━◆  ·  ┊  ·  ◆━━━━━◆  ·
+      │  0 ┈┈┈┈┃┈┈┈┈┈┃┈┈┈┈┈┊┈┈┈┈┈┃┈┈┈┈┈┃┈┈┈┈
+      │  1  ·  ◆━━━━━◆  ·  ┊  ·  ◆━━━━━◆  ·
+      │  2  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+
+    const rightBoxQuad = 0;
+    const leftBoxQuad = 12;
+    Quads.tunnelNoInset(mesh, rightBoxQuad, leftBoxQuad);
+
+    assertArt(
+      mesh,
+      "z",
+      `
+      │    -5 -4 -3 -2 -1  0  1  2  3  4  5
+      │ -5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -2  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │ -1  ·  ◆━━━━━◆━━━━━━━━━━━◆━━━━━◆  ·
+      │  0 ┈┈┈┈┃┈┈┈┈┈┃┈┈┈┈┈┊┈┈┈┈┈┃┈┈┈┈┈┃┈┈┈┈
+      │  1  ·  ◆━━━━━◆━━━━━━━━━━━◆━━━━━◆  ·
+      │  2  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  3  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  4  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
+      `
+    );
+  });
+
   it("extrudes an edge", () => {
     const { mesh } = Quads.createQuad({ w: 2, h: 4, facing: "z+" });
     const [a, b, c, d] = [0, 1, 2, 3];
