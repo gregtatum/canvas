@@ -1,9 +1,10 @@
 import * as Quads from "../";
 import { UnhandledCaseError } from "lib/utils";
+import { HEMesh } from "lib/halfedge";
 
 function getLine([x, y]: Tuple2): string {
   const tau = Math.PI * 2;
-  const theta = (tau + Math.atan2(y, x)) % tau;
+  const theta = (tau + Math.atan2(y * 3, x)) % tau;
   //5  6  7
   //4     0
   //3  2  1
@@ -11,19 +12,19 @@ function getLine([x, y]: Tuple2): string {
     case 0:
       return "━";
     case 1:
-      return "⟍";
+      return "╲";
     case 2:
       return "┃";
     case 3:
-      return "⟋";
+      return "╱";
     case 4:
       return "━";
     case 5:
-      return "⟍";
+      return "╲";
     case 6:
       return "┃";
     case 7:
-      return "⟋";
+      return "╱";
     default:
       throw new Error("Unable to convert a vector to an arrow.");
   }
@@ -59,6 +60,135 @@ function getGrid(width: Integer, height: Integer): string[] {
 
 /// Draw a [QuadMesh] using text art. See <https://gregtatum.com/writing/2020/ascii-physics-system/>
 function quadMeshToTextArt(mesh: QuadMesh, axis: "x" | "y" | "z"): string {
+  const { printSegment, printPoint, getString } = setupDrawTools(axis);
+  for (const quad of mesh.quads) {
+    const [a, b, c, d] = Quads.getPositions(mesh, quad);
+    printSegment(a, b);
+    printSegment(b, c);
+    printSegment(c, d);
+    printSegment(d, a);
+  }
+  for (const quad of mesh.quads) {
+    for (const position of Quads.getPositions(mesh, quad)) {
+      printPoint(position);
+    }
+  }
+  return getString();
+}
+
+export function replaceCodepoint(
+  string: string,
+  char: string,
+  codePointIndex: Index
+) {
+  let codeUnitIndex: Index = 0;
+  for (let i = 0; i < codePointIndex && codeUnitIndex < string.length; i++) {
+    if (string[codeUnitIndex].codePointAt(0)! >> 10 === 0b110110) {
+      // This is a surrogate pair.
+      if (string[codeUnitIndex + 1].codePointAt(0)! >> 10 !== 0b110111) {
+        throw new Error(
+          "The string text was malformed UTF-16. No matching low surrogate."
+        );
+      }
+      codeUnitIndex++;
+    }
+    codeUnitIndex++;
+  }
+  return (
+    string.substring(0, codeUnitIndex) +
+    char +
+    string.substring(codeUnitIndex + 1)
+  );
+}
+
+export function assertArt(
+  mesh: QuadMesh | HEMesh,
+  axis: "x" | "y" | "z",
+  expect: string
+) {
+  let actual: string;
+  if ("faces" in mesh) {
+    const heMesh: HEMesh = mesh;
+    actual = heMeshToTextArt(heMesh, axis);
+  } else {
+    const quadMesh: QuadMesh = mesh;
+    actual = quadMeshToTextArt(quadMesh, axis);
+  }
+
+  const expectLines = expect.split("\n");
+  let expectI = 0;
+
+  function skipWhiteSpace() {
+    for (; expectI < expectLines.length; expectI++) {
+      if (expectLines[expectI].trim() !== "") {
+        break;
+      }
+    }
+  }
+  // Skip leading whitespace
+  skipWhiteSpace();
+
+  function reportIsDifferent() {
+    let msg = `Art does not match (${axis} axis).\n`;
+    msg += "┌─────────────────────────────────────\n";
+    msg += "│ Expected:\n";
+    msg += "├─────────────────────────────────────\n";
+    for (let line of expect.split("\n")) {
+      line = line.trim();
+      if (line) {
+        msg += line;
+        msg += "\n";
+      }
+    }
+    msg += "├─────────────────────────────────────\n";
+    msg += "│ Actual:\n";
+    msg += "├─────────────────────────────────────\n";
+    for (let line of actual.split("\n")) {
+      line = line.trim();
+      if (line) {
+        msg += line;
+        msg += "\n";
+      }
+    }
+    msg += "└─────────────────────────────────────\n";
+    throw new Error(msg);
+  }
+
+  for (const actualLine of actual.split("\n")) {
+    const expectedLine = expectLines[expectI++];
+    if (
+      expectedLine === undefined ||
+      actualLine.trim() !== expectedLine.trim()
+    ) {
+      reportIsDifferent();
+    }
+  }
+  skipWhiteSpace();
+  if (expectLines[expectI]) {
+    reportIsDifferent();
+  }
+}
+
+/**
+ * Lower the precicion of some values so they can be used in
+ * assertions and logging better.
+ */
+export function lowerPrecision(array: Array<number[]>, digits = 3): void {
+  const units = Math.pow(10, digits);
+  for (const position of array) {
+    for (let i = 0; i < position.length; i++) {
+      let n = position[i];
+      n = Math.round(n * units) / units;
+      if (Object.is(n, -0)) {
+        // Remove -0.
+        n = 0;
+      }
+      position[i] = n;
+    }
+  }
+}
+
+function setupDrawTools(axis: "x" | "y" | "z") {
   const marginX = 6;
   const marginY = 1;
   const colSize = 3;
@@ -136,127 +266,33 @@ function quadMeshToTextArt(mesh: QuadMesh, axis: "x" | "y" | "z"): string {
   }
 
   const lines = getGrid(halfW, halfH);
-  for (const quad of mesh.quads) {
-    const [a, b, c, d] = Quads.getPositions(mesh, quad);
-    printSegment(a, b);
-    printSegment(b, c);
-    printSegment(c, d);
-    printSegment(d, a);
-  }
-  for (const quad of mesh.quads) {
-    for (const position of Quads.getPositions(mesh, quad)) {
-      printPoint(position);
+
+  function getString() {
+    let string = "";
+    for (const line of lines) {
+      string += line.trimEnd();
+      string += "\n";
     }
+    return string;
   }
-  let string = "";
-  for (const line of lines) {
-    string += line.trimEnd();
-    string += "\n";
-  }
-  return string;
+
+  return { printSegment, printPoint, getString };
 }
 
-export function replaceCodepoint(
-  string: string,
-  char: string,
-  codePointIndex: Index
-) {
-  let codeUnitIndex: Index = 0;
-  for (let i = 0; i < codePointIndex && codeUnitIndex < string.length; i++) {
-    if (string[codeUnitIndex].codePointAt(0)! >> 10 === 0b110110) {
-      // This is a surrogate pair.
-      if (string[codeUnitIndex + 1].codePointAt(0)! >> 10 !== 0b110111) {
-        throw new Error(
-          "The string text was malformed UTF-16. No matching low surrogate."
-        );
-      }
-      codeUnitIndex++;
+function heMeshToTextArt(mesh: HEMesh, axis: "x" | "y" | "z"): string {
+  const { printSegment, printPoint, getString } = setupDrawTools(axis);
+
+  for (const face of mesh.faces) {
+    for (const edge of face) {
+      printSegment(edge.point, edge.next.point);
     }
-    codeUnitIndex++;
+    printSegment(face.edge.point, face.edge.prev().point);
   }
-  return (
-    string.substring(0, codeUnitIndex) +
-    char +
-    string.substring(codeUnitIndex + 1)
-  );
-}
-
-export function assertArt(
-  mesh: QuadMesh,
-  axis: "x" | "y" | "z",
-  expect: string
-) {
-  const actual = quadMeshToTextArt(mesh, axis);
-
-  const expectLines = expect.split("\n");
-  let expectI = 0;
-
-  function skipWhiteSpace() {
-    for (; expectI < expectLines.length; expectI++) {
-      if (expectLines[expectI].trim() !== "") {
-        break;
-      }
+  for (const face of mesh.faces) {
+    for (const edge of face) {
+      printPoint(edge.point);
     }
   }
-  // Skip leading whitespace
-  skipWhiteSpace();
 
-  function reportIsDifferent() {
-    let msg = `Art does not match (${axis} axis).\n`;
-    msg += "┌─────────────────────────────────────\n";
-    msg += "│ Expected:\n";
-    msg += "├─────────────────────────────────────\n";
-    for (let line of expect.split("\n")) {
-      line = line.trim();
-      if (line) {
-        msg += line;
-        msg += "\n";
-      }
-    }
-    msg += "├─────────────────────────────────────\n";
-    msg += "│ Actual:\n";
-    msg += "├─────────────────────────────────────\n";
-    for (let line of actual.split("\n")) {
-      line = line.trim();
-      if (line) {
-        msg += line;
-        msg += "\n";
-      }
-    }
-    msg += "└─────────────────────────────────────\n";
-    throw new Error(msg);
-  }
-
-  for (const actualLine of actual.split("\n")) {
-    const expectedLine = expectLines[expectI++];
-    if (
-      expectedLine === undefined ||
-      actualLine.trim() !== expectedLine.trim()
-    ) {
-      reportIsDifferent();
-    }
-  }
-  skipWhiteSpace();
-  if (expectLines[expectI]) {
-    reportIsDifferent();
-  }
-}
-
-/**
- * Lower the precicion of some values so they can be used in
- * assertions and logging better.
- */
-export function lowerPrecision(array: Array<number[]>, digits = 3): void {
-  const units = Math.pow(10, digits);
-  for (const position of array) {
-    for (let i = 0; i < position.length; i++) {
-      let n = position[i];
-      n = Math.round(n * units) / units;
-      if (Object.is(n, -0)) {
-        // Remove -0.
-        n = 0;
-      }
-      position[i] = n;
-    }
-  }
+  return getString();
 }

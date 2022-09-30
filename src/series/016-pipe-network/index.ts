@@ -5,6 +5,7 @@ import {
   Mesh,
   Color,
   WebGLRenderer,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   DirectionalLight,
   CanvasTexture,
@@ -13,6 +14,7 @@ import {
   Fog,
   PointLight,
   SpotLight,
+  PlaneGeometry,
 } from "three";
 import { simplex } from "lib/shaders";
 import * as THREE from "three";
@@ -38,7 +40,7 @@ import {
   addGeometryToTriangleMesh,
   getEmptyTriangleMesh,
 } from "lib/triangle-meshes";
-import { PipeNetwork } from "lib/pipe-network";
+import { PipeNetwork, PipeNetworkConfig } from "lib/pipe-network";
 
 const ORIGIN = vec3.create();
 
@@ -77,17 +79,22 @@ function getConfig() {
   const simplex3 = simplex.noise3D.bind(simplex);
 
   initializeShortcuts(seed);
+  const d = 1;
 
   return {
     seed,
     random,
     simplex2,
     simplex3,
-    pipeDimensions: [40, 40, 40] as Tuple3,
-    pipeLength: 0.05,
-    pipeNodeScale: 0.0125,
-    pipeSeed: "20123456789",
-    background: "#f6E1AA",
+    pipeSubdivide: 1,
+    pipeNetwork: {
+      dimensions: [10, 10, 10] as Tuple3,
+      pipeLengths: [20 / 1000, 20 / 1000, 40 / 1000],
+      pipeRadius: 5 / 1000,
+      desiredNodeCount: { ratio: 0.25 },
+      seed: "850123456789",
+    } as PipeNetworkConfig,
+    background: "#c5c4c0",
   };
 }
 
@@ -98,8 +105,8 @@ function getCurrent(config: Config) {
 
   const { camera, scene, renderer } = setupBasicScene(root);
 
-  scene.fog = new Fog(config.background, -0, 30);
-  scene.background = new Color("#68736B");
+  scene.fog = new Fog(config.background, -2, 10);
+  scene.background = new Color(config.background);
 
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
@@ -108,7 +115,8 @@ function getCurrent(config: Config) {
   composer.addPass(screenShader);
   composer.setPixelRatio(window.devicePixelRatio);
 
-  camera.rotation.x = 0.2;
+  camera.rotation.x = 0.0;
+  camera.position.z = 1;
 
   const gui = new GUI();
   const shaderInjector = new ShaderInjector();
@@ -130,6 +138,7 @@ function getCurrent(config: Config) {
     shaderInjector,
     gui,
     pipeNetwork: addPipeNetwork(config, shaderInjector, scene, gui),
+    floor: addFloor(config, scene),
   };
 }
 
@@ -146,7 +155,7 @@ function update(config: Config, current: Current): void {
     (0.5 * Math.sin(current.time * 20) + 0.5) +
     (0.5 * Math.sin(current.time * 47) + 0.5);
 
-  current.pipeNetwork.rotation.y += 0.01;
+  // current.pipeNetwork.rotation.y += 0.01;
 
   {
     const { simplex2 } = config;
@@ -291,15 +300,12 @@ function addPipeNetwork(
   scene: Scene,
   gui: GUI
 ) {
-  const network = new PipeNetwork({
-    dimensions: config.pipeDimensions,
-    pipeLength: config.pipeLength,
-    nodeScale: config.pipeNodeScale,
-    seed: config.pipeSeed,
-  });
+  const network = new PipeNetwork(config.pipeNetwork);
 
   Quads.mergePositions(network.mesh);
-  Quads.subdivide(network.mesh, 1);
+  if (config.pipeSubdivide) {
+    Quads.subdivide(network.mesh, config.pipeSubdivide);
+  }
   Quads.computeSmoothNormals(network.mesh);
 
   const material = new MeshPhysicalMaterial({
@@ -314,19 +320,35 @@ function addPipeNetwork(
   });
 
   material.wireframe = false;
-
-  const pipesMesh = new Mesh(quadMeshToBufferGeometry(network.mesh), material);
-  pipesMesh.name = "Rock Mesh";
+  const geometry = quadMeshToBufferGeometry(network.mesh);
   guiMeshPhysicalMaterial(gui, material);
+
+  // for (let i = 0; i < 10; i++) {
+  const pipesMesh = new Mesh(geometry, material);
+  pipesMesh.name = "Pipe Mesh";
   guiAddMesh(gui, pipesMesh);
 
   scene.add(pipesMesh);
+  pipesMesh.scale.multiplyScalar(1.3);
   // pipesMesh.scale.multiplyScalar(2.6);
-  // pipesMesh.position.x = 0.8;
-  // pipesMesh.position.y = 0.1;
-  // pipesMesh.position.z = 0.1;
+  // pipesMesh.position.x = 0.0 + i * 0.4 - 2;
+  // pipesMesh.position.y = -0.55;
+  // pipesMesh.position.z = -3.9 + Math.sin(i) * 0.1;
+  // pipesMesh.rotation.z = Math.PI * i;
+  // pipesMesh.rotation.y = Math.PI * Math.floor(i * 0.5);
   pipesMesh.castShadow = true;
   pipesMesh.receiveShadow = true;
+  // }
+}
 
-  return pipesMesh;
+function addFloor(config: Config, scene: Scene) {
+  const geometry = new PlaneGeometry(100, 100);
+  const material = new MeshBasicMaterial({
+    color: "#000000",
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.rotation.x += Math.PI * 1.5;
+  mesh.position.y = -1;
+  scene.add(mesh);
+  return mesh;
 }
