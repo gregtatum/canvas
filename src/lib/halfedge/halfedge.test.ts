@@ -85,6 +85,7 @@ describe("HEMesh", () => {
 
     diagonalEdge.flip();
     validateMesh(mesh);
+    expect(isFullyConnected(mesh)).toBe(true);
 
     assertArt(
       mesh,
@@ -104,8 +105,6 @@ describe("HEMesh", () => {
       │  5  ·  ·  ·  ·  ·  ┊  ·  ·  ·  ·  ·
       `
     );
-    // expect(isFullyConnected(mesh)).toBe(true);
-    // validateMesh(mesh);
   });
 });
 

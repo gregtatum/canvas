@@ -60,26 +60,28 @@ export class HalfEdge {
     const fA = this.face;
     const fB = twin.face;
 
-    const pA = eA.point;
+    // Everything commented out below is unchanged from the before state.
+
+    // const pA = eA.point;
     const pB = eB.point;
-    const pC = eC.point;
+    // const pC = eC.point
     const pD = eD.point;
 
     eA.face = fB;
-    eB.face = fA;
+    // eB.face = fA;
     eC.face = fA;
-    eD.face = fB;
+    // eD.face = fB;
 
-    this.face = fA;
+    // this.face = fA;
     this.point = pD;
     this.next = eB;
 
-    twin.face = fB;
+    // twin.face = fB;
     twin.point = pB;
     twin.next = eD;
 
     fA.edge = this;
-    fB.edge = twin;
+    // fB.edge = twin;
 
     eA.next = twin;
     eB.next = eC;
