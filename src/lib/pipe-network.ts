@@ -8,11 +8,12 @@ import * as Quads from "lib/quads";
  */
 export type PipeNodeID = number;
 
-interface PipeNetworkConfig {
+export interface PipeNetworkConfig {
   dimensions: Tuple3<number>;
-  pipeLength: number;
-  nodeScale: number;
-  seed?: string;
+  pipeLengths: Tuple3<number>;
+  pipeRadius: number;
+  desiredNodeCount: { count: number } | { ratio: number };
+  seed?: string | void;
 }
 
 export class PipeNetwork {
@@ -25,27 +26,27 @@ export class PipeNetwork {
   nodeIdMap: Map<PipeNodeID, PipeNode> = new Map();
 
   dimensions: Tuple3<number>;
-  pipeLength: number;
-  nodeScale: number;
+  pipeLengths: Tuple3<number>;
+  pipeRadius: number;
+  desiredNodeCount: number;
+  maxPossibleNodes: number;
   random: () => number;
 
   constructor(config: PipeNetworkConfig) {
     this.dimensions = config.dimensions;
-    this.pipeLength = config.pipeLength;
-    this.nodeScale = config.nodeScale;
+    this.pipeLengths = config.pipeLengths;
+    this.pipeRadius = config.pipeRadius;
+    this.maxPossibleNodes =
+      this.dimensions[0] * this.dimensions[1] * this.dimensions[2];
+    if ("count" in config.desiredNodeCount) {
+      this.desiredNodeCount = config.desiredNodeCount.count;
+    } else {
+      this.desiredNodeCount =
+        config.desiredNodeCount.ratio * this.maxPossibleNodes;
+    }
     this.random = setupRandom(config.seed ?? Math.random());
 
-    // const [xD, yD, zD] = this.dimensions;
-    // for (let x = 0; x < xD; x++) {
-    //   for (let y = 0; y < yD; y++) {
-    //     for (let z = 0; z < zD; z++) {
-    //       const node = new PipeNode(this, x, y, z);
-    //       this.nodes.push(node);
-    //       this.nodeIdMap.set(node.id, node);
-    //     }
-    //   }
-    // }
-    this.buildRandomNodes();
+    this.buildViaRandomWalkers();
     const center = Quads.getPositionsCenter(this.mesh.positions);
     for (const position of this.mesh.positions) {
       position[0] -= center[0];
@@ -54,19 +55,37 @@ export class PipeNetwork {
     }
   }
 
-  buildRandomNodes() {
-    for (let i = 0; i < 3; i++) {
-      let node: null | PipeNode = this.getNode(
-        Math.floor(this.dimensions[0] * this.random()),
-        Math.floor(this.dimensions[1] * this.random()),
-        Math.floor(this.dimensions[2] * this.random())
-      );
-      if (!node) {
-        continue;
-        // throw new Error("Logic error, expected to find a node.");
+  buildViaRandomWalkers() {
+    const [xD, yD, zD] = this.dimensions;
+    while (
+      this.nodes.length < Math.min(this.desiredNodeCount, this.maxPossibleNodes)
+    ) {
+      let startX = Math.floor(this.dimensions[0] * this.random());
+      let startY = Math.floor(this.dimensions[1] * this.random());
+      let startZ = Math.floor(this.dimensions[2] * this.random());
+      let node: null | PipeNode = this.getNode(startX, startY, startZ);
+      let i = 0;
+      const dirX = this.random() > 0.5 ? -1 : 1;
+      const dirY = this.random() > 0.5 ? -1 : 1;
+      const dirZ = this.random() > 0.5 ? -1 : 1;
+      while (node === null || node.isFilled) {
+        i++;
+        if (i > this.maxPossibleNodes) {
+          throw new Error("Logic error in the buildRandomNodes loop.");
+        }
+        // Find a gosh-durn empty node.
+        startX = (startX + dirX + xD) % xD;
+        if (startX === 0) {
+          startY = (startY + dirY + yD) % yD;
+          if (startY === 0) {
+            startZ = (startZ + dirZ + zD) % zD;
+          }
+        }
+        node = this.getNode(startX, startY, startZ);
       }
+
       node.fillInNode();
-      while (node !== null) {
+      while (node !== null && this.nodes.length < this.desiredNodeCount) {
         const result = node.getRandomNeighbor((node) => !node.isFilled);
         if (result === null) {
           break;
@@ -156,16 +175,16 @@ export class PipeNode {
       );
     }
     this.hasPoints = true;
-    const { mesh, pipeLength, nodeScale, dimensions } = this.network;
+    const { mesh, pipeLengths, pipeRadius, dimensions } = this.network;
     const { positions } = mesh;
     this.positionOffset = positions.length;
-    const halfNodeW = nodeScale / 2;
-    const x = this.x * pipeLength;
-    const y = this.y * pipeLength;
-    const z = this.z * pipeLength;
-    const halfPipeX = (pipeLength * (dimensions[0] - 1)) / 2;
-    const halfPipeY = (pipeLength * (dimensions[1] - 1)) / 2;
-    const halfPipeZ = (pipeLength * (dimensions[2] - 1)) / 2;
+    const halfNodeW = pipeRadius / 2;
+    const x = this.x * pipeLengths[0];
+    const y = this.y * pipeLengths[1];
+    const z = this.z * pipeLengths[2];
+    const halfPipeX = (pipeLengths[0] * (dimensions[0] - 1)) / 2;
+    const halfPipeY = (pipeLengths[1] * (dimensions[1] - 1)) / 2;
+    const halfPipeZ = (pipeLengths[2] * (dimensions[2] - 1)) / 2;
 
     const xm = x - halfNodeW - halfPipeX;
     const xp = x + halfNodeW - halfPipeX;
@@ -252,11 +271,19 @@ export class PipeNode {
     }
   }
 
+  #faces: Facing[] = ["x+", "x-", "y+", "y-", "z+", "z-"];
+
   getRandomNeighbor(
     conditionFn?: (node: PipeNode) => boolean
   ): null | { neighbor: PipeNode; facing: Facing } {
-    const faces: Facing[] = ["x+", "x-", "y+", "y-", "z+", "z-"];
-    faces.sort(() => this.network.random() - 0.5);
+    const faces = this.#faces;
+    for (let i = 0; i < faces.length - 1; i++) {
+      const j = i + Math.floor((faces.length - i) * this.network.random());
+      const a = faces[i];
+      const b = faces[j];
+      faces[i] = b;
+      faces[j] = a;
+    }
     for (const facing of faces) {
       const neighbor = this.getNeighbor(facing);
       if (conditionFn) {
