@@ -8,6 +8,7 @@ import {
 import * as THREE from "three";
 import { GUI } from "dat.gui";
 import * as quads from "lib/quads";
+import { HEMesh, HEMeshNormals } from "./halfedge";
 
 export function createCanvasTexture(
   canvasWidth: number,
@@ -347,4 +348,40 @@ export class ShaderInjector {
       return "Custom Shader " + generation;
     };
   }
+}
+
+export function heMeshToBufferGeometry(mesh: HEMesh | HEMeshNormals) {
+  const geometry = new BufferGeometry();
+
+  const elements = new Uint16Array(mesh.faces.length * 3);
+  for (let i = 0; i < mesh.faces.length; i++) {
+    const offset = i * 3;
+    const [a, b, c] = mesh.faces[i];
+    elements[offset + 0] = a.pointIndex;
+    elements[offset + 1] = b.pointIndex;
+    elements[offset + 2] = c.pointIndex;
+  }
+  geometry.setIndex(new BufferAttribute(elements, 1));
+
+  const positions = new Float32Array(mesh.points.length * 3);
+  for (let i = 0; i < mesh.points.length; i++) {
+    const position = mesh.points[i];
+    positions[i * 3] = position[0];
+    positions[i * 3 + 1] = position[1];
+    positions[i * 3 + 2] = position[2];
+  }
+  geometry.setAttribute("position", new BufferAttribute(positions, 3));
+
+  if ("normals" in mesh && mesh.normals) {
+    const normals = new Float32Array(mesh.normals.length * 3);
+    for (let i = 0; i < mesh.normals.length; i++) {
+      const normal = mesh.normals[i];
+      normals[i * 3] = normal[0];
+      normals[i * 3 + 1] = normal[1];
+      normals[i * 3 + 2] = normal[2];
+    }
+    geometry.setAttribute("normal", new BufferAttribute(normals, 3));
+  }
+
+  return geometry;
 }
