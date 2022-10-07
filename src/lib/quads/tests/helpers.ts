@@ -284,13 +284,13 @@ function heMeshToTextArt(mesh: HEMesh, axis: "x" | "y" | "z"): string {
 
   for (const face of mesh.faces) {
     for (const edge of face) {
-      printSegment(edge.point, edge.next.point);
+      printSegment(edge.startPoint(), edge.next.startPoint());
     }
-    printSegment(face.edge.point, face.edge.prev().point);
+    printSegment(face.edge.startPoint(), face.edge.prev().startPoint());
   }
   for (const face of mesh.faces) {
     for (const edge of face) {
-      printPoint(edge.point);
+      printPoint(edge.startPoint());
     }
   }
 
