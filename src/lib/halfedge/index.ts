@@ -331,8 +331,8 @@ export class HEMesh {
       heMesh.createFace(cell[0], cell[1], cell[2]);
     }
 
+    // Build a map of points to faces.
     const pointToFaces = new Map<PointIndex, Face[]>();
-
     for (const face of heMesh.faces) {
       for (const edge of face) {
         const pointIndex = edge.startPointIndex();
@@ -357,44 +357,4 @@ export class HEMesh {
 
     return heMesh;
   }
-}
-
-type GetCellsFromEdge = (a: PointIndex, b: PointIndex) => CellIndex[];
-
-function getCellsFromEdgeGetter(triMesh: TriangleMesh): GetCellsFromEdge {
-  type EdgeKey = number;
-  const edgeToCells = new Map<EdgeKey, CellIndex[]>();
-
-  function getEdgeKey(a: PointIndex, b: PointIndex): EdgeKey {
-    if (a > b) {
-      const aO = a;
-      const bO = b;
-      a = bO;
-      b = aO;
-    }
-    return a + b * triMesh.positions.length;
-  }
-
-  function rememberEdge(cellIndex: CellIndex, a: PointIndex, b: PointIndex) {
-    const key = getEdgeKey(a, b);
-    let cells = edgeToCells.get(key);
-    if (!cells) {
-      cells = [];
-      edgeToCells.set(key, cells);
-    }
-    cells.push(cellIndex);
-  }
-
-  for (let cellIndex = 0; cellIndex < triMesh.cells.length; cellIndex++) {
-    const [a, b, c] = triMesh.cells[cellIndex];
-    rememberEdge(cellIndex, a, b);
-    rememberEdge(cellIndex, b, c);
-    rememberEdge(cellIndex, c, a);
-  }
-
-  return (a: PointIndex, b: PointIndex) =>
-    ensureExists(
-      edgeToCells.get(getEdgeKey(a, b)),
-      "Logic error, could not find cells for an dge."
-    );
 }
