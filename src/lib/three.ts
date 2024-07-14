@@ -8,7 +8,7 @@ import {
 import * as THREE from "three";
 import { GUI } from "dat.gui";
 import * as quads from "lib/quads";
-import { HEMesh, HEMeshNormals } from "./halfedge";
+import { HEMesh } from "./halfedge";
 
 export function createCanvasTexture(
   canvasWidth: number,
@@ -350,7 +350,7 @@ export class ShaderInjector {
   }
 }
 
-export function heMeshToBufferGeometry(mesh: HEMesh | HEMeshNormals) {
+export function heMeshToBufferGeometry(mesh: HEMesh) {
   const geometry = new BufferGeometry();
 
   const elements = new Uint16Array(mesh.faces.length * 3);

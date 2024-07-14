@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ensureExists } from "lib/utils";
 import { vec3 } from "lib/vec-math";
-
 type PointIndex = Index;
-type CellIndex = Index;
-type FaceIndex = Index;
+// type CellIndex = Index;
+// type FaceIndex = Index;
 
 class HalfEdgeIterator implements Iterator<HalfEdge> {
   start: HalfEdge;
@@ -217,6 +217,19 @@ export class Face {
     }
     return connected;
   }
+
+  clone(): Face {
+    return new Face(
+      this.mesh,
+      this.edge.pointIndex,
+      this.edge.next.pointIndex,
+      this.edge.next.next.pointIndex
+    );
+  }
+}
+
+export class HEMeshNormals {
+  // TODO
 }
 
 export class HEMesh {
@@ -348,6 +361,7 @@ export class HEMesh {
     for (const faces of pointToFaces.values()) {
       // Kind of a gross O(n^2) but hopefully it won't be slow. This could
       // be done through an edge lookup to not waste as many cycles.
+      // See commit 795e808cdf00a28e3fda168ab08a6211c2ba8253.
       for (let i = 0; i < faces.length; i++) {
         for (let k = i + 1; k < faces.length; k++) {
           faces[i].connect(faces[k]);
@@ -356,5 +370,178 @@ export class HEMesh {
     }
 
     return heMesh;
+  }
+
+  // TODO
+
+  subdivide() {
+    const createMidpoint = (edge: HalfEdge) => {
+      const a = this.points[edge.startPointIndex()];
+      const b = this.points[edge.endPointIndex()];
+
+      const x = (a[0] + b[0]) / 2;
+      const y = (a[1] + b[1]) / 2;
+      const z = (a[2] + b[2]) / 2;
+
+      midpoints.set(edge, this.points.length);
+      this.points.push([x, y, z]);
+      return this.points.length - 1;
+    };
+
+    const midpoints = new EdgeMap<PointIndex>(this.points.length);
+    const startFaces = new Map<HalfEdge, Face>();
+    const endFaces = new Map<HalfEdge, Face>();
+    const midpointsVisited = new Set<PointIndex>();
+    const facesLength = this.faces.length;
+
+    for (let i = 0; i < facesLength; i++) {
+      const face = this.faces[i];
+      const ab = createMidpoint(face.edge);
+      const bc = createMidpoint(face.edge.next);
+      const ca = createMidpoint(face.edge.next.next);
+
+      //           3
+      //    a ---- ca ---- c
+      //    | fA /  \ fC  /
+      //    |  /    \   /
+      // 1  ab ----- bc
+      //    |  fB   /
+      //    |    /       2
+      //    |  /
+      //    b
+
+      const fA = face.clone();
+      const fB = face.clone();
+      const fC = face.clone();
+
+      startFaces.set(face.edge, fA);
+      endFaces.set(face.edge, fB);
+      startFaces.set(face.edge.next, fB);
+      endFaces.set(face.edge.next, fC);
+      startFaces.set(face.edge.next.next, fC);
+      endFaces.set(face.edge.next.next, fA);
+
+      this.faces.push(fA, fB, fC);
+    }
+    // for (let i = 0; i < facesLength; i++) {
+    //   const face = this.faces[i];
+    //   const l = facesLength + i * 3
+    //   const ab = this.faces[l];
+    //   const bc = this.faces[l + 1];
+    //   const ca = this.faces[l + 2];
+    //   face.edge.pointIndex =
+    //   face.edge.twin =
+    // }
+
+    const splitEdge = (edge: HalfEdge, faceA: Face, faceB: Face) => {
+      //       twin?
+      // <---------------*
+      //         * m
+      // *--------------->
+      // a     edge      b
+      const m = midpoints.get(edge)!;
+      if (midpointsVisited.has(m)) {
+        return;
+      }
+      midpointsVisited.add(m);
+
+      const a = edge.startPointIndex();
+      const b = edge.endPointIndex();
+
+      const edgeFaceStart = startFaces.get(edge);
+      const edgeFaceEnd = endFaces.get(edge);
+
+      const { twin } = edge;
+      if (twin) {
+        const twinFaceStart = startFaces.get(twin);
+        const twinFaceEnd = endFaces.get(twin);
+      } else {
+      }
+    };
+
+    for (let faceIndex = 0; faceIndex < facesLength; faceIndex++) {
+      const face = this.faces[faceIndex];
+      const fA = this.faces[facesLength + faceIndex * 3];
+      const fB = this.faces[facesLength + faceIndex * 3 + 1];
+      const fC = this.faces[facesLength + faceIndex * 3 + 2];
+
+      // Split the edges.
+      splitEdge(face.edge, fA, fB);
+      splitEdge(face.edge.next, fB, fC);
+      splitEdge(face.edge.next.next, fC, fA);
+
+      //           3
+      //    a ---- ac ---- c
+      //    | fA /  \ fC  /
+      //    |  /    \   /
+      // 1  ab ----- bc
+      //    |  fB   /
+      //    |    /       2
+      //    |  /
+      //    b
+
+      const a = face.edge.startPointIndex();
+      const b = face.edge.next.startPointIndex();
+      const c = face.edge.next.next.startPointIndex();
+
+      const ab = getMidpoint(a, b);
+      const bc = getMidpoint(b, c);
+      const ca = getMidpoint(c, a);
+
+      this.faces.push(new Face(this, a, ab, ca));
+      this.faces.push(new Face(this, b, bc, ab));
+      this.faces.push(new Face(this, c, ca, bc));
+      this.faces.push(new Face(this, ab, bc, ca));
+    }
+  }
+}
+
+function getMidpoint(a: any, b: any): number {
+  throw new Error("TODO");
+}
+
+class EdgeMap<T> {
+  #map: Map<number, T> = new Map();
+  #pointLength: number;
+
+  /**
+   * The maximum number of points used by the mesh.
+   */
+  constructor(maxPointLength: number) {
+    this.#pointLength = maxPointLength;
+  }
+
+  getKey(edge: HalfEdge): number {
+    let a = edge.startPointIndex();
+    let b = edge.endPointIndex();
+    if (b > a) {
+      // Make sure the indexes are in a consistent order, so swap the values.
+      // Swap the values.
+      const a1 = a;
+      const b1 = b;
+      a = b1;
+      b = a1;
+    }
+    return a + b * this.#pointLength;
+  }
+
+  set(key: HalfEdge, value: T) {
+    return this.#map.set(this.getKey(key), value);
+  }
+
+  get(key: HalfEdge) {
+    return this.#map.get(this.getKey(key));
+  }
+
+  has(key: HalfEdge) {
+    return this.#map.has(this.getKey(key));
+  }
+
+  entries() {
+    return this.#map.entries();
+  }
+
+  values() {
+    return this.#map.values();
   }
 }
