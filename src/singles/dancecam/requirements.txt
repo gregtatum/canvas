@@ -1,0 +1,7 @@
+mediapipe ~= 0.10
+numpy ~= 2.0
+requests ~= 2.32
+types-requests  ~= 2.32
+# Headless doesn't use GUI, as we're only using this for a websocket server.
+opencv-python-headless ~= 4.10
+websockets ~= 12.0
