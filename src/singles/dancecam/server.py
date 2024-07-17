@@ -60,7 +60,7 @@ class Messenger:
     async def send_poses(self, poses: Any) -> None:
         await self._send(
             {
-                "type": "landmarks",
+                "type": "poses",
                 "poses": poses,
             }
         )
@@ -102,7 +102,6 @@ async def run_pose_loop() -> None:
     while clients_watching_poses:
         # Free up the event loop to process websocket messages.
         await asyncio.sleep(0)
-        print("Running loop")
 
         detection_result = pose_landmarker.detect(image)
 
