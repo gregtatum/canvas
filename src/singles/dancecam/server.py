@@ -1,9 +1,9 @@
 import asyncio
+import base64
 import json
 import os
 from typing import Any, TypeVar, cast
 import cv2
-import numpy as np
 import requests
 import websockets
 import mediapipe as mp
@@ -57,11 +57,21 @@ class Messenger:
             }
         )
 
-    async def send_poses(self, poses: Any) -> None:
+    async def send_poses(self, poses: Any, resolution: tuple[int, int]) -> None:
         await self._send(
             {
                 "type": "poses",
                 "poses": poses,
+                "resolution": resolution,
+            }
+        )
+
+    async def send_frame(self, frame):
+        _, buffer = cv2.imencode(".png", frame)
+        await self._send(
+            {
+                "type": "frame",
+                "image": base64.b64encode(buffer).decode("utf-8"),
             }
         )
 
@@ -91,7 +101,6 @@ async def run_pose_loop() -> None:
 
     is_pose_loop_running = True
 
-    image = mp.Image.create_from_file("image.jpg")
     pose_landmarker = vision.PoseLandmarker.create_from_options(
         vision.PoseLandmarkerOptions(
             base_options=python.BaseOptions(model_asset_path=get_model(model)),
@@ -99,9 +108,20 @@ async def run_pose_loop() -> None:
         )
     )
 
-    while clients_watching_poses:
+    # https://docs.opencv.org/4.5.4/d8/dfe/classcv_1_1VideoCapture.html
+    video_capture = cv2.VideoCapture(1)
+    width, height = get_camera_resolution(video_capture)
+    print("Video backend:", video_capture.getBackendName())
+    print("Using video of size:", width, height)
+    while clients_watching_poses and video_capture.isOpened():
         # Free up the event loop to process websocket messages.
         await asyncio.sleep(0)
+
+        was_frame_returned, frame = video_capture.read()
+        if not was_frame_returned:
+            break
+        # cv2.imwrite("feed-in.png", frame)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
 
         detection_result = pose_landmarker.detect(image)
 
@@ -122,12 +142,23 @@ async def run_pose_loop() -> None:
 
         for messenger in clients_watching_poses.copy():
             try:
-                await messenger.send_poses(poses)
+                await messenger.send_poses(poses, (width, height))
+                await messenger.send_frame(frame)
             except Exception as e:
                 print("Client send failed", e)
                 remove_from_list(clients_watching_poses, messenger)
 
+    video_capture.release()
+    cv2.destroyAllWindows()
+
     is_pose_loop_running = False
+
+
+def get_camera_resolution(video_capture):
+    return (
+        int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+    )
 
 
 T = TypeVar("T")
@@ -141,21 +172,6 @@ def remove_from_list(list: list[T], item: T) -> None:
         pass
 
 
-async def use_webcam(client):
-    cap = cv2.VideoCapture(0)
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
-        # process_image(client, image)
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-
 async def handle_message(
     client: websockets.WebSocketServerProtocol, data: dict[str, Any]
 ):
@@ -166,8 +182,8 @@ async def handle_message(
             await messenger.send_models()
         case "switch-model":
             new_model = data.get("model")
+            global model
             if new_model in models:
-                global model
                 model = new_model
             else:
                 await messenger.send_error(f'The model "{model}" is not available')

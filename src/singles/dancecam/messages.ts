@@ -15,12 +15,17 @@ export type DanceCamEventsToClient =
   | {
       type: "poses";
       poses: Array<Pose>;
+      resolution: [number, number];
     }
   | {
       type: "error";
       message: string;
     }
-  | { type: "models"; models: string[] };
+  | { type: "models"; models: string[] }
+  | {
+      type: "frame";
+      image: string;
+    };
 
 export type DanceCamEventsToServer =
   | { type: "watch-poses" }

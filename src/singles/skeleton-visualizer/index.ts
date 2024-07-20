@@ -59,6 +59,9 @@ function getCurrent(config: Config) {
     // wsUrl: 'ws://dancecam1.local:8765'
     socket: null as null | WebSocket,
     poses: [] as Pose[],
+    // Flip the camera image.
+    flip: true,
+    frame: null as HTMLImageElement | null,
   };
 }
 
@@ -72,6 +75,10 @@ function update(config: Config, current: Current): void {
 function draw(config: Config, current: Current): void {
   const { ctx } = config;
   const { poses } = current;
+
+  if (current.frame) {
+    ctx.drawImage(current.frame, 0, 0);
+  }
 
   // Clear out background.
   ctx.fillStyle = "#000";
@@ -132,9 +139,35 @@ function connectClient(current: Current) {
       case "error":
         console.error("Error:", data.message);
         break;
-      case "poses":
-        current.poses = data.poses;
+      case "frame": {
+        const image = new Image();
+        image.onload = function () {
+          current.frame = image;
+        };
+        image.src = "data:image/png;base64," + data.image;
         break;
+      }
+      case "poses": {
+        const { poses, resolution } = data;
+        current.poses = data.poses;
+        // Apply the camera scale.
+        let scaleX = resolution[0] / resolution[1];
+        let scaleY = resolution[1] / resolution[0];
+        if (resolution[0] < resolution[1]) {
+          scaleX = 1 / scaleX;
+          scaleY = 1 / scaleY;
+        }
+        for (const { landmarks } of poses) {
+          for (const landmark of landmarks) {
+            if (current.flip) {
+              landmark[0] = 1 - landmark[0];
+            }
+            landmark[0] *= scaleX;
+            landmark[1] *= scaleY;
+          }
+        }
+        break;
+      }
       default:
       // Do nothing
     }
