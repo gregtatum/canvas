@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import os
+import time
 from typing import Any, TypeVar, cast
 import cv2
 import requests
@@ -27,13 +28,15 @@ clients_watching_poses: list["Messenger"] = []
 
 class Messenger:
     """
-    Wraps a websocket connection to conform to an API.
+    Wraps a websocket connection and sends structured messages. See messages.ts.
     """
 
     client: websockets.WebSocketServerProtocol
+    show_frame: bool
 
     def __init__(self, client: websockets.WebSocketServerProtocol) -> None:
         self.client = client
+        self.show_frame = False
 
     def __eq__(self, other) -> bool:
         return self.client == other.client
@@ -94,10 +97,26 @@ def get_model(model_name: str) -> str:
     return file_name
 
 
+class Timer:
+    def __init__(self, log: bool):
+        self.now = time.perf_counter()
+        self.log = log
+
+    def measure(self, name: str):
+        before = self.now
+        self.now = time.perf_counter()
+        duration = self.now - before
+        if self.log:
+            print(f"[perf] {name} {duration:.4f} sec")
+
+
 async def run_pose_loop() -> None:
     global is_pose_loop_running
     if is_pose_loop_running:
         return
+
+    # Set to True to debug timing.
+    timer = Timer(log=False)
 
     is_pose_loop_running = True
 
@@ -107,15 +126,31 @@ async def run_pose_loop() -> None:
             output_segmentation_masks=False,
         )
     )
+    timer.measure("Create pose landmarker")
 
     # https://docs.opencv.org/4.5.4/d8/dfe/classcv_1_1VideoCapture.html
     video_capture = cv2.VideoCapture(1)
     width, height = get_camera_resolution(video_capture)
-    print("Video backend:", video_capture.getBackendName())
-    print("Using video of size:", width, height)
+    backend_name = video_capture.getBackendName()
+    print("Video backend:", backend_name)
+    print("Original size:", width, height)
+
+    if backend_name == "AVFOUNDATION":
+        # macOS camera
+        video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        width, height = get_camera_resolution(video_capture)
+        print("Resized video:", width, height)
+
+    timer.measure("Camera created")
+
     while clients_watching_poses and video_capture.isOpened():
         # Free up the event loop to process websocket messages.
+
+        timer.measure("Start of loop")
         await asyncio.sleep(0)
+        timer.measure("After sleep")
 
         was_frame_returned, frame = video_capture.read()
         if not was_frame_returned:
@@ -123,12 +158,16 @@ async def run_pose_loop() -> None:
         # cv2.imwrite("feed-in.png", frame)
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
 
+        timer.measure("Get image")
         detection_result = pose_landmarker.detect(image)
+        timer.measure("Detect pose")
 
         poses: list[dict[str, Any]] = []
         for landmarks in detection_result.pose_landmarks:
             landmarks_list: list[list[float]] = []
-            poses.append({"landmarks": landmarks_list})
+            poses.append(
+                {"landmarks": landmarks_list, "timestamp": int(time.time() * 1000)}
+            )
             for landmark in landmarks:
                 landmarks_list.append(
                     [
@@ -143,7 +182,8 @@ async def run_pose_loop() -> None:
         for messenger in clients_watching_poses.copy():
             try:
                 await messenger.send_poses(poses, (width, height))
-                await messenger.send_frame(frame)
+                if messenger.show_frame:
+                    await messenger.send_frame(frame)
             except Exception as e:
                 print("Client send failed", e)
                 remove_from_list(clients_watching_poses, messenger)
@@ -188,11 +228,13 @@ async def handle_message(
             else:
                 await messenger.send_error(f'The model "{model}" is not available')
         case "watch-poses":
-            if client not in clients_watching_poses:
+            if messenger not in clients_watching_poses:
                 clients_watching_poses.append(messenger)
             await run_pose_loop()
         case "un-watch-poses":
             remove_from_list(clients_watching_poses, messenger)
+        case "show-frame":
+            messenger.show_frame = bool(data.get("show"))
         case _:
             await messenger.send_error("JSON message failed to parse")
 
@@ -224,8 +266,8 @@ async def ws_handler(client: websockets.WebSocketServerProtocol, path: str) -> N
 
 async def main():
     async with websockets.serve(ws_handler, "0.0.0.0", ws_port):
-        print("WebSocket server started on ws://0.0.0.0:8765")
-        print("connect via ws://dancecam1.local:8765 or similar")
+        print("WebSocket server listening on ws://0.0.0.0:8765")
+        print("connect via ws://dancecam1.local:8765, ws://localhost:8765 or similar")
         await asyncio.Future()  # Run forever
 
 
