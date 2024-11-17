@@ -114,6 +114,10 @@ function update(config: Config, current: Current): void {
     current.socket.send(JSON.stringify({ type: "show-frame", show: false }));
     current.showFrameRequested = false;
   }
+  if (!config.showFrame && current.frame) {
+    current.frame.remove();
+    current.frame = null;
+  }
 
   // TODO identify how to drop / add poses gracefully.
   if (current.poses.length > current.smoothedPoses.length) {
@@ -162,10 +166,6 @@ function updatePoseSmoothing(config: Config, current: Current) {
 function draw(config: Config, current: Current): void {
   const { ctx } = config;
   const { smoothedPoses } = current;
-
-  if (current.frame) {
-    ctx.drawImage(current.frame, 0, 0);
-  }
 
   // Clear out background.
   ctx.fillStyle = "#000";
@@ -289,8 +289,13 @@ function connectClient(current: Current) {
   socket.addEventListener("close", (event) => {
     current.isConnecting = false;
     current.socket = null;
+    if (current.frame) {
+      current.frame.remove();
+      current.frame = null;
+    }
+    current.poses = [];
+    current.smoothedPoses = [];
     console.log("WebSocket connection closed", wsUrl);
-    wsUrl;
   });
 
   socket.addEventListener("error", (event) => {
