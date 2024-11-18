@@ -136,7 +136,7 @@ export class DanceCamGUI {
   #gui: GUI;
   #danceDB: DanceDatabase;
   #danceNames: string[] = [];
-  selectedDance = "";
+  selectedDance = "Live Camera";
   isRecording = false;
   danceFolder: GUI;
   danceDropdown: GUIController;
@@ -169,11 +169,8 @@ export class DanceCamGUI {
 
     this.danceFolder.add(this, "deleteDance").name("Delete Dance");
     this.danceFolder.add(this, "downloadDance").name("Download Dance");
-    this.danceFolder.open();
 
-    this.refreshDances().then(() => {
-      this.danceDropdown.setValue("Live Camera");
-    });
+    this.refreshDances();
   }
 
   toggleRecording() {
@@ -209,6 +206,7 @@ export class DanceCamGUI {
   async refreshDances() {
     this.#danceNames = await this.#danceDB.listDances();
     this.danceDropdown.options(["Live Camera", ...this.#danceNames]);
-    this.selectedDance = this.#danceNames.length ? this.#danceNames[0] : "";
+    this.danceDropdown.setValue(this.selectedDance);
+    this.danceDropdown.updateDisplay();
   }
 }

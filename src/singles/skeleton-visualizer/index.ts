@@ -61,8 +61,9 @@ function getConfig() {
   return {
     ctx,
     seed,
-    poseSmoothing: 0.9,
-    showFrame: false,
+    poseSmoothing: getLocationNumber("poseSmoothing", 0.9),
+    showFrame: getLocationBoolean("showFrame", false),
+    showDebugInfo: getLocationBoolean("showDebugInfo", false),
   };
 }
 
@@ -70,8 +71,15 @@ async function getCurrent(config: Config) {
   const gui = new GUI();
   const danceDB = await DanceDatabase.create();
   const folder = gui.addFolder("Config");
-  folder.add(config, "poseSmoothing", 0, 1);
-  folder.add(config, "showFrame", false);
+  folder
+    .add(config, "poseSmoothing", 0, 1)
+    .onChange((value) => updateLocationValue("poseSmoothing", value));
+  folder
+    .add(config, "showFrame")
+    .onChange((value) => updateLocationValue("showFrame", value));
+  folder
+    .add(config, "showDebugInfo")
+    .onChange((value) => updateLocationValue("showDebugInfo", value));
 
   return {
     gui,
@@ -171,18 +179,20 @@ function draw(config: Config, current: Current): void {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-  ctx.fillStyle = "#fff";
-  const size = Math.round(8 * devicePixelRatio);
-  ctx.fillRect(
-    size + Math.sin(current.time * 3) * size * 2 + size,
-    size * 0.5,
-    size * 0.5,
-    size * 0.5
-  );
-  if (current.poseLatencyMS) {
-    ctx.font = `${size}px sans-serif`;
-    ctx.fillText(`${current.poseLatencyMS}ms pose`, size, size * 2.5);
-    ctx.fillText(`${current.poses.length} poses detected`, size, size * 3.5);
+  if (config.showDebugInfo) {
+    ctx.fillStyle = "#fff";
+    const size = Math.round(8 * devicePixelRatio);
+    ctx.fillRect(
+      size + Math.sin(current.time * 3) * size * 2 + size,
+      size * 0.5,
+      size * 0.5,
+      size * 0.5
+    );
+    if (current.poseLatencyMS) {
+      ctx.font = `${size}px sans-serif`;
+      ctx.fillText(`${current.poseLatencyMS}ms pose`, size, size * 2.5);
+      ctx.fillText(`${current.poses.length} poses detected`, size, size * 3.5);
+    }
   }
 
   // Draw the points of the poses.
@@ -301,4 +311,39 @@ function connectClient(current: Current) {
   socket.addEventListener("error", (event) => {
     console.error("WebSocket error:", event);
   });
+}
+
+function getLocationString(key: string, defaultValue?: string) {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(key) ?? defaultValue;
+}
+
+function getLocationNumber(key: string, defaultValue = 0) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const storedValue = urlParams.get(key);
+  if (storedValue === null) {
+    return defaultValue;
+  }
+  const number = Number(storedValue);
+  if (Number.isNaN(number)) {
+    return defaultValue;
+  }
+  return number;
+}
+
+function getLocationBoolean(key: string, defaultValue = false) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const storedValue = urlParams.get(key);
+  if (storedValue === null) {
+    return defaultValue;
+  }
+  return storedValue === "true";
+}
+
+function updateLocationValue(key: string, value: string) {
+  const urlParams = new URLSearchParams(window.location.search);
+  urlParams.set(key, value);
+  const url = new URL(window.location.href);
+  const newLocation = `${url.origin}${url.pathname}?${urlParams}`;
+  history.replaceState(null, "", newLocation);
 }
