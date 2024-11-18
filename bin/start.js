@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-let loadInquirer = import("inquirer");
+const loadInquirer = import("inquirer");
 const {
   findSessionFromCli,
   getAllSessions,
@@ -25,6 +25,8 @@ const cyan = "\u001b[36m";
 const white = "\u001b[37m";
 const reset = "\u001b[0m";
 /* eslint-enable @typescript-eslint/no-unused-vars */
+
+const disabledWatch = new Set(["skeleton-visualizer"]);
 
 (async () => {
   const inquirer = (await loadInquirer).default;
@@ -92,6 +94,9 @@ const reset = "\u001b[0m";
     outputPublicPath: "/",
   });
 
+  const liveReload =
+    process.env.NODE_ENV === "development" && !disabledWatch.has(sessionSlug);
+
   // TODO - Type this:
   /** @type {any} */
   const serverConfig = {
@@ -100,9 +105,10 @@ const reset = "\u001b[0m";
       {
         directory: config.output.path,
         publicPath: config.output.publicPath,
-      }
+      },
     ],
-    hot: process.env.NODE_ENV === "development" ? true : false,
+    hot: liveReload,
+    liveReload,
   };
 
   const port = 9966;
