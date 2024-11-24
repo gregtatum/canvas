@@ -9,7 +9,8 @@ import {
   Pose,
 } from "lib/dancecam/messages";
 import lerp from "lerp";
-import { DanceCamGUI, DanceDatabase } from "lib/dancecam/pose-db";
+import { DanceCam, DanceDatabase } from "lib/dancecam";
+import { exposeAsGlobal } from "lib/utils";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = Awaited<ReturnType<typeof getCurrent>>;
@@ -30,26 +31,83 @@ main();
 async function main() {
   const config = getConfig();
   const current = await getCurrent(config);
+  exposeAsGlobal("current", current);
+  exposeAsGlobal("config", config);
 
-  current.danceCamGUI.onStartRecording = () => {
-    current.recording = "starting";
+  current.danceCam.onStartRecording = () => {
+    current.danceRecording = [];
   };
-  current.danceCamGUI.onStartRecording = () => {
-    current.recording = "off";
-    return current.dance;
+  current.danceCam.onStopRecording = () => {
+    return current.danceRecording;
   };
-  (window as any).current = current;
-  (window as any).config = config;
+  current.danceCam.onChangeDance = (dance) => {
+    updateLocationValue("dance", current.danceCam.selectedDance);
+    // Reset any smoothing.
+    current.smoothedPoses = [];
+    current.poses = [];
+    if (dance) {
+      current.danceReplay = new DanceReplay(dance);
+      current.socket?.close();
+    } else {
+      current.danceReplay = null;
+    }
+  };
 
   loop((now) => {
     current.time = now;
     update(config, current);
     draw(config, current);
   });
+}
 
-  window.onhashchange = function (): void {
-    location.reload();
-  };
+class DanceReplay {
+  dance: Dance;
+  duration: number;
+  startTime: number;
+  endTime: number;
+  scrubberTime: number;
+  lastTimestamp: number;
+
+  constructor(dance: Dance) {
+    this.dance = dance;
+
+    let startTime = Infinity;
+    let endTime = -Infinity;
+    for (const poseFrame of dance) {
+      startTime = Math.min(startTime, poseFrame.timestamp);
+      endTime = Math.max(endTime, poseFrame.timestamp);
+    }
+    this.duration =
+      endTime -
+      startTime +
+      // Add on a bit of time for the last frame.
+      (endTime - startTime) / dance.length;
+
+    this.startTime = startTime;
+    this.endTime = endTime;
+    this.scrubberTime = 0;
+    this.lastTimestamp = Date.now();
+  }
+
+  getCurrentPoses(): Pose[] {
+    // Advance the scrubberTime.
+    const nextTimestamp = Date.now();
+    const dt = nextTimestamp - this.lastTimestamp;
+    this.lastTimestamp = nextTimestamp;
+    this.scrubberTime = (this.scrubberTime + dt) % this.duration;
+
+    // Find the poseFrame for the scrubber time.
+    let targetPoseFrame = this.dance[0];
+    const scrubberTimestamp = this.scrubberTime + this.startTime;
+    for (const poseFrame of this.dance) {
+      if (poseFrame.timestamp > scrubberTimestamp) {
+        break;
+      }
+      targetPoseFrame = poseFrame;
+    }
+
+    return targetPoseFrame.poses;
+  }
 }
 
 function getConfig() {
@@ -81,12 +139,21 @@ async function getCurrent(config: Config) {
     .add(config, "showDebugInfo")
     .onChange((value) => updateLocationValue("showDebugInfo", value));
 
+  const danceCam = await DanceCam.create(
+    danceDB,
+    document.body,
+    getLocationString("dance")
+  );
+
+  const dance = await danceCam.getSelectedDance();
+  const danceReplay = dance ? new DanceReplay(dance) : null;
+
   return {
     gui,
     danceDB,
-    danceCamGUI: await DanceCamGUI.create(gui, danceDB),
-    recording: "off" as "off" | "starting" | "on",
-    dance: [] as Dance,
+    danceCam,
+    danceReplay,
+    danceRecording: [] as Dance,
     time: 0,
     // TODO -- Add UI to specify this.
     wsUrl: "ws://localhost:8765",
@@ -106,21 +173,33 @@ async function getCurrent(config: Config) {
 }
 
 function update(config: Config, current: Current): void {
-  if (!current.socket && !current.isConnecting && !document.hidden) {
+  if (
+    !current.socket &&
+    !current.isConnecting &&
+    !document.hidden &&
+    !current.danceReplay
+  ) {
     current.isConnecting = true;
     connectClient(current);
   }
-  if (!current.socket) {
+
+  if (!current.socket && !current.danceReplay) {
     return;
   }
 
+  if (current.danceReplay) {
+    current.poses = current.danceReplay.getCurrentPoses();
+  }
+
   // Adjust the requests for showing the frame.
-  if (config.showFrame && !current.showFrameRequested) {
-    current.socket.send(JSON.stringify({ type: "show-frame", show: true }));
-    current.showFrameRequested = true;
-  } else if (!config.showFrame && current.showFrameRequested) {
-    current.socket.send(JSON.stringify({ type: "show-frame", show: false }));
-    current.showFrameRequested = false;
+  if (current.socket) {
+    if (config.showFrame && !current.showFrameRequested) {
+      current.socket.send(JSON.stringify({ type: "show-frame", show: true }));
+      current.showFrameRequested = true;
+    } else if (!config.showFrame && current.showFrameRequested) {
+      current.socket.send(JSON.stringify({ type: "show-frame", show: false }));
+      current.showFrameRequested = false;
+    }
   }
   if (!config.showFrame && current.frame) {
     current.frame.remove();
@@ -130,12 +209,7 @@ function update(config: Config, current: Current): void {
   // TODO identify how to drop / add poses gracefully.
   if (current.poses.length > current.smoothedPoses.length) {
     current.smoothedPoses = current.poses.map((pose) => {
-      return {
-        timestamp: pose.timestamp,
-        landmarks: pose.landmarks.map(
-          (landmark) => landmark.slice() as Landmark
-        ),
-      };
+      return pose.map((landmark) => landmark.slice() as Landmark);
     });
   }
 
@@ -153,9 +227,9 @@ function updatePoseSmoothing(config: Config, current: Current) {
     const pose = poses[i];
     const smoothedPose = smoothedPoses[i];
 
-    for (let j = 0; j < pose.landmarks.length; j++) {
-      const landmark1 = pose.landmarks[j];
-      const landmark2 = smoothedPose.landmarks[j];
+    for (let j = 0; j < pose.length; j++) {
+      const landmark1 = pose[j];
+      const landmark2 = smoothedPose[j];
       landmark2[0] = lerp(landmark1[0], landmark2[0], poseSmoothing);
       landmark2[1] = lerp(landmark1[1], landmark2[1], poseSmoothing);
       landmark2[2] = lerp(landmark1[2], landmark2[2], poseSmoothing);
@@ -202,12 +276,12 @@ function draw(config: Config, current: Current): void {
   const midScreen = innerWidth / 2;
   const scaleX = innerHeight;
   const scaleY = innerHeight;
-  for (const { landmarks } of smoothedPoses) {
+  for (const pose of smoothedPoses) {
     // Draw the connections
     ctx.beginPath();
     for (const [a, b] of poseConnections) {
-      const [xa, ya] = landmarks[a];
-      const [xb, yb] = landmarks[b];
+      const [xa, ya] = pose[a];
+      const [xb, yb] = pose[b];
       ctx.moveTo(xa * scaleX - hw + midScreen, ya * scaleY);
       ctx.lineTo(xb * scaleX - hw + midScreen, yb * scaleY);
     }
@@ -215,7 +289,7 @@ function draw(config: Config, current: Current): void {
     ctx.stroke();
 
     // Draw the points
-    for (const [x, y, z, visibility, presence] of landmarks) {
+    for (const [x, y, z, visibility, presence] of pose) {
       ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
     }
   }
@@ -265,12 +339,16 @@ function connectClient(current: Current) {
         break;
       }
       case "poses": {
-        const { poses, resolution } = data;
+        const { posesFrame } = data;
+        const { poses, resolution } = posesFrame;
         if (!poses.length) {
           // Ignore dropped poses
           return;
         }
         current.poses = poses;
+        if (current.danceCam.isRecording) {
+          current.danceRecording.push(posesFrame);
+        }
 
         const now = performance.now();
         if (current.lastPostTimeMS) {
@@ -280,8 +358,8 @@ function connectClient(current: Current) {
 
         // The landmarks come in squished from the original resolution of
         // something like 640x480 as a value between -1 and 1.
-        for (const { landmarks } of poses) {
-          for (const landmark of landmarks) {
+        for (const pose of poses) {
+          for (const landmark of pose) {
             if (current.flip) {
               landmark[0] = 1 - landmark[0];
             }

@@ -86,8 +86,11 @@ class Messenger:
         await self._send(
             {
                 "type": "poses",
-                "poses": poses,
-                "resolution": resolution,
+                "posesFrame": {
+                    "poses": poses,
+                    "resolution": resolution,
+                    "timestamp": int(time.time() * 1000),
+                },
             }
         )
 
@@ -207,12 +210,10 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
 
         poses: list[dict[str, Any]] = []
         for landmarks in detection_result.pose_landmarks:
-            landmarks_list: list[list[float]] = []
-            poses.append(
-                {"landmarks": landmarks_list, "timestamp": int(time.time() * 1000)}
-            )
+            pose: list[list[float]] = []
+            poses.append(pose)
             for landmark in landmarks:
-                landmarks_list.append(
+                pose.append(
                     [
                         cast(float, landmark.x),
                         cast(float, landmark.y),

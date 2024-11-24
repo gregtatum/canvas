@@ -48,3 +48,8 @@ export function addCSS(text: string): void {
   styleSheet.innerText = text;
   document.head.appendChild(styleSheet);
 }
+
+export function exposeAsGlobal(name: string, value: any) {
+  (window as any)[name] = value;
+  console.log(name, value);
+}

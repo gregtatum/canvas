@@ -6,18 +6,20 @@ export type Landmark = [
   presence: number
 ];
 
-export interface Pose {
-  landmarks: Array<Landmark>;
+export interface PosesFrame {
+  poses: Pose[];
   timestamp: number;
+  resolution: [number, number];
 }
 
-export type Dance = Pose[];
+export type Pose = Landmark[];
+
+export type Dance = Array<PosesFrame>;
 
 export type DanceCamEventsToClient =
   | {
       type: "poses";
-      poses: Array<Pose>;
-      resolution: [number, number];
+      posesFrame: PosesFrame;
     }
   | {
       type: "error";
