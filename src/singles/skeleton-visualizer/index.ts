@@ -1,4 +1,6 @@
 import { GUI } from "dat.gui";
+import createControls from "orbit-controls";
+import createCamera from "perspective-camera";
 
 import initializeShortcuts from "lib/shortcuts";
 import { setupCanvas, loop, generateSeed } from "lib/draw";
@@ -9,8 +11,15 @@ import {
   Pose,
 } from "lib/dancecam/messages";
 import lerp from "lerp";
-import { DanceCam, DanceDatabase } from "lib/dancecam";
+import {
+  DanceCam,
+  DanceDatabase,
+  LandmarkNames,
+  landmarks,
+  PoseAnalysis,
+} from "lib/dancecam";
 import { exposeAsGlobal } from "lib/utils";
+import { mat3, mat4, vec3, vec4 } from "lib/vec-math";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = Awaited<ReturnType<typeof getCurrent>>;
@@ -148,8 +157,28 @@ async function getCurrent(config: Config) {
   const dance = await danceCam.getSelectedDance();
   const danceReplay = dance ? new DanceReplay(dance) : null;
 
+  const controls = createControls({
+    phi: Math.PI * 0.4,
+    theta: 0.2,
+    distanceBounds: [0.5, 1.5],
+    phiBounds: [Math.PI * 0.4, Math.PI * 0.6],
+    zoomSpeed: 0.001,
+    pinchSpeed: 0.001,
+    rotateSpeed: 0.025,
+    damping: 0.01,
+    element: config.ctx.canvas,
+  });
+
+  const camera = createCamera({
+    near: 0.01,
+    far: 10,
+    position: [0, 0, 3],
+  });
+
   return {
     gui,
+    camera,
+    controls,
     danceDB,
     danceCam,
     danceReplay,
@@ -162,7 +191,9 @@ async function getCurrent(config: Config) {
     // wsUrl: 'ws://dancecam1.local:8765'
     socket: null as null | WebSocket,
     poses: [] as Pose[],
+    poseAnalysis: new PoseAnalysis(),
     smoothedPoses: [] as Pose[],
+    transformedPoses: [] as Array<Tuple3[]>,
     // Flip the camera image.
     flip: true,
     frame: null as HTMLImageElement | null,
@@ -191,6 +222,21 @@ function update(config: Config, current: Current): void {
     current.poses = current.danceReplay.getCurrentPoses();
   }
 
+  if (current.poses.length) {
+    current.poseAnalysis.update(current.poses[0]);
+  }
+
+  {
+    // Update the camera.
+    const { controls, camera } = current;
+    controls.update();
+    controls.copyInto(camera.position, camera.direction, camera.up);
+    camera.update();
+
+    camera.view;
+    camera.projection;
+  }
+
   // Adjust the requests for showing the frame.
   if (current.socket) {
     if (config.showFrame && !current.showFrameRequested) {
@@ -214,6 +260,12 @@ function update(config: Config, current: Current): void {
   }
 
   updatePoseSmoothing(config, current);
+
+  current.transformedPoses = current.smoothedPoses.map((pose) =>
+    pose.map((landmark) =>
+      vec3.rotateY(vec3.create(), landmark as any as Tuple3, [0, 0, 0], 0)
+    )
+  );
 }
 
 /**
@@ -247,7 +299,7 @@ function updatePoseSmoothing(config: Config, current: Current) {
 
 function draw(config: Config, current: Current): void {
   const { ctx } = config;
-  const { smoothedPoses } = current;
+  const poses = current.transformedPoses;
 
   // Clear out background.
   ctx.fillStyle = "#000";
@@ -276,7 +328,8 @@ function draw(config: Config, current: Current): void {
   const midScreen = innerWidth / 2;
   const scaleX = innerHeight;
   const scaleY = innerHeight;
-  for (const pose of smoothedPoses) {
+  for (const pose of poses) {
+    ctx.lineWidth = 1 * devicePixelRatio;
     // Draw the connections
     ctx.beginPath();
     for (const [a, b] of poseConnections) {
@@ -288,11 +341,78 @@ function draw(config: Config, current: Current): void {
     ctx.strokeStyle = "#fff4";
     ctx.stroke();
 
+    drawLine(config, current, pose, [
+      "right index knuckle",
+      "right wrist",
+      "right elbow",
+      "right shoulder",
+      "left shoulder",
+      "left elbow",
+      "left wrist",
+      "left index knuckle",
+    ]);
+
     // Draw the points
-    for (const [x, y, z, visibility, presence] of pose) {
+    for (const [x, y] of pose) {
       ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
     }
   }
+
+  drawPoseAnalysis(config, current);
+}
+
+function drawLine(
+  config: Config,
+  current: Current,
+  pose: Pose | Tuple3[],
+  line: LandmarkNames[]
+) {
+  const { ctx } = config;
+  const w = 10;
+  const hw = w / 2;
+  const midScreen = innerWidth / 2;
+  const scaleX = innerHeight;
+  const scaleY = innerHeight;
+  ctx.beginPath();
+  for (let i = 1; i < line.length; i++) {
+    const [xa, ya] = pose[landmarks[line[i - 1]]];
+    const [xb, yb] = pose[landmarks[line[i]]];
+    ctx.moveTo(xa * scaleX - hw + midScreen, ya * scaleY);
+    ctx.lineTo(xb * scaleX - hw + midScreen, yb * scaleY);
+  }
+  ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.strokeStyle = "#f00";
+  ctx.stroke();
+}
+
+const poseAngles = [
+  "upperArmAngleLeft",
+  "upperArmAngleRight",
+  "forearmAngleLeft",
+  "forearmAngleRight",
+  // "elbowForwardBackLeft",
+  // "elbowForwardBackRight",
+] as const;
+
+function drawPoseAnalysis(config: Config, current: Current) {
+  const { poseAnalysis } = current;
+
+  const { ctx } = config;
+
+  ctx.fillStyle = "#fff";
+  const size = 30;
+  ctx.font = `${size}px sans-serif`;
+  for (let i = 0; i < poseAngles.length; i++) {
+    const key = poseAngles[i];
+    ctx.fillText(
+      `${key} : ${poseAnalysis[key].toFixed(2)}`,
+      5,
+      size * i * 1.5 + size
+    );
+  }
+  poseAnalysis.getTuple3("left shoulder"),
+    poseAnalysis.getTuple3("left elbow"),
+    poseAnalysis.getTuple3("left wrist");
 }
 
 function connectClient(current: Current) {
@@ -424,4 +544,27 @@ function updateLocationValue(key: string, value: string) {
   const url = new URL(window.location.href);
   const newLocation = `${url.origin}${url.pathname}?${urlParams}`;
   history.replaceState(null, "", newLocation);
+}
+
+function transformPointWithProjViewMatrix(
+  point: Tuple3,
+  projViewMatrix: MatrixTuple4x4
+): Tuple3 {
+  // Convert the 3D point to a 4D vector (homogeneous coordinates)
+  const point4D = vec4.fromValues(point[0], point[1], point[2], 1);
+
+  // Transform the point by the projection-view matrix
+  const transformedPoint = vec4.create();
+  vec4.transformMat4(transformedPoint, point4D, projViewMatrix);
+
+  // Convert the result back to a 3D point (divide by w)
+  const w = transformedPoint[3];
+  if (w !== 0) {
+    return [
+      transformedPoint[0] / w,
+      transformedPoint[1] / w,
+      transformedPoint[2] / w,
+    ];
+  }
+  throw new Error("Transformation resulted in w = 0, point is at infinity.");
 }

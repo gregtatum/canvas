@@ -208,7 +208,7 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
 
         detection_result = await pose_detection_future
 
-        poses: list[dict[str, Any]] = []
+        poses: list[list[list[float]]] = []
         for landmarks in detection_result.pose_landmarks:
             pose: list[list[float]] = []
             poses.append(pose)

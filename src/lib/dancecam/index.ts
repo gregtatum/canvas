@@ -1,5 +1,6 @@
 /* eslint-disable no-alert */
-import { Dance } from "./messages";
+import { vec2, vec3 } from "lib/vec-math";
+import { Dance, Pose } from "./messages";
 import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";
@@ -10,6 +11,33 @@ interface DanceRow {
   name: string;
   dance: Dance;
   timestamp: number;
+}
+
+// prettier-ignore
+const landmarksList = [
+  "nose",
+  "right eye inner",     "right eye center", "right eye outer",
+  "left eye inner",      "left eye center",  "left eye outer",
+  "right ear",           "left ear",
+  "right mouth corner",  "left mouth corner",
+  "right shoulder",      "left shoulder",
+  "right elbow",         "left elbow",
+  "right wrist",         "left wrist",
+  "right pinky knuckle", "left pinky knuckle",
+  "right index knuckle", "left index knuckle",
+  "right thumb knuckle", "left thumb knuckle",
+  "right hip",           "left hip",
+  "right knee",          "left knee",
+  "right ankle",         "left ankle",
+  "right heel",          "left heel",
+  "right foot index",    "left foot index",
+] as const
+
+export type LandmarkNames = typeof landmarksList[number];
+
+export const landmarks: Record<string, number> = {};
+for (let i = 0; i < landmarksList.length; i++) {
+  landmarks[landmarksList[i]] = i;
 }
 
 /**
@@ -357,6 +385,9 @@ export class DanceCam {
   };
 
   deleteDance = async () => {
+    if (!confirm(`Are you sure you want to delete "${this.selectedDance}"?`)) {
+      return;
+    }
     const { danceDropdown } = this.elements;
     if (this.selectedDance) {
       const danceName = this.selectedDance;
@@ -407,4 +438,182 @@ function hide(element: HTMLElement) {
 
 function show(element: HTMLElement) {
   element.style.display = "block";
+}
+
+const _calculateAngle_v1 = vec3.create();
+const _calculateAngle_v2 = vec3.create();
+
+/**
+ * Calculate the angle between the vectors formed by three 3D points.
+ */
+function calculateAngle(a: Tuple3, b: Tuple3, c: Tuple3): Radian {
+  const v1 = _calculateAngle_v1;
+  const v2 = _calculateAngle_v2;
+
+  // Compute vectors from B to A and B to C
+  vec3.subtract(v1, a, b);
+  vec3.subtract(v2, c, b);
+
+  // Compute the dot product.
+  vec3.normalize(v1, v1);
+  vec3.normalize(v2, v2);
+  const dot = vec3.dot(v1, v2);
+
+  // Clamp the dot product to the range [-1, 1] to avoid NaN due to precision errors
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+
+  // Calculate the angle in radians.
+  return Math.acos(clampedDot);
+}
+
+const _calculateAngleV2_v1 = vec2.create();
+const _calculateAngleV2_v2 = vec2.create();
+
+/**
+ * Calculate the angle between the vectors formed by three 3D points.
+ */
+function calculateAngleV2(a3: Tuple3, b3: Tuple3, c3: Tuple3): Radian {
+  const a = a3 as any as Tuple2;
+  const b = b3 as any as Tuple2;
+  const c = c3 as any as Tuple2;
+  const v1 = _calculateAngleV2_v1;
+  const v2 = _calculateAngleV2_v2;
+
+  // Compute vectors from B to A and B to C
+  vec2.subtract(v1, a, b);
+  vec2.subtract(v2, c, b);
+
+  // Compute the dot product.
+  vec2.normalize(v1, v1);
+  vec2.normalize(v2, v2);
+  const dot = vec2.dot(v1, v2);
+
+  // Clamp the dot product to the range [-1, 1] to avoid NaN due to precision errors
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+
+  // Calculate the angle in radians.
+  return Math.acos(clampedDot);
+}
+
+const _projPtVec1 = vec3.create();
+const _projPtVec2 = vec3.create();
+
+function projectPointOntoPlane(
+  out: Tuple3,
+  point: Tuple3,
+  planeNormal: Tuple3,
+  planePoint: Tuple3
+) {
+  // Compute the vector from the point on the plane to the point to be projected
+  const pointToPlane = vec3.sub(_projPtVec1, point, planePoint);
+
+  // Compute the distance from the point to the plane
+  const distance = vec3.dot(pointToPlane, planeNormal);
+
+  // Compute the projection of the point onto the plane
+  return vec3.sub(out, point, vec3.scale(_projPtVec2, planeNormal, distance));
+}
+
+const _midShoulder = vec3.create();
+
+export class PoseAnalysis {
+  pose: Pose = [];
+
+  upperArmAngleLeft = 0;
+  upperArmAngleRight = 0;
+  forearmAngleLeft = 0;
+  forearmAngleRight = 0;
+  elbowForwardBackLeft = 0;
+  elbowForwardBackRight = 0;
+
+  getLandmark(name: LandmarkNames) {
+    return this.pose[landmarks[name]];
+  }
+
+  /**
+   * Coerce a Landmark into a Tuple3. Mildly incorrect, but probably safe for
+   * immutable operations.
+   */
+  getTuple3(name: LandmarkNames) {
+    return this.pose[landmarks[name]] as any as Tuple3;
+  }
+
+  getMidShoulder() {
+    const midShoulder = vec3.add(
+      _midShoulder,
+      this.getTuple3("right shoulder"),
+      this.getTuple3("left shoulder")
+    );
+    vec3.scale(midShoulder, midShoulder, 0.5);
+    return midShoulder;
+  }
+
+  update(pose: Pose) {
+    this.pose = pose;
+    this.upperArmAngleLeft = calculateAngleV2(
+      this.getTuple3("left hip"),
+      this.getTuple3("left shoulder"),
+      this.getTuple3("left elbow")
+    );
+    this.upperArmAngleRight = calculateAngleV2(
+      this.getTuple3("right hip"),
+      this.getTuple3("right shoulder"),
+      this.getTuple3("right elbow")
+    );
+    this.forearmAngleLeft = calculateAngleV2(
+      this.getTuple3("left shoulder"),
+      this.getTuple3("left elbow"),
+      this.getTuple3("left wrist")
+    );
+    this.forearmAngleRight = calculateAngleV2(
+      this.getTuple3("right shoulder"),
+      this.getTuple3("right elbow"),
+      this.getTuple3("right wrist")
+    );
+
+    const midShoulder = this.getMidShoulder();
+
+    this.elbowForwardBackLeft = getConstrainedAngle(
+      midShoulder,
+      this.getTuple3("left shoulder"),
+      this.getTuple3("left hip"),
+      this.getTuple3("left elbow")
+    );
+
+    this.elbowForwardBackRight = getConstrainedAngle(
+      midShoulder,
+      this.getTuple3("right shoulder"),
+      this.getTuple3("right hip"),
+      this.getTuple3("right elbow")
+    );
+  }
+}
+
+const _constrVec1 = vec3.create();
+const _constrVec2 = vec3.create();
+
+function getConstrainedAngle(
+  basePoint: Tuple3,
+  tipPoint: Tuple3,
+  planeReference: Tuple3,
+  pointToProject: Tuple3
+): Radian {
+  const planeNormal = getPlaneNormalAtTip(
+    _constrVec1,
+    tipPoint,
+    planeReference
+  );
+  const projectedElbow = projectPointOntoPlane(
+    _constrVec2,
+    pointToProject,
+    planeNormal,
+    tipPoint
+  );
+  return calculateAngle(basePoint, tipPoint, projectedElbow);
+}
+
+function getPlaneNormalAtTip(out: Tuple3, base: Tuple3, tip: Tuple3): Tuple3 {
+  vec3.subtract(out, tip, base);
+  vec3.normalize(out, out);
+  return out;
 }
