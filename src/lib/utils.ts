@@ -53,3 +53,10 @@ export function exposeAsGlobal(name: string, value: any) {
   (window as any)[name] = value;
   console.log(name, value);
 }
+
+/**
+ * Constrain a number to be within a range of [min, max].
+ */
+export function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}

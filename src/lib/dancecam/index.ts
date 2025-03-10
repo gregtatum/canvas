@@ -617,3 +617,249 @@ function getPlaneNormalAtTip(out: Tuple3, base: Tuple3, tip: Tuple3): Tuple3 {
   vec3.normalize(out, out);
   return out;
 }
+
+const logged: Record<string, boolean> = {};
+function logOnce(name: string, ...args: any[]) {
+  if (logged[name]) {
+    return;
+  }
+  logged[name] = true;
+  console.log(`!!! ${name}`, ...args);
+}
+
+/**
+ * Linearly interpolate to find a point along a path.
+ */
+export class LerpOnPath {
+  // This value is cached between calls, so it leaks memory based on the size of the
+  // path, which is fine since we want to avoid the GC of creating new arrays.
+  #distances: number[] = [];
+  #totalDistance = 0;
+  #path: Tuple3[] = [];
+  #result: Tuple3 = [0, 0, 0];
+
+  setPath(path: Tuple3[]) {
+    this.#path = path;
+
+    // Compute distances between consecutive points
+    this.#totalDistance = 0;
+    for (let i = 1; i < path.length; i++) {
+      const distance = vec3.distance(path[i - 1], path[i]);
+      this.#distances[i - 1] = distance;
+      this.#totalDistance += distance;
+    }
+  }
+
+  getValue(t: number, out: Tuple3 = this.#result): Tuple3 {
+    if (this.#path.length === 0) {
+      return vec3.set(out, 0, 0, 0);
+    }
+
+    if (this.#path.length === 1) {
+      return vec3.copy(out, this.#path[0]);
+    }
+
+    const distances = this.#distances;
+
+    // Handle t being out of the bounds [0, 1]
+    if (t < 0) {
+      // Extend behind first point.
+      const segmentT = (t * distances[0]) / this.#totalDistance;
+      return vec3.lerp(out, this.#path[0], this.#path[1], segmentT);
+    }
+
+    if (t > 1) {
+      // Extend beyond last point.
+      const segmentT =
+        ((t - 1) * distances[distances.length - 1]) / this.#totalDistance;
+      return vec3.lerp(
+        out,
+        this.#path[this.#path.length - 2],
+        this.#path[this.#path.length - 1],
+        1 + segmentT
+      );
+    }
+    const path = this.#path;
+    const targetDistance = t * this.#totalDistance;
+
+    // Locate the segment where the target distance falls
+    let accumulatedDistance = 0;
+    for (let i = 1; i < path.length; i++) {
+      const nextAccumulatedDistance = accumulatedDistance + distances[i - 1];
+
+      if (targetDistance <= nextAccumulatedDistance) {
+        // Compute local t within the segment
+        const segmentT =
+          (targetDistance - accumulatedDistance) / distances[i - 1];
+
+        return vec3.lerp(out, path[i - 1], path[i], segmentT);
+      }
+
+      accumulatedDistance = nextAccumulatedDistance;
+    }
+
+    return path[path.length - 1];
+  }
+}
+
+/**
+ * Smoothly interpolate to find a point along a path using a 4-point cubic Bézier curve.
+ */
+export class BezierOnPath {
+  // This value is cached between calls, so it leaks memory based on the size of the
+  // path, which is fine since we want to avoid the GC of creating new arrays.
+  distances: number[] = [];
+  totalDistance = 0;
+  path: Tuple3[] = [];
+  result: Tuple3 = [0, 0, 0];
+  controlPointsStart: Tuple3[] = [];
+  controlPointsEnd: Tuple3[] = [];
+
+  setPath(path: Tuple3[], smoothingFactor = 0.3) {
+    this.path = path;
+    if (path.length < 2) {
+      // This path is to small to compute a Bezier curve.
+    }
+
+    // Compute distances between consecutive points.
+    this.totalDistance = 0;
+    for (let i = 1; i < path.length; i++) {
+      const distance = vec3.distance(path[i - 1], path[i]);
+      this.distances[i - 1] = distance;
+      this.totalDistance += distance;
+    }
+
+    // Compute the control points. Visit each segment composed of pointA and pointB.
+    // The control points will be positioned according to the previous and next segments.
+    // https://www.desmos.com/calculator/ebdtbxgbq0
+    for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex++) {
+      const pointAIndex = segmentIndex;
+      const pointBIndex = segmentIndex + 1;
+
+      const prevPointA = path[pointAIndex - 1];
+      const pointA = path[pointAIndex];
+      const pointB = path[pointBIndex];
+      const nextPointB = path[pointBIndex + 1];
+      const segmentDistance = this.distances[segmentIndex];
+      const moveDistance = segmentDistance * smoothingFactor;
+
+      logOnce(`${segmentIndex} - prevPointA`, prevPointA);
+      logOnce(`${segmentIndex} - nextPointB`, nextPointB);
+
+      let controlPointA;
+      if (prevPointA) {
+        controlPointA = vec3.create();
+        vec3.sub(controlPointA, pointA, prevPointA);
+        vec3.normalize(controlPointA, controlPointA);
+        vec3.scaleAndAdd(controlPointA, pointA, controlPointA, moveDistance);
+      } else {
+        controlPointA = vec3.clone(pointA);
+      }
+      this.controlPointsStart[segmentIndex] = controlPointA;
+
+      let controlPointB;
+      if (nextPointB) {
+        controlPointB = vec3.create();
+        vec3.sub(controlPointB, pointB, nextPointB);
+        vec3.normalize(controlPointB, controlPointB);
+        vec3.scaleAndAdd(controlPointB, pointB, controlPointB, moveDistance);
+      } else {
+        controlPointB = vec3.clone(pointB);
+      }
+
+      this.controlPointsEnd[segmentIndex] = controlPointB;
+    }
+  }
+
+  /**
+   * Get a point along the curve.
+   */
+  getValue(t: number, out: Tuple3 = this.result): Tuple3 {
+    if (this.path.length === 0) {
+      return vec3.set(out, 0, 0, 0);
+    }
+
+    if (this.path.length === 1) {
+      return vec3.copy(out, this.path[0]);
+    }
+
+    const path = this.path;
+    const targetDistance = t * this.totalDistance;
+    logOnce("targetDistance", targetDistance);
+    logOnce("path", path);
+    logOnce("bezierOnPath", this);
+
+    // Locate the segment where the target distance falls
+    let accumulatedDistance = 0;
+    const segmentCount = path.length - 1;
+    for (
+      let segmentIndex = 0;
+      segmentIndex < segmentCount - 1;
+      segmentIndex++
+    ) {
+      logOnce(`segmentIndex ${segmentIndex}`);
+      const pointAIndex = segmentIndex;
+      const pointBIndex = segmentIndex + 1;
+
+      const segmentDistance = this.distances[segmentIndex];
+      const nextAccumulatedDistance = accumulatedDistance + segmentDistance;
+
+      if (targetDistance <= nextAccumulatedDistance) {
+        logOnce(`segmentIndex ${segmentIndex} segment found`);
+
+        // Compute local t within the segment
+        const segmentT =
+          (targetDistance - accumulatedDistance) / segmentDistance;
+
+        // Get Bézier control points for this segment
+        // https://www.desmos.com/calculator/ebdtbxgbq0
+        const cpA = this.controlPointsStart[segmentIndex]; // Control point or previous point.
+        const pA = this.path[pointAIndex]; // First point of the segment.
+        const pB = this.path[pointBIndex]; // Second point of the segment.
+        const cpB = this.controlPointsEnd[segmentIndex]; // Control point or next point.
+
+        logOnce(`- ${segmentIndex} segmentT`, segmentT);
+        logOnce(`- ${segmentIndex} targetDistance`, targetDistance);
+        logOnce(`- ${segmentIndex} accumulatedDistance`, accumulatedDistance);
+        logOnce(`- ${segmentIndex} cpA`, cpA);
+        logOnce(`- ${segmentIndex} pA`, pA);
+        logOnce(`- ${segmentIndex} pB`, pB);
+        logOnce(`- ${segmentIndex} cpB`, cpB);
+
+        return this.#computeCubicBezier(out, cpA, pA, pB, cpB, segmentT);
+      }
+      accumulatedDistance = nextAccumulatedDistance;
+    }
+
+    // This is beyond the range.
+    return vec3.copy(out, path[path.length - 1]);
+  }
+
+  /**
+   * Computes a point on a cubic Bézier curve given two anchor points and two control points.
+   */
+  #computeCubicBezier(
+    out: Tuple3,
+    cpA: Tuple3,
+    pA: Tuple3,
+    ppB: Tuple3,
+    cpB: Tuple3,
+    t: number
+  ): Tuple3 {
+    const u = 1 - t;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const t2 = t * t;
+    const t3 = t2 * t;
+
+    // Bézier curve equation
+    out[0] =
+      u3 * pA[0] + 3 * u2 * t * cpA[0] + 3 * u * t2 * cpB[0] + t3 * ppB[0];
+    out[1] =
+      u3 * pA[1] + 3 * u2 * t * cpA[1] + 3 * u * t2 * cpB[1] + t3 * ppB[1];
+    out[2] =
+      u3 * pA[2] + 3 * u2 * t * cpA[2] + 3 * u * t2 * cpB[2] + t3 * ppB[2];
+
+    return out;
+  }
+}

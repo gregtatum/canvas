@@ -12,10 +12,12 @@ import {
 } from "lib/dancecam/messages";
 import lerp from "lerp";
 import {
+  BezierOnPath,
   DanceCam,
   DanceDatabase,
-  LandmarkNames,
+  LandmarkNames as LandmarkName,
   landmarks,
+  LerpOnPath,
   PoseAnalysis,
 } from "lib/dancecam";
 import { exposeAsGlobal } from "lib/utils";
@@ -33,7 +35,7 @@ const poseConnections = [
   [18, 20], [11, 23], [12, 24], [23, 24], [23, 25],
   [24, 26], [25, 27], [26, 28], [27, 29], [28, 30],
   [29, 31], [30, 32], [27, 31], [28, 32]
-]
+];
 
 main();
 
@@ -95,12 +97,12 @@ class DanceReplay {
     this.startTime = startTime;
     this.endTime = endTime;
     this.scrubberTime = 0;
-    this.lastTimestamp = Date.now();
+    this.lastTimestamp = Date.now() * 0.15;
   }
 
   getCurrentPoses(): Pose[] {
     // Advance the scrubberTime.
-    const nextTimestamp = Date.now();
+    const nextTimestamp = Date.now() * 0.15;
     const dt = nextTimestamp - this.lastTimestamp;
     this.lastTimestamp = nextTimestamp;
     this.scrubberTime = (this.scrubberTime + dt) % this.duration;
@@ -125,9 +127,37 @@ function getConfig() {
 
   initializeShortcuts(seed);
 
+  const landmarksByName: Record<string, LandmarkName[]> = {
+    footToHandR2L: [
+      "right heel",
+      "right ankle",
+      "right knee",
+      "right hip",
+      "left shoulder",
+      "left elbow",
+      "left wrist",
+      "left index knuckle",
+    ],
+    // footToHandL2R: [
+    //   "left heel",
+    //   "left ankle",
+    //   "left knee",
+    //   "left hip",
+    //   "right shoulder",
+    //   "right elbow",
+    //   "right wrist",
+    //   "right index knuckle",
+    // ],
+  };
+
   return {
     ctx,
     seed,
+    pointPathConfig: {
+      speed: 0.001,
+      pointCount: 50,
+      landmarksByName,
+    },
     poseSmoothing: getLocationNumber("poseSmoothing", 0.9),
     showFrame: getLocationBoolean("showFrame", false),
     showDebugInfo: getLocationBoolean("showDebugInfo", false),
@@ -182,6 +212,9 @@ async function getCurrent(config: Config) {
     danceDB,
     danceCam,
     danceReplay,
+    pointPaths: new PointPaths(config),
+    lerpOnPath: new LerpOnPath(),
+    bezierOnPath: new BezierOnPath(),
     danceRecording: [] as Dance,
     time: 0,
     // TODO -- Add UI to specify this.
@@ -210,20 +243,22 @@ function update(config: Config, current: Current): void {
     !document.hidden &&
     !current.danceReplay
   ) {
+    // This is either the first update called, or the connection was dropped to the camera
+    // because it was unavailable or because we tabbed out and the document was hidden.
+    // Attempt to start a connection.
     current.isConnecting = true;
     connectClient(current);
   }
 
   if (!current.socket && !current.danceReplay) {
+    // There is no connection, and there is no dance replay, so don't update
+    // anything else.
     return;
   }
 
   if (current.danceReplay) {
+    // Update the poses from the dance replay.
     current.poses = current.danceReplay.getCurrentPoses();
-  }
-
-  if (current.poses.length) {
-    current.poseAnalysis.update(current.poses[0]);
   }
 
   {
@@ -260,12 +295,133 @@ function update(config: Config, current: Current): void {
   }
 
   updatePoseSmoothing(config, current);
+  if (current.smoothedPoses.length) {
+    current.poseAnalysis.update(current.smoothedPoses[0]);
+  }
+
+  current.pointPaths.update(config, current);
 
   current.transformedPoses = current.smoothedPoses.map((pose) =>
     pose.map((landmark) =>
       vec3.rotateY(vec3.create(), landmark as any as Tuple3, [0, 0, 0], 0)
     )
   );
+}
+
+/**
+ * Move points along a path.
+ */
+interface PointPath {
+  name: string;
+  path: Tuple3[];
+  landmarkNames: LandmarkName[];
+
+  /**
+   * The random points moving around the path.
+   */
+  points: Tuple3[];
+
+  /**
+   * How far the point is along the unit interval of the length of the path, this is
+   * the "t" value.
+   */
+  tValues: number[];
+}
+
+class PointPaths {
+  pointPaths: PointPath[] = [];
+
+  constructor({ pointPathConfig }: Config) {
+    for (const [pathName, landmarks] of Object.entries(
+      pointPathConfig.landmarksByName
+    )) {
+      const points: Tuple3[] = [];
+      const tValues: number[] = [];
+      this.pointPaths.push({
+        name: pathName,
+        landmarkNames: landmarks,
+        // Starts out as (0,0,0) and the pose gets copied over during update.
+        path: landmarks.map(() => vec3.create()),
+        tValues,
+        points,
+      });
+
+      for (let i = 0; i < pointPathConfig.pointCount; i++) {
+        points.push(vec3.create());
+        tValues.push(i / pointPathConfig.pointCount);
+      }
+    }
+  }
+
+  update(config: Config, current: Current) {
+    const { bezierOnPath } = current;
+    const { pointPathConfig } = config;
+
+    // Copy over the paths from the pose.
+    const { poseAnalysis } = current;
+    for (const { path, landmarkNames } of this.pointPaths) {
+      for (let i = 0; i < path.length; i++) {
+        const landmarkName = landmarkNames[i];
+        vec3.copy(path[i], poseAnalysis.getTuple3(landmarkName));
+      }
+    }
+
+    // Move the paths more forward along the path.
+    for (const { path, points, tValues } of this.pointPaths) {
+      bezierOnPath.setPath(path);
+      for (let i = 0; i < points.length; i++) {
+        tValues[i] = (tValues[i] + pointPathConfig.speed) % 1;
+        bezierOnPath.getValue(tValues[i], points[i]);
+      }
+    }
+  }
+
+  draw(config: Config, current: Current) {
+    const { ctx } = config;
+    const { bezierOnPath } = current;
+
+    // Draw the points of the poses.
+    ctx.fillStyle = "#ff00ff99";
+    const w = 7;
+    const hw = w / 2;
+    const midScreen = innerWidth / 2;
+    const scaleX = innerHeight;
+    const scaleY = innerHeight;
+    for (const { points } of this.pointPaths) {
+      for (const [x, y] of points) {
+        ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
+      }
+    }
+
+    ctx.lineWidth = 1 * devicePixelRatio;
+    // Draw the connections
+    ctx.beginPath();
+    ctx.strokeStyle = "#0ff4";
+
+    for (
+      let segmentIndex = 0;
+      segmentIndex < bezierOnPath.path.length - 1;
+      segmentIndex++
+    ) {
+      const [xa, ya] = bezierOnPath.path[segmentIndex];
+      const [xb, yb] = bezierOnPath.path[segmentIndex + 1];
+      ctx.moveTo(xa * scaleX - hw + midScreen, ya * scaleY);
+      ctx.lineTo(xb * scaleX - hw + midScreen, yb * scaleY);
+    }
+    ctx.stroke();
+
+    // ctx.fillStyle = "#ffff0099";
+    // for (const point of bezierOnPath.controlPointsStart) {
+    //   const [x, y] = point;
+    //   ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
+    // }
+    ctx.fillStyle = "#00ffff99";
+    for (let i = 0; i < bezierOnPath.controlPointsEnd.length; i++) {
+      const [x, y] = bezierOnPath.controlPointsEnd[i];
+      ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
+      ctx.fillText(String(i), x * scaleX - hw + midScreen, y * scaleY - hw);
+    }
+  }
 }
 
 /**
@@ -282,11 +438,15 @@ function updatePoseSmoothing(config: Config, current: Current) {
     for (let j = 0; j < pose.length; j++) {
       const landmark1 = pose[j];
       const landmark2 = smoothedPose[j];
-      landmark2[0] = lerp(landmark1[0], landmark2[0], poseSmoothing);
-      landmark2[1] = lerp(landmark1[1], landmark2[1], poseSmoothing);
-      landmark2[2] = lerp(landmark1[2], landmark2[2], poseSmoothing);
-      landmark2[3] = lerp(landmark1[3], landmark2[3], poseSmoothing);
-      landmark2[4] = lerp(landmark1[4], landmark2[4], poseSmoothing);
+
+      landmark2[0] = lerp(landmark1[0], landmark2[0], poseSmoothing); // x
+      landmark2[1] = lerp(landmark1[1], landmark2[1], poseSmoothing); // y
+      landmark2[2] = lerp(landmark1[2], landmark2[2], poseSmoothing); // z
+      landmark2[3] = lerp(landmark1[3], landmark2[3], poseSmoothing); // visibility
+      landmark2[4] = lerp(landmark1[4], landmark2[4], poseSmoothing); // presence
+
+      // The depth is totally busted.
+      // landmark2[2] *= 0.0; // z
 
       // landmark2[0] = landmark1[0];
       // landmark2[1] = landmark1[1];
@@ -359,13 +519,15 @@ function draw(config: Config, current: Current): void {
   }
 
   drawPoseAnalysis(config, current);
+
+  current.pointPaths.draw(config, current);
 }
 
 function drawLine(
   config: Config,
   current: Current,
   pose: Pose | Tuple3[],
-  line: LandmarkNames[]
+  line: LandmarkName[]
 ) {
   const { ctx } = config;
   const w = 10;
