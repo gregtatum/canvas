@@ -312,7 +312,6 @@ export class DanceCam {
       downloadButton,
     } = this.elements;
 
-    console.log(`!!! danceDropdown.value`, danceDropdown.value);
     if (danceDropdown.value === LIVE_CAMERA) {
       hide(deleteButton);
       hide(downloadButton);
@@ -618,15 +617,6 @@ function getPlaneNormalAtTip(out: Tuple3, base: Tuple3, tip: Tuple3): Tuple3 {
   return out;
 }
 
-const logged: Record<string, boolean> = {};
-function logOnce(name: string, ...args: any[]) {
-  if (logged[name]) {
-    return;
-  }
-  logged[name] = true;
-  console.log(`!!! ${name}`, ...args);
-}
-
 /**
  * Linearly interpolate to find a point along a path.
  */
@@ -729,45 +719,54 @@ export class BezierOnPath {
       this.totalDistance += distance;
     }
 
-    // Compute the control points. Visit each segment composed of pointA and pointB.
-    // The control points will be positioned according to the previous and next segments.
-    // https://www.desmos.com/calculator/ebdtbxgbq0
-    for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex++) {
-      const pointAIndex = segmentIndex;
-      const pointBIndex = segmentIndex + 1;
+    /**
+     * Compute the control points, two for each point.
+     *
+     * For a drawing of these steps:
+     * @see {@link file://./beziercurve.png}
+     *
+     * For an interactive example of bezier curves:
+     * @see {@link https://www.desmos.com/calculator/ebdtbxgbq0}
+     */
+    for (let pointIndex = 0; pointIndex < path.length; pointIndex++) {
+      const prevPoint = path[pointIndex - 1];
+      const currPoint = path[pointIndex];
+      const nextPoint = path[pointIndex + 1];
 
-      const prevPointA = path[pointAIndex - 1];
-      const pointA = path[pointAIndex];
-      const pointB = path[pointBIndex];
-      const nextPointB = path[pointBIndex + 1];
-      const segmentDistance = this.distances[segmentIndex];
-      const moveDistance = segmentDistance * smoothingFactor;
-
-      logOnce(`${segmentIndex} - prevPointA`, prevPointA);
-      logOnce(`${segmentIndex} - nextPointB`, nextPointB);
-
-      let controlPointA;
-      if (prevPointA) {
-        controlPointA = vec3.create();
-        vec3.sub(controlPointA, pointA, prevPointA);
-        vec3.normalize(controlPointA, controlPointA);
-        vec3.scaleAndAdd(controlPointA, pointA, controlPointA, moveDistance);
-      } else {
-        controlPointA = vec3.clone(pointA);
+      if (!prevPoint || !nextPoint) {
+        this.controlPointsStart[pointIndex] = vec3.clone(currPoint);
+        this.controlPointsEnd[pointIndex] = vec3.clone(currPoint);
+        continue;
       }
-      this.controlPointsStart[segmentIndex] = controlPointA;
+      const prevUnit = vec3.create();
+      const nextUnit = vec3.create();
 
-      let controlPointB;
-      if (nextPointB) {
-        controlPointB = vec3.create();
-        vec3.sub(controlPointB, pointB, nextPointB);
-        vec3.normalize(controlPointB, controlPointB);
-        vec3.scaleAndAdd(controlPointB, pointB, controlPointB, moveDistance);
-      } else {
-        controlPointB = vec3.clone(pointB);
-      }
+      vec3.sub(prevUnit, prevPoint, currPoint);
+      vec3.sub(nextUnit, nextPoint, currPoint);
+      vec3.normalize(prevUnit, prevUnit);
+      vec3.normalize(nextUnit, nextUnit);
 
-      this.controlPointsEnd[segmentIndex] = controlPointB;
+      const controlPointStart = vec3.create();
+      vec3.sub(controlPointStart, nextUnit, prevUnit); // Opposite flip.
+      vec3.normalize(controlPointStart, controlPointStart);
+      vec3.scaleAndAdd(
+        controlPointStart,
+        currPoint,
+        controlPointStart,
+        this.distances[pointIndex] * smoothingFactor
+      );
+      this.controlPointsStart[pointIndex] = controlPointStart;
+
+      const controlPointEnd = vec3.create();
+      vec3.sub(controlPointEnd, prevUnit, nextUnit);
+      vec3.normalize(controlPointEnd, controlPointEnd);
+      vec3.scaleAndAdd(
+        controlPointEnd,
+        currPoint,
+        controlPointEnd,
+        this.distances[pointIndex - 1] * smoothingFactor
+      );
+      this.controlPointsEnd[pointIndex] = controlPointEnd;
     }
   }
 
@@ -785,9 +784,6 @@ export class BezierOnPath {
 
     const path = this.path;
     const targetDistance = t * this.totalDistance;
-    logOnce("targetDistance", targetDistance);
-    logOnce("path", path);
-    logOnce("bezierOnPath", this);
 
     // Locate the segment where the target distance falls
     let accumulatedDistance = 0;
@@ -797,7 +793,6 @@ export class BezierOnPath {
       segmentIndex < segmentCount - 1;
       segmentIndex++
     ) {
-      logOnce(`segmentIndex ${segmentIndex}`);
       const pointAIndex = segmentIndex;
       const pointBIndex = segmentIndex + 1;
 
@@ -805,26 +800,16 @@ export class BezierOnPath {
       const nextAccumulatedDistance = accumulatedDistance + segmentDistance;
 
       if (targetDistance <= nextAccumulatedDistance) {
-        logOnce(`segmentIndex ${segmentIndex} segment found`);
-
         // Compute local t within the segment
         const segmentT =
           (targetDistance - accumulatedDistance) / segmentDistance;
 
         // Get Bézier control points for this segment
         // https://www.desmos.com/calculator/ebdtbxgbq0
-        const cpA = this.controlPointsStart[segmentIndex]; // Control point or previous point.
+        const cpA = this.controlPointsStart[pointAIndex]; // Control point or previous point.
         const pA = this.path[pointAIndex]; // First point of the segment.
         const pB = this.path[pointBIndex]; // Second point of the segment.
-        const cpB = this.controlPointsEnd[segmentIndex]; // Control point or next point.
-
-        logOnce(`- ${segmentIndex} segmentT`, segmentT);
-        logOnce(`- ${segmentIndex} targetDistance`, targetDistance);
-        logOnce(`- ${segmentIndex} accumulatedDistance`, accumulatedDistance);
-        logOnce(`- ${segmentIndex} cpA`, cpA);
-        logOnce(`- ${segmentIndex} pA`, pA);
-        logOnce(`- ${segmentIndex} pB`, pB);
-        logOnce(`- ${segmentIndex} cpB`, cpB);
+        const cpB = this.controlPointsEnd[pointBIndex]; // Control point or next point.
 
         return this.#computeCubicBezier(out, cpA, pA, pB, cpB, segmentT);
       }

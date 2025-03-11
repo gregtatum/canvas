@@ -77,7 +77,7 @@ class DanceReplay {
   startTime: number;
   endTime: number;
   scrubberTime: number;
-  lastTimestamp: number;
+  lastTimestamp: number | null;
 
   constructor(dance: Dance) {
     this.dance = dance;
@@ -97,12 +97,15 @@ class DanceReplay {
     this.startTime = startTime;
     this.endTime = endTime;
     this.scrubberTime = 0;
-    this.lastTimestamp = Date.now() * 0.15;
+    this.lastTimestamp = 0;
   }
 
-  getCurrentPoses(): Pose[] {
+  getCurrentPoses(now: number): Pose[] {
+    if (this.lastTimestamp === null) {
+      this.lastTimestamp = now;
+    }
     // Advance the scrubberTime.
-    const nextTimestamp = Date.now() * 0.15;
+    const nextTimestamp = now;
     const dt = nextTimestamp - this.lastTimestamp;
     this.lastTimestamp = nextTimestamp;
     this.scrubberTime = (this.scrubberTime + dt) % this.duration;
@@ -138,16 +141,16 @@ function getConfig() {
       "left wrist",
       "left index knuckle",
     ],
-    // footToHandL2R: [
-    //   "left heel",
-    //   "left ankle",
-    //   "left knee",
-    //   "left hip",
-    //   "right shoulder",
-    //   "right elbow",
-    //   "right wrist",
-    //   "right index knuckle",
-    // ],
+    footToHandL2R: [
+      "left heel",
+      "left ankle",
+      "left knee",
+      "left hip",
+      "right shoulder",
+      "right elbow",
+      "right wrist",
+      "right index knuckle",
+    ],
   };
 
   return {
@@ -258,7 +261,7 @@ function update(config: Config, current: Current): void {
 
   if (current.danceReplay) {
     // Update the poses from the dance replay.
-    current.poses = current.danceReplay.getCurrentPoses();
+    current.poses = current.danceReplay.getCurrentPoses(current.time * 1000);
   }
 
   {
@@ -393,33 +396,36 @@ class PointPaths {
       }
     }
 
-    ctx.lineWidth = 1 * devicePixelRatio;
-    // Draw the connections
-    ctx.beginPath();
-    ctx.strokeStyle = "#0ff4";
+    if (config.showDebugInfo) {
+      // Draw the connections
+      ctx.lineWidth = 1 * devicePixelRatio;
+      ctx.beginPath();
+      ctx.strokeStyle = "#0ff4";
 
-    for (
-      let segmentIndex = 0;
-      segmentIndex < bezierOnPath.path.length - 1;
-      segmentIndex++
-    ) {
-      const [xa, ya] = bezierOnPath.path[segmentIndex];
-      const [xb, yb] = bezierOnPath.path[segmentIndex + 1];
-      ctx.moveTo(xa * scaleX - hw + midScreen, ya * scaleY);
-      ctx.lineTo(xb * scaleX - hw + midScreen, yb * scaleY);
-    }
-    ctx.stroke();
+      for (
+        let segmentIndex = 0;
+        segmentIndex < bezierOnPath.path.length - 1;
+        segmentIndex++
+      ) {
+        const [xa, ya] = bezierOnPath.path[segmentIndex];
+        const [xb, yb] = bezierOnPath.path[segmentIndex + 1];
+        ctx.moveTo(xa * scaleX - hw + midScreen, ya * scaleY);
+        ctx.lineTo(xb * scaleX - hw + midScreen, yb * scaleY);
+      }
+      ctx.stroke();
 
-    // ctx.fillStyle = "#ffff0099";
-    // for (const point of bezierOnPath.controlPointsStart) {
-    //   const [x, y] = point;
-    //   ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
-    // }
-    ctx.fillStyle = "#00ffff99";
-    for (let i = 0; i < bezierOnPath.controlPointsEnd.length; i++) {
-      const [x, y] = bezierOnPath.controlPointsEnd[i];
-      ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
-      ctx.fillText(String(i), x * scaleX - hw + midScreen, y * scaleY - hw);
+      ctx.fillStyle = "#ffff0099";
+      for (let i = 0; i < bezierOnPath.controlPointsStart.length; i++) {
+        const [x, y] = bezierOnPath.controlPointsStart[i];
+        ctx.fillText(String(i), x * scaleX - hw + midScreen, y * scaleY - hw);
+        ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
+      }
+      ctx.fillStyle = "#00ffff99";
+      for (let i = 0; i < bezierOnPath.controlPointsEnd.length; i++) {
+        const [x, y] = bezierOnPath.controlPointsEnd[i];
+        ctx.fillRect(x * scaleX - hw + midScreen, y * scaleY - hw, w, w);
+        ctx.fillText(String(i), x * scaleX - hw + midScreen, y * scaleY - hw);
+      }
     }
   }
 }
