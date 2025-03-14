@@ -25,6 +25,9 @@ export default function shortcuts(seed?: string, restart?: () => void): void {
   window.addEventListener(
     "keydown",
     (event) => {
+      if (event.target !== document.body) {
+        return;
+      }
       let key = event.key;
       if (event.metaKey) {
         key = "cmd-" + key;

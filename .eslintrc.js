@@ -64,7 +64,6 @@ module.exports = {
     "dot-notation": "error",
     eqeqeq: "error",
     "for-direction": "error",
-    "no-alert": "error",
     "no-caller": "error",
     "no-eval": "error",
     "no-extend-native": "error",

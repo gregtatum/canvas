@@ -20,8 +20,9 @@ import {
   LerpOnPath,
   PoseAnalysis,
 } from "lib/dancecam";
-import { exposeAsGlobal } from "lib/utils";
+import { exposeAsGlobal, LocationManager } from "lib/utils";
 import { mat3, mat4, vec3, vec4 } from "lib/vec-math";
+import { TimelineManager } from "./timeline";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = Awaited<ReturnType<typeof getCurrent>>;
@@ -52,7 +53,7 @@ async function main() {
     return current.danceRecording;
   };
   current.danceCam.onChangeDance = (dance) => {
-    updateLocationValue("dance", current.danceCam.selectedDance);
+    LocationManager.updateValue("dance", current.danceCam.selectedDance);
     // Reset any smoothing.
     current.smoothedPoses = [];
     current.poses = [];
@@ -65,7 +66,9 @@ async function main() {
   };
 
   loop((now) => {
-    current.time = now;
+    const nextTime = now * config.speed;
+    current.dt = nextTime - current.time;
+    current.time = nextTime;
     update(config, current);
     draw(config, current);
   });
@@ -156,14 +159,15 @@ function getConfig() {
   return {
     ctx,
     seed,
+    speed: 0.1,
     pointPathConfig: {
       speed: 0.001,
       pointCount: 50,
       landmarksByName,
     },
-    poseSmoothing: getLocationNumber("poseSmoothing", 0.9),
-    showFrame: getLocationBoolean("showFrame", false),
-    showDebugInfo: getLocationBoolean("showDebugInfo", false),
+    poseSmoothing: LocationManager.getNumber("poseSmoothing", 0.9),
+    showFrame: LocationManager.getBoolean("showFrame", false),
+    showDebugInfo: LocationManager.getBoolean("showDebugInfo", false),
   };
 }
 
@@ -173,18 +177,21 @@ async function getCurrent(config: Config) {
   const folder = gui.addFolder("Config");
   folder
     .add(config, "poseSmoothing", 0, 1)
-    .onChange((value) => updateLocationValue("poseSmoothing", value));
+    .onChange((value) => LocationManager.updateNumber("poseSmoothing", value));
+  folder
+    .add(config, "speed", 0, 1)
+    .onChange((value) => LocationManager.updateNumber("speed", value));
   folder
     .add(config, "showFrame")
-    .onChange((value) => updateLocationValue("showFrame", value));
+    .onChange((value) => LocationManager.updateValue("showFrame", value));
   folder
     .add(config, "showDebugInfo")
-    .onChange((value) => updateLocationValue("showDebugInfo", value));
+    .onChange((value) => LocationManager.updateValue("showDebugInfo", value));
 
   const danceCam = await DanceCam.create(
     danceDB,
     document.body,
-    getLocationString("dance")
+    LocationManager.getString("dance")
   );
 
   const dance = await danceCam.getSelectedDance();
@@ -220,6 +227,7 @@ async function getCurrent(config: Config) {
     bezierOnPath: new BezierOnPath(),
     danceRecording: [] as Dance,
     time: 0,
+    dt: 0,
     // TODO -- Add UI to specify this.
     wsUrl: "ws://localhost:8765",
     // wsUrl: "ws://dancecam1.local:8765",
@@ -236,6 +244,7 @@ async function getCurrent(config: Config) {
     poseLatencyMS: 0,
     lastPostTimeMS: 0,
     showFrameRequested: false,
+    timelineManager: new TimelineManager(document.body, danceDB),
   };
 }
 
@@ -373,7 +382,7 @@ class PointPaths {
     for (const { path, points, tValues } of this.pointPaths) {
       bezierOnPath.setPath(path);
       for (let i = 0; i < points.length; i++) {
-        tValues[i] = (tValues[i] + pointPathConfig.speed) % 1;
+        tValues[i] = (tValues[i] + pointPathConfig.speed * current.dt) % 1;
         bezierOnPath.getValue(tValues[i], points[i]);
       }
     }
@@ -435,7 +444,7 @@ class PointPaths {
  */
 function updatePoseSmoothing(config: Config, current: Current) {
   const { poses, smoothedPoses } = current;
-  const { poseSmoothing } = config;
+  const poseSmoothing = config.poseSmoothing * (1 + 1 / config.speed / 100);
 
   for (let i = 0; i < poses.length; i++) {
     const pose = poses[i];
@@ -524,7 +533,9 @@ function draw(config: Config, current: Current): void {
     }
   }
 
-  drawPoseAnalysis(config, current);
+  if (config.showDebugInfo) {
+    drawPoseAnalysis(config, current);
+  }
 
   current.pointPaths.draw(config, current);
 }
@@ -677,41 +688,6 @@ function connectClient(current: Current) {
   socket.addEventListener("error", (event) => {
     console.error("WebSocket error:", event);
   });
-}
-
-function getLocationString(key: string, defaultValue?: string) {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get(key) ?? defaultValue;
-}
-
-function getLocationNumber(key: string, defaultValue = 0) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const storedValue = urlParams.get(key);
-  if (storedValue === null) {
-    return defaultValue;
-  }
-  const number = Number(storedValue);
-  if (Number.isNaN(number)) {
-    return defaultValue;
-  }
-  return number;
-}
-
-function getLocationBoolean(key: string, defaultValue = false) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const storedValue = urlParams.get(key);
-  if (storedValue === null) {
-    return defaultValue;
-  }
-  return storedValue === "true";
-}
-
-function updateLocationValue(key: string, value: string) {
-  const urlParams = new URLSearchParams(window.location.search);
-  urlParams.set(key, value);
-  const url = new URL(window.location.href);
-  const newLocation = `${url.origin}${url.pathname}?${urlParams}`;
-  history.replaceState(null, "", newLocation);
 }
 
 function transformPointWithProjViewMatrix(

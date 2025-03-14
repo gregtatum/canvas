@@ -60,3 +60,113 @@ export function exposeAsGlobal(name: string, value: any) {
 export function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
+
+/**
+ * Provide a simple way to append all of the childen of some HTML text.
+ *
+ * Returns a getter function for elements in the wrapper.
+ */
+export function appendHTML(container: Element, html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  for (const node of doc.body.childNodes) {
+    container.appendChild(node);
+  }
+  return <T extends Element>(querySelector: string): T =>
+    ensureExists(container.querySelector<T>(querySelector));
+}
+
+/**
+ * Provide a simple way to append all of the childen of some HTML text.
+ *
+ * Returns a getter function for elements in the wrapper.
+ */
+export function createHTML(html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const container = doc.body.firstElementChild as HTMLElement | null;
+  if (doc.body.children.length > 1) {
+    throw new Error("Expected only 1 root element.");
+  }
+  if (!container) {
+    throw new Error("Could not find an html element");
+  }
+  return {
+    container,
+    get: <T extends Element>(querySelector: string): T =>
+      ensureExists(container.querySelector<T>(querySelector)),
+  };
+}
+
+/**
+ * Debounce a function.
+ */
+export function debounce<T extends (...args: any[]) => void>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<T>) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+export class LocationManager {
+  static getString(key: string, defaultValue?: string) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(key) ?? defaultValue;
+  }
+
+  static getNumber(key: string, defaultValue = 0) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storedValue = urlParams.get(key);
+    if (storedValue === null) {
+      return defaultValue;
+    }
+    const number = Number(storedValue);
+    if (Number.isNaN(number)) {
+      return defaultValue;
+    }
+    return number;
+  }
+
+  static getBoolean(key: string, defaultValue = false) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storedValue = urlParams.get(key);
+    if (storedValue === null) {
+      return defaultValue;
+    }
+    return storedValue === "true";
+  }
+
+  /**
+   * Updates a number with a given precision.
+   */
+  static updateNumber(key: string, value: number, precision = 4) {
+    const divisor = Math.pow(10, precision);
+    LocationManager.updateValue(
+      key,
+      String(Math.floor(value * divisor) / divisor)
+    );
+  }
+
+  static updateValue = debounce((key: string, value: string) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set(key, value);
+    const url = new URL(window.location.href);
+    const newLocation = `${url.origin}${url.pathname}?${urlParams}`;
+    history.replaceState(null, "", newLocation);
+  }, 500);
+
+  static deleteValue = debounce((key: string) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.delete(key);
+    const url = new URL(window.location.href);
+    const newLocation = `${url.origin}${url.pathname}?${urlParams}`;
+    history.replaceState(null, "", newLocation);
+  }, 500);
+}

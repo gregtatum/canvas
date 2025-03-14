@@ -1,17 +1,19 @@
 /* eslint-disable no-alert */
 import { vec2, vec3 } from "lib/vec-math";
-import { Dance, Pose } from "./messages";
+import {
+  AudioRecord,
+  Dance,
+  DanceRecord,
+  DatabaseStores,
+  Pose,
+  Timeline,
+  TimelineRecord,
+} from "./messages";
 import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";
-const DB_VERSION = 1;
+const DB_VERSION = 6;
 const LIVE_CAMERA = "Live Camera";
-
-interface DanceRow {
-  name: string;
-  dance: Dance;
-  timestamp: number;
-}
 
 // prettier-ignore
 const landmarksList = [
@@ -58,12 +60,20 @@ export class DanceDatabase {
    */
   static async create(): Promise<DanceDatabase> {
     return new Promise((resolve, reject) => {
+      console.log(`[DanceDatabase] opening db ${DB_NAME} ${DB_VERSION}`);
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+
         if (!db.objectStoreNames.contains("dances")) {
           db.createObjectStore("dances", { keyPath: "name" });
+        }
+        if (!db.objectStoreNames.contains("audio")) {
+          db.createObjectStore("audio", { keyPath: "name" });
+        }
+        if (!db.objectStoreNames.contains("timelines")) {
+          db.createObjectStore("timelines", { keyPath: "name" });
         }
       };
 
@@ -78,54 +88,131 @@ export class DanceDatabase {
     });
   }
 
-  async addDance(name: string, dance: Dance): Promise<void> {
+  /**
+   * Adds or updates a row to the store as type checked by @see {DatabaseStores}.
+   */
+  async put<T extends keyof DatabaseStores>(
+    storeName: T,
+    payload: DatabaseStores[T]
+  ): Promise<DatabaseStores[T]> {
     return new Promise((resolve, reject) => {
-      const transaction = this.#db.transaction("dances", "readwrite");
-      const store = transaction.objectStore("dances");
-      console.log("[DanceDatabase] add dance", name, dance);
-      const danceRow: DanceRow = { name, dance, timestamp: Date.now() };
-      const request = store.put(danceRow);
-      request.onsuccess = () => resolve();
+      const transaction = this.#db.transaction(storeName, "readwrite");
+      const store = transaction.objectStore(storeName);
+      console.log(`[DanceDatabase] add ${storeName}`, payload);
+      const request = store.put(payload);
+      request.onsuccess = () => resolve(payload);
       request.onerror = () => reject(request.error);
     });
   }
 
-  async getDance(name: string): Promise<Dance | undefined> {
+  /**
+   * Get a row from the store as type checked by @see {DatabaseStores}.
+   */
+  async get<T extends keyof DatabaseStores>(
+    storeName: T,
+    query: string
+  ): Promise<DatabaseStores[T] | undefined> {
     return new Promise((resolve, reject) => {
-      const transaction = this.#db.transaction("dances", "readonly");
-      const store = transaction.objectStore("dances");
+      const transaction = this.#db.transaction(storeName, "readonly");
+      const store = transaction.objectStore(storeName);
 
-      const request: IDBRequest<DanceRow> = store.get(name);
+      const request: IDBRequest<DatabaseStores[T]> = store.get(query);
       request.onsuccess = () => {
-        const { dance } = request.result;
-        console.log("[DanceDatabase] get dance", name, dance);
-        resolve(dance);
+        console.log(`[DanceDatabase] get ${storeName}`, query, request.result);
+        resolve(request.result as any);
       };
       request.onerror = () => reject(request.error);
     });
   }
 
-  async deleteDance(name: string): Promise<void> {
+  /**
+   * Delete a row from the store as type checked by @see {DatabaseStores}.
+   */
+  async delete<T extends keyof DatabaseStores>(
+    storeName: T,
+    name: string
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const transaction = this.#db.transaction("dances", "readwrite");
-      const store = transaction.objectStore("dances");
+      const transaction = this.#db.transaction(storeName, "readwrite");
+      const store = transaction.objectStore(storeName);
 
-      console.log("[DanceDatabase] delete dance", name);
+      console.log("[DanceDatabase] delete " + storeName, name);
       const request = store.delete(name);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   }
 
-  async listDances(): Promise<string[]> {
+  /**
+   * List all of the keys in the store.
+   */
+  async list<T extends keyof DatabaseStores>(storeName: T): Promise<string[]> {
     return new Promise((resolve, reject) => {
-      const transaction = this.#db.transaction("dances", "readonly");
-      const store = transaction.objectStore("dances");
-
+      const transaction = this.#db.transaction(storeName, "readonly");
+      const store = transaction.objectStore(storeName);
       const request = store.getAllKeys();
       request.onsuccess = () => resolve(request.result as string[]);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  async addDance(name: string, dance: Dance): Promise<DanceRecord> {
+    return this.put("dances", { name, dance, timestamp: Date.now() });
+  }
+
+  async addAudio(name: string, audio: Blob): Promise<AudioRecord> {
+    return this.put("audio", { name, audio, timestamp: Date.now() });
+  }
+
+  async addTimeline(
+    name: string,
+    boundsInSeconds: number,
+    timeline: Timeline[]
+  ): Promise<TimelineRecord> {
+    const now = Date.now();
+    return this.put("timelines", {
+      name,
+      created: now,
+      lastModified: now,
+      boundsInSeconds,
+      timeline,
+    });
+  }
+
+  async getDance(name: string): Promise<Dance | undefined> {
+    return (await this.get("dances", name))?.dance;
+  }
+
+  async getAudioBlob(name: string): Promise<Blob | undefined> {
+    return (await this.get("audio", name))?.audio;
+  }
+
+  async getTimeline(name: string): Promise<TimelineRecord | undefined> {
+    return this.get("timelines", name);
+  }
+
+  async deleteDance(name: string): Promise<void> {
+    return this.delete("dances", name);
+  }
+
+  async deleteAudio(name: string): Promise<void> {
+    return this.delete("audio", name);
+  }
+
+  async deleteTimeline(name: string): Promise<void> {
+    return this.delete("timelines", name);
+  }
+
+  async listDances(): Promise<string[]> {
+    return this.list("dances");
+  }
+
+  async listAudio(): Promise<string[]> {
+    return this.list("audio");
+  }
+
+  async listTimelines(): Promise<string[]> {
+    return this.list("timelines");
   }
 
   async downloadDance(name: string): Promise<void> {
@@ -747,7 +834,7 @@ export class BezierOnPath {
       vec3.normalize(nextUnit, nextUnit);
 
       const controlPointStart = vec3.create();
-      vec3.sub(controlPointStart, nextUnit, prevUnit); // Opposite flip.
+      vec3.sub(controlPointStart, nextUnit, prevUnit);
       vec3.normalize(controlPointStart, controlPointStart);
       vec3.scaleAndAdd(
         controlPointStart,
@@ -758,7 +845,7 @@ export class BezierOnPath {
       this.controlPointsStart[pointIndex] = controlPointStart;
 
       const controlPointEnd = vec3.create();
-      vec3.sub(controlPointEnd, prevUnit, nextUnit);
+      vec3.sub(controlPointEnd, prevUnit, nextUnit); // Opposite flip.
       vec3.normalize(controlPointEnd, controlPointEnd);
       vec3.scaleAndAdd(
         controlPointEnd,

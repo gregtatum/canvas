@@ -16,6 +16,37 @@ export type Pose = Landmark[];
 
 export type Dance = Array<PosesFrame>;
 
+export interface AudioRecord {
+  name: string;
+  timestamp: number;
+  audio: Blob;
+}
+
+export interface DanceRecord {
+  name: string;
+  dance: Dance;
+  timestamp: number;
+}
+
+export type Timeline =
+  | { offset: number; type: "audio"; audioKey: string }
+  | { offset: number; type: "dance" }
+  | { offset: number; type: "keyframe"; key: string; value: any };
+
+export interface TimelineRecord {
+  name: string;
+  created: number;
+  lastModified: number;
+  boundsInSeconds: number;
+  timeline: Timeline[];
+}
+
+export interface DatabaseStores {
+  dances: DanceRecord;
+  audio: AudioRecord;
+  timelines: TimelineRecord;
+}
+
 export type DanceCamEventsToClient =
   | {
       type: "poses";
