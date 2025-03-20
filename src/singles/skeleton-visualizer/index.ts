@@ -249,6 +249,8 @@ async function getCurrent(config: Config) {
 }
 
 function update(config: Config, current: Current): void {
+  current.timelineManager.update();
+
   if (
     !current.socket &&
     !current.isConnecting &&
@@ -476,6 +478,8 @@ function draw(config: Config, current: Current): void {
   const { ctx } = config;
   const poses = current.transformedPoses;
 
+  current.timelineManager.draw();
+
   // Clear out background.
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, innerWidth, innerHeight);
@@ -580,7 +584,7 @@ function drawPoseAnalysis(config: Config, current: Current) {
 
   ctx.fillStyle = "#fff";
   const size = 30;
-  ctx.font = `${size}px sans-serif`;
+  ctx.font = `${size}px system-ui`;
   for (let i = 0; i < poseAngles.length; i++) {
     const key = poseAngles[i];
     ctx.fillText(

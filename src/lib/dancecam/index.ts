@@ -174,7 +174,7 @@ export class DanceDatabase {
       name,
       created: now,
       lastModified: now,
-      boundsInSeconds,
+      duration: boundsInSeconds,
       timeline,
     });
   }

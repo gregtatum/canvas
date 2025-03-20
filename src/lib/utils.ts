@@ -170,3 +170,23 @@ export class LocationManager {
     history.replaceState(null, "", newLocation);
   }, 500);
 }
+
+/**
+ * Use lookup functions to determine if a reactive update is needed.
+ */
+export function reactiveInvalidator(
+  invalidations: Array<() => unknown>
+): () => boolean {
+  const prev: unknown[] = [];
+  return () => {
+    let isInvalidated = false;
+    for (let i = 0; i < invalidations.length; i++) {
+      const next = invalidations[i]();
+      if (next !== prev[i]) {
+        isInvalidated = true;
+      }
+      prev[i] = next;
+    }
+    return isInvalidated;
+  };
+}

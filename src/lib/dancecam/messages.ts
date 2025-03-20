@@ -37,7 +37,7 @@ export interface TimelineRecord {
   name: string;
   created: number;
   lastModified: number;
-  boundsInSeconds: number;
+  duration: number;
   timeline: Timeline[];
 }
 

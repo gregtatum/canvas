@@ -6,6 +6,7 @@ import {
   createHTML,
   ensureExists,
   LocationManager,
+  reactiveInvalidator,
 } from "lib/utils";
 
 /**
@@ -259,6 +260,14 @@ export class TimelineManager {
     }
     this.reactiveUpdate();
   }
+
+  update() {
+    this.timelineView?.update();
+  }
+
+  draw() {
+    this.timelineView?.draw();
+  }
 }
 
 class TimelineView {
@@ -266,7 +275,9 @@ class TimelineView {
   elements: ReturnType<typeof TimelineView.createElements>;
   timelineName: string;
   timelineRecord: TimelineRecord;
+  secondsRange: [number, number];
   closeTimeline: () => void;
+  ctx: CanvasRenderingContext2D;
 
   constructor(
     db: DanceDatabase,
@@ -282,6 +293,11 @@ class TimelineView {
     TimelineView.addCSS();
     this.elements = TimelineView.createElements();
     this.setupHandlers();
+    this.ctx = ensureExists(
+      this.elements.canvas.getContext("2d", { alpha: false })
+    );
+
+    this.secondsRange = [0, this.timelineRecord.duration];
 
     document.body.appendChild(this.elements.container);
   }
@@ -289,14 +305,34 @@ class TimelineView {
   static createElements() {
     const { container, get } = createHTML(/* html */ `
       <div class="timeline timeline-view">
-        timeline view
-        <button class="timeline-view-close" type="button">Close</button>
+        <div class="timeline-view-header">
+          <div class="timeline-view-controls">
+            <div class="timeline-view-time">00:10:00</div>
+            <button class="timeline-view-play" type="button">
+              <img src="../html/play.svg" />
+            </button>
+            <button class="timeline-view-record" type="button">
+              <div />
+            </button>
+            <button class="timeline-view-close" type="button">
+            <img src="../html/xmark.svg" />
+            </button>
+          </div>
+          <div class="timeline-view-timeline">
+            <canvas />
+            <div class="timeline-view-zoom"></div>
+          </div>
+        </div>
+        <div class="timeline-view-items">
+          <!-- Items get appended here. -->
+        </div>
       </div>
     `);
 
     return {
       container,
       closeButton: get<HTMLButtonElement>(".timeline-view-close"),
+      canvas: get<HTMLCanvasElement>(".timeline-view-timeline canvas"),
     };
   }
 
@@ -313,21 +349,293 @@ class TimelineView {
         inset: auto 0 0 0;
         background: #fff;
         display: flex;
-        padding: 0.3rem;
         border-top: 1px solid var(--border-color-subtle);
         justify-content: space-between;
         background-color: var(--background-color);
         color: var(--font-color);
         align-items: center;
+
+        --sidebar-width: 300px;
+      }
+
+      .timeline-view-header {
+        display: flex;
+
+      }
+
+      .timeline-view-controls {
+        display: flex;
+        align-items: center;
+        border-right: 1px solid var(--border-color-subtle);
+        width: var(--sidebar-width);
+        box-sizing: content-box;
+        padding: 0.7rem 0.7rem;
+        gap: 0.7rem;
+        justify-content: end;
+      }
+
+      .timeline-view-controls {
+        & button {
+          border: none;
+          background: none;
+          padding: 0;
+          width: 24px;
+          height: 24px;
+
+          & img {
+            width: 24px;
+            height: 24px;
+          }
+        }
+      }
+      .timeline-view-time {
+        flex: 1;
+      }
+      .timeline-view-play {
+
+      }
+      .timeline-view-record {
+        & div {
+          width: 18px;
+          height: 18px;
+          border-radius: 12px;
+          outline: 2px solid red;
+          position: relative;
+          box-sizing: border-box;
+          background: red;
+          border: 2px solid var(--background-color);
+          left: 3px;
+        }
+      }
+      .timeline-view-close {
+        
+      }
+      .timeline-view-timeline {
+        flex: 1;
+        & canvas {
+          /* Override all of the default canvas styles from style.css */
+          width: calc(100vw - var(--sidebar-width));
+          height: 1.5rem;
+          background-color: red;
+          transition: none;
+          position: relative;
+          z-index: 0;
+          /* Additional properties. */
+        }
+      }
+      .timeline-view-zoom {
+
+      }
+      .timeline-view-items {
+
       }
     `);
   }
 
-  setupHandlers() {
-    this.elements.closeButton.addEventListener("click", this.closeTimeline);
+  prevWindowWidth = -1;
+  // 1 second to 1 hour.
+  tickIntervals = [1, 5, 10, 30, 60, 300, 600, 1800, 3600];
+  redrawTimeline = reactiveInvalidator([
+    () => this.timelineRecord.duration,
+    () => this.secondsRange[0],
+    () => this.secondsRange[1],
+    () => window.innerWidth,
+  ]);
+  reactiveDrawTimeline() {
+    if (!this.redrawTimeline()) {
+      return;
+    }
+    const { secondsRange, ctx } = this;
+    const { canvas } = this.elements;
+    if (this.prevWindowWidth !== window.innerWidth) {
+      // Properly size the canvas.
+      this.prevWindowWidth = window.innerWidth;
+      const rect = this.elements.canvas.getBoundingClientRect();
+      canvas.width = rect.width * devicePixelRatio;
+      canvas.height = rect.height * devicePixelRatio;
+    }
+
+    // Clear the canvas
+    ctx.fillStyle = "#433";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const timeRange = secondsRange[1] - secondsRange[0];
+    this.timelineRecord.duration;
+
+    // Determine an appropriate tick interval
+    const majorTickInterval =
+      this.tickIntervals.find((tick) => timeRange / tick <= 10) || 3600; // Max 10 ticks
+
+    // Define minor tick interval (divide major by 5 or 10)
+    let minorTickInterval = majorTickInterval / 5;
+    if (minorTickInterval < 1) minorTickInterval = 1; // Minimum 1-second interval
+
+    // Canvas dimensions
+    const width = canvas.width;
+    const height = canvas.height;
+    const textBottom = 12 * devicePixelRatio; // Where the bottom of the text is.
+    const textMargin = 3 * devicePixelRatio; // The margin between text and the marks.
+    const majorTickTop = textBottom + textMargin;
+    const minorTickTop = (majorTickTop + height) / 2;
+    const majorTickWidth = 1 * devicePixelRatio;
+    const minorTickWidth = 0.5 * devicePixelRatio;
+
+    // Convert time to X-coordinate
+    const timeToX = (time: number) =>
+      ((time - secondsRange[0]) / timeRange) * width;
+
+    // Draw major ticks
+    ctx.font = `${12 * devicePixelRatio}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = majorTickWidth;
+
+    // Major ticks and number labels.
+    ctx.beginPath();
+    for (
+      let t =
+        Math.ceil(secondsRange[0] / majorTickInterval) * majorTickInterval;
+      t <= secondsRange[1];
+      t += majorTickInterval
+    ) {
+      const x = timeToX(t);
+      ctx.moveTo(x, majorTickTop);
+      ctx.lineTo(x, height);
+
+      // Convert seconds to a readable format (MM:SS)
+      const minutes = Math.floor(t / 60);
+      const seconds = t % 60;
+      const label =
+        minutes > 0
+          ? `${minutes}:${seconds.toString().padStart(2, "0")}`
+          : `${seconds}s`;
+      ctx.fillText(label, x, textBottom);
+    }
+    ctx.stroke();
+
+    // Minor ticks
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = minorTickWidth;
+    ctx.beginPath();
+    for (
+      let t =
+        Math.ceil(secondsRange[0] / minorTickInterval) * minorTickInterval;
+      t <= secondsRange[1];
+      t += minorTickInterval
+    ) {
+      if (t % majorTickInterval === 0) continue; // Skip if it's already a major tick
+      const x = timeToX(t);
+      ctx.moveTo(x, minorTickTop);
+      ctx.lineTo(x, height); // Minor tick size
+    }
+    ctx.moveTo(0, height - minorTickWidth);
+    ctx.lineTo(width, height - minorTickWidth);
+
+    ctx.stroke();
+
+    const { duration: boundsInSeconds } = this.timelineRecord;
+    // Draw progress bar (small bar at the top)
+    const progressBarHeight = 5;
+
+    ctx.fillStyle = "#ff0";
+    ctx.fillRect(
+      (secondsRange[0] / boundsInSeconds) * width,
+      0,
+      ((secondsRange[1] - secondsRange[0]) / boundsInSeconds) * width,
+      progressBarHeight
+    );
   }
 
+  setupHandlers() {
+    this.elements.closeButton.addEventListener("click", this.closeTimeline);
+    this.elements.container.addEventListener("wheel", this.wheelHandler, {
+      passive: false,
+    });
+  }
+
+  wheelHandler = (event: WheelEvent) => {
+    const { canvas } = this.elements;
+    const timelineDuration = this.timelineRecord.duration; // End time, implied start is always 0
+    const [start, end] = this.secondsRange;
+    const rangeDuration = end - start;
+    let newStart = 0;
+    let newEnd = 0;
+    const minimumRange = Math.min(timelineDuration, 4); // seconds
+
+    const canvasRect = canvas.getBoundingClientRect();
+
+    if (event.shiftKey) {
+      // Zoom in.
+      event.preventDefault(); // Prevent default scrolling when zooming
+
+      const deltaY = getNormalizedScrollDelta(event, "deltaY");
+      const zoomFactor = 1 / 100;
+      const zoomAmount = rangeDuration * zoomFactor * -Math.sign(deltaY);
+
+      if (rangeDuration <= minimumRange && deltaY < 0) {
+        return;
+      }
+
+      // Get mouse position relative to the timeline
+      const mouseDevicePixelX = event.clientX - canvasRect.left;
+      const mouseViewRatio = mouseDevicePixelX / canvasRect.width;
+
+      // Adjust the range based on the mouse position
+      newStart = start + zoomAmount * mouseViewRatio;
+      newEnd = end - zoomAmount * (1 - mouseViewRatio);
+
+      if (newStart < 0) {
+        newStart = 0;
+      }
+
+      if (newEnd > timelineDuration) {
+        newEnd = timelineDuration;
+      }
+
+      // Make sure it never gets too small.
+      if (newEnd - newStart < minimumRange) {
+        newEnd = newStart + minimumRange;
+        if (newEnd > timelineDuration) {
+          newStart = timelineDuration - minimumRange;
+          newEnd = minimumRange;
+        }
+      }
+    } else {
+      // Pan left and right.
+      const deltaX = getNormalizedScrollDelta(event, "deltaX");
+      const panFactor = 1 / 100;
+      const panAmount = rangeDuration * panFactor * Math.sign(deltaX);
+
+      newStart = start + panAmount;
+      newEnd = end + panAmount;
+
+      // Ensure panning stays within bounds
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = newStart + rangeDuration;
+      }
+      if (newEnd > timelineDuration) {
+        newEnd = timelineDuration;
+        newStart = newEnd - rangeDuration;
+      }
+    }
+    this.secondsRange[0] = newStart;
+    this.secondsRange[1] = newEnd;
+  };
+
   reactiveUpdate() {}
+
+  update() {
+    // this.secondsRange[1] += 0.2;
+    // this.secondsRange[0] += 0.1;
+    // this.timelineRecord.boundsInSeconds = this.secondsRange[1];
+  }
+
+  draw() {
+    this.reactiveDrawTimeline();
+  }
 
   destroy() {
     this.elements.container.remove();
@@ -837,4 +1145,24 @@ class Scrubbers {
     this.elements.playPosition.style.left = `${ratio * 100}%`;
     this.elements.horizontalLine.style.width = `${ratio * 100}%`;
   }
+}
+
+/**
+ * Scroll wheel events can by of various types. Do the right thing by converting these
+ * into CssPixels. https://developer.mozilla.org/en-US/docs/Web/API/WheelEvent/deltaMode
+ */
+function getNormalizedScrollDelta(
+  event: WheelEvent,
+  key: "deltaY" | "deltaX"
+): CssPixels {
+  const delta = event[key];
+  switch (event.deltaMode) {
+    case 1: // DOM_DELTA_LINE
+      return delta * 15;
+    case 2: // DOM_DELTA_PAGE
+      return delta * window.innerHeight;
+    default:
+  }
+  // Scroll by pixel.
+  return delta;
 }
