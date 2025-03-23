@@ -12,7 +12,7 @@ import {
 import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const LIVE_CAMERA = "Live Camera";
 
 // prettier-ignore
@@ -70,7 +70,7 @@ export class DanceDatabase {
           db.createObjectStore("dances", { keyPath: "name" });
         }
         if (!db.objectStoreNames.contains("audio")) {
-          db.createObjectStore("audio", { keyPath: "name" });
+          db.createObjectStore("audio", { keyPath: "hash" });
         }
         if (!db.objectStoreNames.contains("timelines")) {
           db.createObjectStore("timelines", { keyPath: "name" });
@@ -160,8 +160,12 @@ export class DanceDatabase {
     return this.put("dances", { name, dance, timestamp: Date.now() });
   }
 
-  async addAudio(name: string, audio: Blob): Promise<AudioRecord> {
-    return this.put("audio", { name, audio, timestamp: Date.now() });
+  async addAudio(
+    name: string,
+    hash: string,
+    audio: Blob
+  ): Promise<AudioRecord> {
+    return this.put("audio", { name, hash, audio, timestamp: Date.now() });
   }
 
   async addTimeline(
@@ -179,12 +183,19 @@ export class DanceDatabase {
     });
   }
 
+  async saveTimelineRecord(
+    timelineRecord: TimelineRecord
+  ): Promise<TimelineRecord> {
+    timelineRecord.lastModified = Date.now();
+    return this.put("timelines", timelineRecord);
+  }
+
   async getDance(name: string): Promise<Dance | undefined> {
     return (await this.get("dances", name))?.dance;
   }
 
-  async getAudioBlob(name: string): Promise<Blob | undefined> {
-    return (await this.get("audio", name))?.audio;
+  async getAudioRecord(hash: string): Promise<AudioRecord | undefined> {
+    return this.get("audio", hash);
   }
 
   async getTimeline(name: string): Promise<TimelineRecord | undefined> {
@@ -322,7 +333,7 @@ export class DanceCam {
     addCSS(/* css */ `
       #dancecam {
         position: absolute;
-        bottom: 0;
+        bottom: 50px;
         width: 100%;
       }
       .dancecam-controls {

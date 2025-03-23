@@ -4,9 +4,10 @@ function _click(selector: string): void {
 }
 
 if (process.env.NODE_ENV === "development") {
+  // Disable the art archive.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const artArchive = require("../../bin/art-archive/client");
-  artArchive.addKeyboardShortcuts();
+  // const artArchive = require("../../bin/art-archive/client");
+  // artArchive.addKeyboardShortcuts();
 }
 
 export default function shortcuts(seed?: string, restart?: () => void): void {

@@ -18,6 +18,7 @@ export type Dance = Array<PosesFrame>;
 
 export interface AudioRecord {
   name: string;
+  hash: string;
   timestamp: number;
   audio: Blob;
 }
@@ -28,10 +29,27 @@ export interface DanceRecord {
   timestamp: number;
 }
 
+export interface TimelineAudio {
+  offset: number;
+  type: "audio";
+  hash: string | null;
+}
+export interface TimelineDance {
+  offset: number;
+  type: "dance";
+}
+export interface TimelineKeyframe {
+  offset: number;
+  type: "keyframe";
+  key: string;
+  value: any;
+}
+
 export type Timeline =
-  | { offset: number; type: "audio"; audioKey: string }
-  | { offset: number; type: "dance" }
-  | { offset: number; type: "keyframe"; key: string; value: any };
+  | { type: "new" }
+  | TimelineAudio
+  | TimelineDance
+  | TimelineKeyframe;
 
 export interface TimelineRecord {
   name: string;

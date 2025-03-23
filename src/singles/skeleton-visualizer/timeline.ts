@@ -1,5 +1,10 @@
 import { type DanceDatabase } from "lib/dancecam";
-import { TimelineRecord } from "lib/dancecam/messages";
+import {
+  AudioRecord,
+  Timeline,
+  TimelineAudio,
+  TimelineRecord,
+} from "lib/dancecam/messages";
 import {
   addCSS,
   appendHTML,
@@ -8,6 +13,7 @@ import {
   LocationManager,
   reactiveInvalidator,
 } from "lib/utils";
+import { UnhandledCaseError } from "../../lib/utils";
 
 /**
  * Manages adding and removing timelines
@@ -27,7 +33,7 @@ export class TimelineManager {
 
     db.listTimelines().then((timelines) => this.updateTimelinesView(timelines));
 
-    this.reactiveUpdate();
+    this.reactive();
     parent.appendChild(this.elements.container);
   }
 
@@ -126,7 +132,7 @@ export class TimelineManager {
     };
   }
 
-  reactiveUpdate() {
+  reactive() {
     const { select, container } = this.elements;
     select.disabled = select.childElementCount === 1;
 
@@ -166,7 +172,7 @@ export class TimelineManager {
     this.timelineName = null;
     this.timelineRecord = null;
     LocationManager.deleteValue("timelineName");
-    this.reactiveUpdate();
+    this.reactive();
   };
 
   setupHandlers() {
@@ -192,7 +198,18 @@ export class TimelineManager {
         this.timelineRecord = null;
         this.timelineName = null;
       }
-      this.reactiveUpdate();
+      this.reactive();
+    });
+
+    document.body.addEventListener("keydown", (event) => {
+      if (
+        event.key === "s" &&
+        (event.metaKey || event.ctrlKey) &&
+        this.timelineRecord
+      ) {
+        event.preventDefault();
+        this.db.saveTimelineRecord(this.timelineRecord);
+      }
     });
   }
 
@@ -204,12 +221,12 @@ export class TimelineManager {
         } else {
           alert("Could not find the timeline");
         }
-        this.reactiveUpdate();
+        this.reactive();
       },
       (error) => {
         console.error(error);
         alert("There was an error loading the timeline");
-        this.reactiveUpdate();
+        this.reactive();
       }
     );
   }
@@ -227,11 +244,11 @@ export class TimelineManager {
       }
       const threeMinutes = 3 * 60;
       this.timelineRecord = await this.db.addTimeline(name, threeMinutes, []);
-      this.reactiveUpdate();
+      this.reactive();
     } catch (error) {
       console.error(error);
       alert("There was an error creating the timeline");
-      this.reactiveUpdate();
+      this.reactive();
     }
   }
 
@@ -258,7 +275,7 @@ export class TimelineManager {
     } else {
       this.timelineName = null;
     }
-    this.reactiveUpdate();
+    this.reactive();
   }
 
   update() {
@@ -277,6 +294,7 @@ class TimelineView {
   timelineRecord: TimelineRecord;
   secondsRange: [number, number];
   closeTimeline: () => void;
+  needsSaving = false;
   ctx: CanvasRenderingContext2D;
 
   constructor(
@@ -299,6 +317,7 @@ class TimelineView {
 
     this.secondsRange = [0, this.timelineRecord.duration];
 
+    this.reactive();
     document.body.appendChild(this.elements.container);
   }
 
@@ -308,14 +327,17 @@ class TimelineView {
         <div class="timeline-view-header">
           <div class="timeline-view-controls">
             <div class="timeline-view-time">00:10:00</div>
-            <button class="timeline-view-play" type="button">
+            <button class="timeline-view-add" title="Add" type="button">
+              <img src="../html/plus.svg" />
+            </button>
+            <button class="timeline-view-play" title="Play" type="button">
               <img src="../html/play.svg" />
             </button>
-            <button class="timeline-view-record" type="button">
+            <button class="timeline-view-record" title="Record" type="button">
               <div />
             </button>
-            <button class="timeline-view-close" type="button">
-            <img src="../html/xmark.svg" />
+            <button class="timeline-view-close" tile="Close" type="button">
+              <img src="../html/xmark.svg" />
             </button>
           </div>
           <div class="timeline-view-timeline">
@@ -331,8 +353,12 @@ class TimelineView {
 
     return {
       container,
+      addButton: get<HTMLButtonElement>(".timeline-view-add"),
+      playButton: get<HTMLButtonElement>(".timeline-view-play"),
+      recordButton: get<HTMLButtonElement>(".timeline-view-record"),
       closeButton: get<HTMLButtonElement>(".timeline-view-close"),
       canvas: get<HTMLCanvasElement>(".timeline-view-timeline canvas"),
+      timelines: get(".timeline-view-items"),
     };
   }
 
@@ -350,10 +376,10 @@ class TimelineView {
         background: #fff;
         display: flex;
         border-top: 1px solid var(--border-color-subtle);
-        justify-content: space-between;
         background-color: var(--background-color);
         color: var(--font-color);
         align-items: center;
+        flex-direction: column;
 
         --sidebar-width: 300px;
       }
@@ -368,10 +394,18 @@ class TimelineView {
         align-items: center;
         border-right: 1px solid var(--border-color-subtle);
         width: var(--sidebar-width);
-        box-sizing: content-box;
+        box-sizing: border-box;
         padding: 0.7rem 0.7rem;
         gap: 0.7rem;
         justify-content: end;
+
+        & button {
+          cursor: pointer;
+          opacity: 0.8;
+          &:hover {
+            opacity: 1;
+          }
+        }
       }
 
       .timeline-view-controls {
@@ -379,12 +413,12 @@ class TimelineView {
           border: none;
           background: none;
           padding: 0;
-          width: 24px;
-          height: 24px;
+          width: 20px;
+          height: 20px;
 
           & img {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
           }
         }
       }
@@ -396,8 +430,8 @@ class TimelineView {
       }
       .timeline-view-record {
         & div {
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
           border-radius: 12px;
           outline: 2px solid red;
           position: relative;
@@ -427,7 +461,7 @@ class TimelineView {
 
       }
       .timeline-view-items {
-
+        width: 100%;
       }
     `);
   }
@@ -553,6 +587,8 @@ class TimelineView {
     this.elements.container.addEventListener("wheel", this.wheelHandler, {
       passive: false,
     });
+
+    this.elements.addButton.addEventListener("click", this.addNewRow);
   }
 
   wheelHandler = (event: WheelEvent) => {
@@ -625,7 +661,77 @@ class TimelineView {
     this.secondsRange[1] = newEnd;
   };
 
-  reactiveUpdate() {}
+  updateTimeline(callback: (timelineRecord: TimelineRecord) => void) {
+    callback(this.timelineRecord);
+    this.needsSaving = true;
+    this.reactive();
+  }
+
+  addNewRow = () => {
+    const newRow = this.timelineRecord.timeline.find(
+      (timeline) => timeline.type === "new"
+    );
+    if (newRow) {
+      this.rowViews.get(newRow)?.container?.querySelector("select")?.focus();
+      // Don't add a second one here.
+      return;
+    }
+    this.timelineRecord.timeline = this.timelineRecord.timeline.slice();
+    this.timelineRecord.timeline.push({ type: "new" });
+    this.reactive();
+  };
+
+  replaceNewRow(timelineType: string) {
+    const index = this.timelineRecord.timeline.findIndex(
+      (timeline) => timeline.type === "new"
+    );
+    this.timelineRecord.timeline = this.timelineRecord.timeline.slice();
+    this.timelineRecord.timeline[index] = createDefaultTimeline(timelineType);
+    this.reactive();
+  }
+
+  prevTimeline: Timeline[] = [];
+  rowViews = new WeakMap<Timeline, Row>();
+  reactive() {
+    if (this.timelineRecord.timeline !== this.prevTimeline) {
+      this.rebuildTimelines();
+    }
+  }
+
+  /**
+   * Synchronize the timeline views.
+   */
+  rebuildTimelines() {
+    for (let i = 0; i < this.timelineRecord.timeline.length; i++) {
+      const timeline = this.timelineRecord.timeline[i];
+      const element: Element | undefined = this.elements.timelines.children[i];
+      const nextElement: Element | undefined =
+        this.elements.timelines.children[i - 1];
+      let rowView = this.rowViews.get(timeline);
+      if (element && element === rowView?.container) {
+        continue;
+      }
+      if (!rowView) {
+        rowView = createTimelineRow(timeline, this);
+        this.rowViews.set(timeline, rowView);
+      }
+      if (nextElement) {
+        this.elements.timelines.insertBefore(rowView.container, nextElement);
+      } else {
+        while (this.elements.timelines.childElementCount > i) {
+          this.elements.timelines.lastElementChild?.remove();
+        }
+        this.elements.timelines.appendChild(rowView.container);
+      }
+    }
+    // Ensure there are no extra elements left over.
+    while (
+      this.elements.timelines.childElementCount >
+      this.timelineRecord.timeline.length
+    ) {
+      this.elements.timelines.lastElementChild?.remove();
+    }
+  }
 
   update() {
     // this.secondsRange[1] += 0.2;
@@ -642,510 +748,285 @@ class TimelineView {
   }
 }
 
-export class TimelineManager2 {
-  #danceDB: DanceDatabase;
-  #danceNames: string[] = [];
-  mount: HTMLElement;
-  selectedTimeline: string | null;
-  isRecording = false;
-  elements: ReturnType<typeof TimelineManager2.getElements>;
-
-  static async create(
-    danceDB: DanceDatabase,
-    mount: HTMLElement,
-    selectedTimeline: string | null
-  ) {
-    const timelineNames = await danceDB.listTimelines();
-    return new TimelineManager2(
-      danceDB,
-      timelineNames,
-      mount,
-      selectedTimeline
-    );
+function createDefaultTimeline(timelineType: string): Timeline {
+  switch (timelineType) {
+    case "new":
+      return { type: "new" };
+    case "audio":
+      return { offset: 0, type: "audio", hash: null };
+    case "dance":
+      return { offset: 0, type: "dance" };
+    case "keyframe":
+      return { offset: 0, type: "keyframe", key: "", value: null };
+    default:
+      throw new Error("Unknown timeline " + timelineType);
   }
+}
 
-  constructor(
-    danceDB: DanceDatabase,
-    danceNames: string[],
-    mount: HTMLElement,
-    selectedTimeline: string | null
-  ) {
-    this.#danceDB = danceDB;
-    this.#danceNames = danceNames;
-    this.mount = mount;
-    this.selectedTimeline = selectedTimeline;
+function createTimelineRow(timeline: Timeline, timelineView: TimelineView) {
+  switch (timeline.type) {
+    case "new":
+      return new NewRow(timeline, timelineView);
+    case "audio":
+      return new AudioRow(timeline, timelineView);
+    case "dance":
+      return new DanceRow(timeline, timelineView);
+    case "keyframe":
+      return new KeyframeRow(timeline, timelineView);
+    default:
+      throw new UnhandledCaseError(timeline, "Timeline");
+  }
+}
 
-    const parser = new DOMParser();
-    const parsedHTML = parser.parseFromString(
-      /* html */ `
-      <div id="timeline">
-        <div class="timeline-controls">
-          <button id="timeline-discard">Discard</button>
-          <button id="timeline-save">Save</button>
-          <button id="timeline-delete">Delete</button>
-          <button id="timeline-download">Download</button>
-          <button id="timeline-record">Record</button>
-          <select id="timeline-dropdown"></select>
-        </div>
-      </div>
-    `,
-      "text/html"
-    );
-
+class Row {
+  timeline: Timeline;
+  timelineView: TimelineView;
+  db: DanceDatabase;
+  container: HTMLElement;
+  static cssAdded = false;
+  constructor(timeline: Timeline, timelineView: TimelineView) {
+    this.timeline = timeline;
+    this.timelineView = timelineView;
+    this.db = timelineView.db;
+    this.container = document.createElement("div");
+    this.container.className = "timeline-row";
+    if (Row.cssAdded) {
+      return;
+    }
+    Row.cssAdded = true;
     addCSS(/* css */ `
-      #timeline {
-        position: absolute;
-        bottom: 0;
-        width: 100%;
-      }
-      .timeline-controls {
+      .timeline-row {
         display: flex;
-        justify-content: end;
-        margin: 5px;
-        gap: 5px;
       }
-      .hide-ui #timeline {
-        display: none;
+      .timeline-row-start {
+        width: var(--sidebar-width);
+        border-right: 1px solid var(--border-color-subtle);
+        box-sizing: border-box;
+        border-top: 1px solid var(--border-color-subtle);
+        padding: 8px;
+        display: flex;
+        align-items: center;
+      }
+      .timeline-row-start-content {
+        flex: 1;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .timeline-row-end {
+        flex: 1;
+      }
+
+      .timeline-row-remove {
+        background: none;
+        border: none;
+        padding: 6px;
+        margin: -6px;
+        cursor: pointer;
+        opacity: 0.8;
+
+        &:hover {
+          opacity: 1;
+        }
+
+        & img {
+          width: 12px;
+          height: 12px;
+        }
       }
     `);
+  }
+}
 
-    const root = ensureExists(parsedHTML.body.firstElementChild);
-    this.mount.appendChild(root);
-    this.elements = TimelineManager2.getElements(root);
-
+class NewRow extends Row {
+  elements: ReturnType<typeof NewRow.prototype.createElements>;
+  constructor(timeline: Timeline, timelineView: TimelineView) {
+    super(timeline, timelineView);
+    this.elements = this.createElements();
     this.addHandlers();
-    this.refreshDances(danceNames);
-    this.updateVisibility();
   }
 
-  getSelectedTimeline() {
-    if (!this.selectedTimeline) {
-      return null;
-    }
-    return this.#danceDB.getDance(this.selectedTimeline);
-  }
-
-  static getElements(root: Element) {
-    const getElement = <T extends HTMLElement>(selector: string): T => {
-      const element = root.querySelector(selector);
-      if (!element) {
-        throw new Error(`Could not find element by selector "${selector}"`);
-      }
-      return element as T;
-    };
-
+  createElements() {
+    const get = appendHTML(
+      this.container,
+      /* html */ `
+        <div class="timeline-row-start">
+          <select>
+            <option value="audio">Audio</option>
+            <option value="dance">Dance</option>
+            <option value="keyframe">Keyframe</option>
+          </select>
+          <button type="button">Add</button>
+        </div>
+        <div class="timeline-row-end"></div>
+      `
+    );
     return {
-      danceDropdown: getElement<HTMLSelectElement>("#timeline-dropdown"),
-      recordButton: getElement<HTMLButtonElement>("#timeline-record"),
-      saveButton: getElement<HTMLButtonElement>("#timeline-save"),
-      discardButton: getElement<HTMLButtonElement>("#timeline-discard"),
-      deleteButton: getElement<HTMLButtonElement>("#timeline-delete"),
-      downloadButton: getElement<HTMLButtonElement>("#timeline-download"),
+      button: get<HTMLButtonElement>("button"),
+      select: get<HTMLButtonElement>("select"),
     };
   }
 
   addHandlers() {
-    const {
-      recordButton,
-      danceDropdown,
-      saveButton,
-      discardButton,
-      deleteButton,
-      downloadButton,
-    } = this.elements;
-
-    danceDropdown.addEventListener("change", this.changeDance);
-    recordButton.addEventListener("click", this.startRecording);
-    saveButton.addEventListener("click", this.saveRecording);
-    discardButton.addEventListener("click", this.discardRecording);
-    deleteButton.addEventListener("click", this.deleteDance);
-    downloadButton.addEventListener("click", this.downloadDance);
-  }
-
-  updateVisibility() {
-    const {
-      discardButton,
-      recordButton,
-      danceDropdown,
-      deleteButton,
-      saveButton,
-      downloadButton,
-    } = this.elements;
-
-    // if (danceDropdown.value === LIVE_CAMERA) {
-    //   hide(deleteButton);
-    //   hide(downloadButton);
-    //   if (this.isRecording) {
-    //     hide(recordButton);
-    //     hide(danceDropdown);
-    //     show(discardButton);
-    //     show(saveButton);
-    //   } else {
-    //     show(recordButton);
-    //     show(danceDropdown);
-    //     hide(discardButton);
-    //     hide(saveButton);
-    //   }
-    // } else {
-    //   hide(recordButton);
-    //   hide(saveButton);
-    //   hide(discardButton);
-    //   show(deleteButton);
-    //   show(downloadButton);
-    // }
-  }
-
-  startRecording = () => {
-    console.log("Start recording");
-    // Start recording
-    this.isRecording = true;
-    this.updateVisibility();
-    this.onStartRecording();
-  };
-
-  saveRecording = async () => {
-    // Stop recording
-    this.isRecording = false;
-    this.updateVisibility();
-    const dance = this.onStopRecording();
-    if (dance.length) {
-      const danceName = prompt("Enter a name for the new dance:") || "untitled";
-      await this.#danceDB.addDance(danceName, dance);
-      this.refreshDances(await this.#danceDB.listDances());
-      this.elements.danceDropdown.value = danceName;
-      this.selectedTimeline = danceName;
-      this.elements.danceDropdown.value = danceName;
-      this.changeDance();
-      console.log("[TimelineManager2] saved", danceName, dance);
-    } else {
-      this.onDiscardRecording();
-    }
-  };
-
-  discardRecording = () => {
-    this.isRecording = false;
-    this.updateVisibility();
-    this.onDiscardRecording();
-  };
-
-  changeDance = async () => {
-    const { danceDropdown } = this.elements;
-    this.updateVisibility();
-    this.selectedTimeline = danceDropdown.value;
-
-    if (!this.selectedTimeline || this.selectedTimeline === LIVE_CAMERA) {
-      this.onChangeDance(null);
-    } else {
-      const dance = await this.#danceDB.getDance(this.selectedTimeline);
-      if (dance) {
-        this.onChangeDance(dance);
-      }
-    }
-  };
-
-  deleteDance = async () => {
-    if (
-      !confirm(`Are you sure you want to delete "${this.selectedTimeline}"?`)
-    ) {
-      return;
-    }
-    const { danceDropdown } = this.elements;
-    if (this.selectedTimeline) {
-      const danceName = this.selectedTimeline;
-
-      danceDropdown.selectedIndex += 1;
-      this.selectedTimeline = danceDropdown.value;
-      if (!danceDropdown.value) {
-        this.selectedTimeline = LIVE_CAMERA;
-        danceDropdown.value = LIVE_CAMERA;
-      }
-      this.changeDance();
-
-      await this.#danceDB.deleteDance(danceName);
-      console.log("[TimelineManager2] deleted", danceName);
-      this.refreshDances(await this.#danceDB.listDances());
-    }
-  };
-
-  downloadDance = async () => {
-    if (this.selectedTimeline) {
-      await this.#danceDB.downloadDance(this.selectedTimeline);
-    }
-  };
-
-  refreshDances(danceNames: string[]) {
-    this.#danceNames = danceNames;
-    const { danceDropdown } = this.elements;
-    const previousValue = this.selectedTimeline;
-    while (danceDropdown.children.length > 1) {
-      danceDropdown.lastChild!.remove();
-    }
-    for (const name of this.#danceNames) {
-      const option = document.createElement("option");
-      option.innerText = name;
-      danceDropdown.appendChild(option);
-    }
-    danceDropdown.value = previousValue;
-    if (!danceDropdown.value) {
-      this.selectedTimeline = LIVE_CAMERA;
-      this.changeDance();
-    }
-  }
-}
-
-export class AudioTimeline {
-  name: string;
-  audio: HTMLAudioElement | null;
-  isPlaying = false;
-  isActivePlayer = false;
-  elements: ReturnType<typeof AudioTimeline.createElements>;
-  blob: Promise<Blob | undefined>;
-
-  constructor(name: string, container: Element, db: DanceDatabase) {
-    this.name = name;
-    this.blob = db.getAudioBlob(name);
-    this.audio = null;
-    this.blob.then(this.onBlobLoad, this.onBlobError);
-
-    this.elements = AudioTimeline.createElements();
-
-    container.appendChild(this.elements.container);
-  }
-
-  onBlobLoad = (blob: Blob | undefined) => {
-    if (!blob) {
-      this.showError(`The audio file "${this.name}" could not be found.`);
-      return;
-    }
-    const audio = new Audio();
-    {
-      // Create the audio element.
-      const url = URL.createObjectURL(blob);
-      audio.src = url;
-      audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-      this.audio = audio;
-    }
-
-    {
-      // Setup the event listeners
-      this.elements.playButton.addEventListener("click", () =>
-        this.togglePlay()
-      );
-      audio.addEventListener("timeupdate", () => {
-        this.elements.durationDisplay.textContent = this.formatTime(
-          audio.currentTime
-        );
-      });
-    }
-
-    new AudioWaveform(this.audio, this.elements.waveformCanvas, blob);
-    new Scrubbers(this.audio, this.elements.waveformWrapper);
-  };
-
-  onBlobError = (error: unknown) => {
-    console.error(error);
-    this.showError(
-      `There was an error accessing the media file "${this.name}".`
-    );
-  };
-
-  showError(error: string) {
-    // eslint-disable-next-line no-alert
-    alert(error);
-  }
-
-  static createElements() {
-    const parser = new DOMParser();
-    const html = `
-      <div class="mediaAudio">
-        <div class="mediaAudioWave" data-waveform>
-          <canvas class="waveformCanvas"></canvas>
-        </div>
-        <div class="mediaAudioControls">
-          <button class="mediaAudioControlsPlay" type="button" aria-label="Play">
-            <span class="icon-mask" data-icon-mask="play"></span>
-          </button>
-          <div class="mediaAudioControlsSpacer"></div>
-          <div class="mediaAudioControlsName">${this.name}</div>
-          <div class="mediaAudioControlsDuration">0:00</div>
-        </div>
-      </div>
-    `;
-    const doc = parser.parseFromString(html, "text/html");
-    const container = doc.body.firstChild as HTMLElement;
-
-    function get<T extends Element>(querySelector: string): T {
-      return ensureExists(container.querySelector<T>(querySelector));
-    }
-
-    return {
-      container,
-      playButton: get<HTMLButtonElement>(".mediaAudioControlsPlay"),
-      durationDisplay: get<HTMLDivElement>(".mediaAudioControlsDuration"),
-      waveformCanvas: get<HTMLCanvasElement>(".waveformCanvas"),
-      waveformWrapper: get<HTMLDivElement>("[data-waveform]"),
-      iconMask: get<HTMLSpanElement>(".icon-mask"),
-    };
-  }
-
-  togglePlay() {
-    if (this.isPlaying) {
-      this.audio?.pause();
-      this.elements.iconMask.setAttribute("data-icon-mask", "play");
-    } else {
-      this.audio?.play();
-      this.elements.iconMask.setAttribute("data-icon-mask", "pause");
-    }
-    this.isPlaying = !this.isPlaying;
-  }
-
-  formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
-}
-
-class AudioWaveform {
-  audio: HTMLAudioElement;
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  blob: Blob;
-
-  constructor(audio: HTMLAudioElement, canvas: HTMLCanvasElement, blob: Blob) {
-    this.audio = audio;
-    this.canvas = canvas;
-    this.blob = blob;
-    {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        throw new Error("Could not load the canvas context.");
-      }
-      this.ctx = ctx;
-    }
-
-    this.initCanvas();
-    this.audio.addEventListener("loadedmetadata", () => this.drawWaveform());
-  }
-
-  initCanvas() {
-    let { width, height } = this.canvas.getBoundingClientRect();
-    width *= devicePixelRatio;
-    height *= devicePixelRatio;
-    this.canvas.width = width;
-    this.canvas.height = height;
-  }
-
-  async drawWaveform() {
-    const { width, height } = this.canvas;
-    const audioContext = new AudioContext();
-    const arrayBuffer = await this.blob.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    const { waveform, maxWaveHeight } = this.getWaveform(audioBuffer, width);
-
-    // Draw the waveform
-    this.ctx.clearRect(0, 0, width, height);
-    this.ctx.fillStyle = "#aaa";
-    waveform.forEach((value, x) => {
-      const y = (1 - value / maxWaveHeight) * height;
-      this.ctx.fillRect(x, y, 1, height);
+    this.elements.button.addEventListener("click", () => {
+      this.timelineView.replaceNewRow(this.elements.select.value);
     });
   }
-
-  getWaveform(audioBuffer: AudioBuffer, size: number) {
-    const leftChannel = audioBuffer.getChannelData(0);
-    const rightChannel = audioBuffer.getChannelData(1);
-    const waveform: number[] = [];
-    const window = Math.floor(leftChannel.length / size);
-    let sum = 0;
-    let maxWaveHeight = 0;
-
-    for (let i = 0; i < leftChannel.length; i++) {
-      sum += Math.abs(leftChannel[i]) + Math.abs(rightChannel[i]);
-      if (i % window === window - 1) {
-        const value = sum / window;
-        waveform.push(value);
-        maxWaveHeight = Math.max(maxWaveHeight, value);
-        sum = 0;
-      }
-    }
-    return { waveform, maxWaveHeight };
-  }
 }
 
-class Scrubbers {
-  audio: HTMLAudioElement;
-  container: HTMLDivElement;
-  elements: ReturnType<typeof Scrubbers.createElements>;
+class AudioRow extends Row {
+  timeline: TimelineAudio;
+  audioRecord: Promise<AudioRecord> | null = null;
+  elements: ReturnType<typeof AudioRow.prototype.createElements>;
+  audioElement: Promise<HTMLAudioElement> | null = null;
 
-  constructor(audio: HTMLAudioElement, container: HTMLDivElement) {
-    this.audio = audio;
-    this.container = container;
-
-    this.elements = Scrubbers.createElements(container);
-    this.attachEvents();
+  constructor(timeline: TimelineAudio, timelineView: TimelineView) {
+    super(timeline, timelineView);
+    this.elements = this.createElements();
+    this.timeline = timeline;
+    this.addHandlers();
+    this.reactive();
   }
 
-  static createElements(container: Element) {
+  createElements() {
     const get = appendHTML(
-      container,
+      this.container,
       /* html */ `
-      <div
-        className="mediaAudioScrubberPlayPosition"
-        ref={playPositionRef}
-      ></div>
-      <div className="mediaAudioScrubberHorizontalLine">
-        <div ref={horizontalLineRef}></div>
-      </div>
-      <div
-        className="mediaAudioScrubberHoverPosition"
-        ref={hoverPositionRef}
-      ></div>
-    `
+        <div class="timeline-row-start">
+          <div class="timeline-row-start-content">
+            <span class="timeline-audio-name">Audio</span>
+            <input type="file"
+                  accept="audio/mpeg,audio/aac,audio/ogg,audio/wav,audio/webm" />
+          </div>
+          <button class="timeline-row-remove" tile="Remove row" type="button">
+            <img src="../html/xmark.svg">
+          </button>
+        </div>
+        <div class="timeline-row-end">
+          <div class="timeline-line timeline-audio-line"></div>
+        </div>
+      `
     );
-
     return {
-      playPosition: get<HTMLDivElement>("mediaAudioScrubberPlayPosition"),
-      hoverPosition: get<HTMLDivElement>("mediaAudioScrubberHoverPosition"),
-      horizontalLine: get<HTMLDivElement>("mediaAudioScrubberHorizontalLine"),
+      input: get<HTMLInputElement>("input[type=file]"),
+      line: get<HTMLDivElement>(".timeline-line"),
+      nameLabel: get<HTMLSpanElement>(".timeline-audio-name"),
+      removeButton: get<HTMLButtonElement>(".timeline-row-remove"),
     };
   }
 
-  attachEvents() {
-    this.container.addEventListener("mousedown", (event) =>
-      this.adjustAudioTime(event.clientX)
-    );
-    this.container.addEventListener("mousemove", (event) =>
-      this.moveHover(event.clientX)
-    );
-    this.container.addEventListener("mouseup", (event) =>
-      this.adjustAudioTime(event.clientX)
-    );
-    this.audio.addEventListener("timeupdate", () => this.updatePlayPosition());
+  isAudioBuilt = false;
+
+  reactive() {
+    const { input, nameLabel } = this.elements;
+    if (this.timeline.hash && !this.audioRecord) {
+      this.audioRecord = ensureNonNull(
+        this.db.getAudioRecord(this.timeline.hash)
+      );
+    }
+    input.style.display = this.audioRecord ? "none" : "block";
+
+    if (this.audioRecord && !this.audioElement) {
+      this.audioElement = this.audioRecord.then((record) =>
+        getHTMLAudioElement(record.audio)
+      );
+    }
+
+    if (this.audioRecord && this.audioElement && !this.isAudioBuilt) {
+      this.isAudioBuilt = true;
+      this.audioRecord.then((record) => {
+        nameLabel.innerText = record.name;
+      });
+
+      this.audioElement.then((element) => {
+        console.log(`!!! element`, element);
+      });
+    }
   }
 
-  toSongRatio(clientX: number): number {
-    const { width, left } = this.container.getBoundingClientRect();
-    const ratio = (clientX - left) / width;
-    return Math.max(0, Math.min(1, ratio));
+  async handleFile(file: File) {
+    const hash = await hashBlob(file);
+    const record = await this.db.getAudioRecord(hash);
+    if (record) {
+      // This was already stored in the Audio database.
+      this.audioRecord = Promise.resolve(record);
+      this.timeline.hash = record.hash;
+      this.audioElement = getHTMLAudioElement(record.audio);
+    } else {
+      this.audioRecord = this.db.addAudio(file.name, hash, file);
+      this.timeline.hash = hash;
+      this.audioElement = this.audioRecord.then((record) =>
+        getHTMLAudioElement(record.audio)
+      );
+    }
+    this.timelineView.needsSaving = true;
+
+    this.audioElement.then((audioElement) => {
+      const { timelineRecord } = this.timelineView;
+      if (isNaN(audioElement.duration)) {
+        console.error("The duration was not available", audioElement);
+        return;
+      }
+      if (timelineRecord.duration < audioElement.duration) {
+        this.timelineView.needsSaving = true;
+        timelineRecord.duration = audioElement.duration;
+      }
+    });
+    this.reactive();
   }
 
-  moveHover(clientX: number) {
-    this.elements.hoverPosition.style.left = `${
-      this.toSongRatio(clientX) * 100
-    }%`;
-  }
+  addHandlers() {
+    const { input, removeButton } = this.elements;
 
-  adjustAudioTime(clientX: number) {
-    this.audio.currentTime = this.audio.duration * this.toSongRatio(clientX);
-  }
+    // Handle file selection via input.
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) {
+        return;
+      }
+      this.handleFile(file);
+    });
 
-  updatePlayPosition() {
-    const ratio = this.audio.currentTime / this.audio.duration;
-    this.elements.playPosition.style.left = `${ratio * 100}%`;
-    this.elements.horizontalLine.style.width = `${ratio * 100}%`;
+    // Drag and drop support.
+    this.container.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.container.classList.add("drag-over");
+    });
+
+    this.container.addEventListener("dragleave", () => {
+      this.container.classList.remove("drag-over");
+    });
+
+    this.container.addEventListener("drop", (event) => {
+      event.preventDefault();
+      this.container.classList.remove("drag-over");
+
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith("audio/")) {
+        alert("Unsupported file type: " + file.type);
+        return;
+      }
+
+      this.handleFile(file);
+    });
+
+    removeButton.addEventListener("click", () => {
+      if (confirm("Are you sure you want to delete that row?")) {
+        this.timelineView.updateTimeline((timelineRecord) => {
+          timelineRecord.timeline = timelineRecord.timeline.filter(
+            (timeline) => timeline !== this.timeline
+          );
+        });
+      }
+    });
   }
 }
+
+class DanceRow extends Row {}
+
+class KeyframeRow extends Row {}
 
 /**
  * Scroll wheel events can by of various types. Do the right thing by converting these
@@ -1165,4 +1046,69 @@ function getNormalizedScrollDelta(
   }
   // Scroll by pixel.
   return delta;
+}
+
+async function hashBlob(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function getHTMLAudioElement(blob: Blob): Promise<HTMLAudioElement> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    const url = URL.createObjectURL(blob);
+
+    audio.preload = "metadata";
+
+    audio.addEventListener("loadedmetadata", () => {
+      resolve(audio);
+    });
+
+    audio.addEventListener("error", (e) => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Error loading audio metadata"));
+    });
+
+    audio.src = url;
+  });
+}
+
+function getAudioDuration(blob: Blob): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    const url = URL.createObjectURL(blob);
+
+    audio.preload = "metadata";
+
+    audio.addEventListener("loadedmetadata", () => {
+      URL.revokeObjectURL(url); // Clean up after ourselves
+      if (isNaN(audio.duration)) {
+        reject(new Error("Failed to read duration"));
+      } else {
+        resolve(audio.duration);
+      }
+    });
+
+    audio.addEventListener("error", (e) => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Error loading audio metadata"));
+    });
+
+    audio.src = url;
+  });
+}
+
+function ensureNonNull<T>(promise: Promise<T | null | undefined>): Promise<T> {
+  return promise.then((value) => {
+    if (value === undefined) {
+      return Promise.reject(new Error("The value was undefined"));
+    }
+    if (value === null) {
+      return Promise.reject(new Error("The value was null"));
+    }
+    return value;
+  });
 }
