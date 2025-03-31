@@ -215,6 +215,9 @@ async function getCurrent(config: Config) {
     position: [0, 0, 3],
   });
 
+  const timelineManager = TimelineManager.create(danceDB);
+  document.body.appendChild(timelineManager);
+
   return {
     gui,
     camera,
@@ -244,7 +247,7 @@ async function getCurrent(config: Config) {
     poseLatencyMS: 0,
     lastPostTimeMS: 0,
     showFrameRequested: false,
-    timelineManager: new TimelineManager(document.body, danceDB),
+    timelineManager,
   };
 }
 

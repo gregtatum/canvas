@@ -191,7 +191,10 @@ export function reactiveInvalidator(
   };
 }
 
-export function addStylesheet(path: string, root = document.head) {
+export function addStylesheet(
+  path: string,
+  root: HTMLHeadElement | ShadowRoot = document.head
+) {
   const normalizedPath = new URL(path, document.baseURI).href;
 
   // Check if stylesheet is already present in this root.

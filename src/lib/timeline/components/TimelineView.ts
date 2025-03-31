@@ -28,11 +28,16 @@ export class TimelineView {
   time: Seconds = 0;
   startPosition: Seconds = 0;
 
+  // Umm... so layout and bounding box size is wonky here, so redraw 5 times
+  // until it's settled. This is not great, but it works?
+  firstRedraws = 5;
+
   constructor(
     db: DanceDatabase,
     timelineName: string,
     timelineRecord: TimelineRecord,
-    closeTimeline: () => void
+    closeTimeline: () => void,
+    shadowRoot: HTMLElement
   ) {
     this.db = db;
     this.timelineName = timelineName;
@@ -48,49 +53,49 @@ export class TimelineView {
     this.secondsRange = [0, this.timelineRecord.duration];
 
     this.reactive();
-    document.body.appendChild(this.elements.container);
+    shadowRoot.appendChild(this.elements.container);
   }
 
   static createElements() {
     const { container, get } = createHTML(/* html */ `
-      <div class="timeline timeline-view">
-        <div class="timeline-view-header">
-          <div class="timeline-view-controls">
-            <div class="timeline-view-time">00:10:00</div>
-            <button class="timeline-view-add" title="Add" type="button">
+      <div class="view">
+        <div class="view-header">
+          <div class="_controls">
+            <div class="_time">00:10:00</div>
+            <button class="_add" title="Add" type="button">
               <img src="../html/plus.svg" />
             </button>
-            <button class="timeline-view-play" title="Play" type="button">
+            <button class="_play" title="Play" type="button">
               <img src="../html/play.svg" />
             </button>
-            <button class="timeline-view-record" title="Record" type="button">
+            <button class="_record" title="Record" type="button">
               <div />
             </button>
-            <button class="timeline-view-close" tile="Close" type="button">
+            <button class="_close" tile="Close" type="button">
               <img src="../html/xmark.svg" />
             </button>
           </div>
-          <div class="timeline-view-timeline">
+          <div class="_tickmarks">
             <canvas />
-            <div class="timeline-view-zoom"></div>
+            <div class="_zoom"></div>
           </div>
         </div>
-        <div class="timeline-view-items">
-          <!-- Items get appended here. -->
+        <div class="view-rows">
+          <!-- Timeline rows get appended here. -->
         </div>
       </div>
     `);
 
     return {
       container,
-      addButton: get<HTMLButtonElement>(".timeline-view-add"),
-      playButton: get<HTMLButtonElement>(".timeline-view-play"),
-      playButtonImg: get<HTMLImageElement>(".timeline-view-play img"),
-      recordButton: get<HTMLButtonElement>(".timeline-view-record"),
-      closeButton: get<HTMLButtonElement>(".timeline-view-close"),
-      canvas: get<HTMLCanvasElement>(".timeline-view-timeline canvas"),
-      timelines: get(".timeline-view-items"),
-      time: get<HTMLElement>(".timeline-view-time"),
+      addButton: get<HTMLButtonElement>("._add"),
+      playButton: get<HTMLButtonElement>("._play"),
+      playButtonImg: get<HTMLImageElement>("._play img"),
+      recordButton: get<HTMLButtonElement>("._record"),
+      closeButton: get<HTMLButtonElement>("._close"),
+      canvas: get<HTMLCanvasElement>("._tickmarks canvas"),
+      rows: get(".view-rows"),
+      time: get<HTMLElement>("._time"),
     };
   }
 
@@ -101,11 +106,15 @@ export class TimelineView {
     () => this.timelineRecord.duration,
     () => this.secondsRange[0],
     () => this.secondsRange[1],
+    () => this.firstRedraws,
     () => window.innerWidth,
   ]);
   reactiveDrawTimeline() {
     if (!this.redrawTimeline()) {
       return;
+    }
+    if (this.firstRedraws > 0) {
+      this.firstRedraws--;
     }
     for (const timeline of this.timelineRecord.timeline) {
       const rowView = this.rowViews.get(timeline);
@@ -113,13 +122,12 @@ export class TimelineView {
     }
     const { secondsRange, ctx } = this;
     const { canvas } = this.elements;
-    if (this.prevWindowWidth !== window.innerWidth) {
-      // Properly size the canvas.
-      this.prevWindowWidth = window.innerWidth;
-      const rect = this.elements.canvas.getBoundingClientRect();
-      canvas.width = rect.width * devicePixelRatio;
-      canvas.height = rect.height * devicePixelRatio;
-    }
+
+    // Properly size the canvas.
+    this.prevWindowWidth = window.innerWidth;
+    const rect = this.elements.canvas.getBoundingClientRect();
+    canvas.width = rect.width * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
 
     // Clear the canvas
     ctx.fillStyle = "#433";
@@ -358,11 +366,11 @@ export class TimelineView {
    * Synchronize the timeline views.
    */
   rebuildTimelines() {
+    const rowsElements = this.elements.rows;
     for (let i = 0; i < this.timelineRecord.timeline.length; i++) {
       const timeline = this.timelineRecord.timeline[i];
-      const element: Element | undefined = this.elements.timelines.children[i];
-      const nextElement: Element | undefined =
-        this.elements.timelines.children[i - 1];
+      const element: Element | undefined = rowsElements.children[i];
+      const nextElement: Element | undefined = rowsElements.children[i - 1];
       let rowView = this.rowViews.get(timeline);
       if (element && element === rowView?.container) {
         continue;
@@ -372,20 +380,19 @@ export class TimelineView {
         this.rowViews.set(timeline, rowView);
       }
       if (nextElement) {
-        this.elements.timelines.insertBefore(rowView.container, nextElement);
+        rowsElements.insertBefore(rowView.container, nextElement);
       } else {
-        while (this.elements.timelines.childElementCount > i) {
-          this.elements.timelines.lastElementChild?.remove();
+        while (rowsElements.childElementCount > i) {
+          rowsElements.lastElementChild?.remove();
         }
-        this.elements.timelines.appendChild(rowView.container);
+        rowsElements.appendChild(rowView.container);
       }
     }
     // Ensure there are no extra elements left over.
     while (
-      this.elements.timelines.childElementCount >
-      this.timelineRecord.timeline.length
+      rowsElements.childElementCount > this.timelineRecord.timeline.length
     ) {
-      this.elements.timelines.lastElementChild?.remove();
+      rowsElements.lastElementChild?.remove();
     }
   }
 

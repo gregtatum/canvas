@@ -13,7 +13,7 @@ export abstract class Row {
     this.timelineView = timelineView;
     this.db = timelineView.db;
     this.container = document.createElement("div");
-    this.container.className = "timeline-row";
+    this.container.className = "row";
     if (Row.cssAdded) {
       return;
     }

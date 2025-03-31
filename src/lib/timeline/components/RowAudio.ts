@@ -28,26 +28,26 @@ export class RowAudio extends Row {
     const get = appendHTML(
       this.container,
       /* html */ `
-        <div class="timeline-row-start">
-          <div class="timeline-row-start-content">
-            <span class="timeline-audio-name">Audio</span>
+        <div class="_start">
+          <div class="_content">
+            <span class="_name">Audio</span>
             <input type="file"
                   accept="audio/mpeg,audio/aac,audio/ogg,audio/wav,audio/webm" />
           </div>
-          <button class="timeline-row-remove" tile="Remove row" type="button">
+          <button class="_remove" tile="Remove row" type="button">
             <img src="../html/xmark.svg">
           </button>
         </div>
-        <div class="timeline-row-end">
-          <canvas class="timeline-line timeline-audio-line" />
+        <div class="_end">
+          <canvas class="row-line" />
         </div>
       `
     );
     return {
       input: get<HTMLInputElement>("input[type=file]"),
-      line: get<HTMLDivElement>(".timeline-line"),
-      nameLabel: get<HTMLSpanElement>(".timeline-audio-name"),
-      removeButton: get<HTMLButtonElement>(".timeline-row-remove"),
+      line: get<HTMLDivElement>(".row-line"),
+      nameLabel: get<HTMLSpanElement>("._name"),
+      removeButton: get<HTMLButtonElement>("._remove"),
       canvas: get<HTMLCanvasElement>("canvas"),
     };
   }

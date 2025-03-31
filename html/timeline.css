@@ -1,4 +1,4 @@
-.timeline {
+:host {
   --accent-color: #44b9ff;
   --background-color: #333;
   --background-color-outset: #444;
@@ -17,7 +17,7 @@
   font-weight: normal;
 }
 
-.timeline-manager {
+.manager {
   position: absolute;
   inset: auto 0 0 0;
   background: #fff;
@@ -67,57 +67,57 @@
   }
 }
 
-.timeline-row {
+.row {
   display: flex;
-}
 
-.timeline-row-start {
-  width: var(--sidebar-width);
-  border-right: 1px solid var(--border-color-subtle);
-  box-sizing: border-box;
-  border-top: 1px solid var(--border-color-subtle);
-  padding: 8px;
-  display: flex;
-  align-items: center;
-}
+  & ._start {
+    width: var(--sidebar-width);
+    border-right: 1px solid var(--border-color-subtle);
+    box-sizing: border-box;
+    border-top: 1px solid var(--border-color-subtle);
+    padding: 8px;
+    display: flex;
+    align-items: center;
 
-.timeline-row-start-content {
-  flex: 1;
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.timeline-row-end {
-  flex: 1;
-  border-top: 1px solid var(--border-color-subtle);
-}
-
-.timeline-row-remove {
-  background: none;
-  border: none;
-  padding: 6px;
-  margin: -6px;
-  cursor: pointer;
-  opacity: 0.8;
-
-  &:hover {
-    opacity: 1;
+    & ._content {
+      flex: 1;
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
   }
 
-  & img {
-    width: 12px;
-    height: 12px;
+  & ._end {
+    flex: 1;
+    border-top: 1px solid var(--border-color-subtle);
+  }
+
+  & ._remove {
+    background: none;
+    border: none;
+    padding: 6px;
+    margin: -6px;
+    cursor: pointer;
+    opacity: 0.8;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    & img {
+      width: 12px;
+      height: 12px;
+    }
   }
 }
 
-.timeline-line {
+.row-line {
   height: 33px;
   background-color: #74c0e4;
-  z-index: 1;
+  width: 100%;
 }
 
-.timeline-view {
+.view {
   position: absolute;
   inset: auto 0 0 0;
   background: #fff;
@@ -131,88 +131,72 @@
   --sidebar-width: 300px;
 }
 
-.timeline-view-header {
+.view-header {
   display: flex;
-}
 
-.timeline-view-controls {
-  display: flex;
-  align-items: center;
-  border-right: 1px solid var(--border-color-subtle);
-  width: var(--sidebar-width);
-  box-sizing: border-box;
-  padding: 0.7rem 0.7rem;
-  gap: 0.7rem;
-  justify-content: end;
+  & ._controls {
+    display: flex;
+    align-items: center;
+    border-right: 1px solid var(--border-color-subtle);
+    width: var(--sidebar-width);
+    box-sizing: border-box;
+    padding: 0.7rem 0.7rem;
+    gap: 0.7rem;
+    justify-content: end;
 
-  & button {
-    cursor: pointer;
-    opacity: 0.8;
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.timeline-view-controls {
-  & button {
-    border: none;
-    background: none;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-
-    & img {
+    & button {
+      cursor: pointer;
+      opacity: 0.8;
+      border: none;
+      background: none;
+      padding: 0;
       width: 20px;
       height: 20px;
+
+      &:hover {
+        opacity: 1;
+      }
+
+      & img {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    ._time {
+      flex: 1;
+    }
+  }
+
+  ._record {
+    & div {
+      width: 14px;
+      height: 14px;
+      border-radius: 12px;
+      outline: 2px solid red;
+      position: relative;
+      box-sizing: border-box;
+      background: red;
+      border: 2px solid var(--background-color);
+      left: 3px;
+    }
+  }
+
+  ._tickmarks {
+    flex: 1;
+    & canvas {
+      /* Override all of the default canvas styles from style.css */
+      width: calc(100vw - var(--sidebar-width));
+      height: 1.5rem;
+      background-color: red;
+      transition: none;
+      position: relative;
+      z-index: 0;
+      /* Additional properties. */
     }
   }
 }
 
-.timeline-view-time {
-  flex: 1;
-}
-
-.timeline-view-play {
-
-}
-
-.timeline-view-record {
-  & div {
-    width: 14px;
-    height: 14px;
-    border-radius: 12px;
-    outline: 2px solid red;
-    position: relative;
-    box-sizing: border-box;
-    background: red;
-    border: 2px solid var(--background-color);
-    left: 3px;
-  }
-}
-
-.timeline-view-close {
-
-}
-
-.timeline-view-timeline {
-  flex: 1;
-  & canvas {
-    /* Override all of the default canvas styles from style.css */
-    width: calc(100vw - var(--sidebar-width));
-    height: 1.5rem;
-    background-color: red;
-    transition: none;
-    position: relative;
-    z-index: 0;
-    /* Additional properties. */
-  }
-}
-
-.timeline-view-zoom {
-
-}
-
-.timeline-view-items {
+.view-rows {
   width: 100%;
 }

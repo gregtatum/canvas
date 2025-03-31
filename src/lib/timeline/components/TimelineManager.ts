@@ -3,39 +3,74 @@ import type { TimelineRecord } from "lib/timeline/types";
 import { addStylesheet, createHTML, LocationManager } from "lib/utils";
 import { TimelineView } from "lib/timeline/components/TimelineView";
 
+const COMPONENT_NAME = "timeline-manager";
+
 /**
  * Manages adding and removing timelines
  */
-export class TimelineManager {
+export class TimelineManager extends HTMLElement {
   elements: ReturnType<typeof TimelineManager.createElements>;
-  db: DanceDatabase;
+
+  // You can't use web components constructors, but the DanceDatabase must be defined
+  // before creating one. Use the TimelineManager.create method to create an instance.
+  #db?: DanceDatabase;
+  get db() {
+    if (!this.#db) {
+      throw new Error(
+        "The TimelineManager.create method must be used to construct a TimelineManager."
+      );
+    }
+    return this.#db;
+  }
+  set db(db: DanceDatabase) {
+    this.#db = db;
+  }
+
   timelineName?: string = LocationManager.getString("timelineName");
   timelineRecord?: TimelineRecord;
   timelineView?: TimelineView;
+  #shadowRoot: ShadowRoot;
 
-  constructor(parent: HTMLElement, db: DanceDatabase) {
-    this.db = db;
+  /**
+   * The main entry into creating
+   */
+  static create(db: DanceDatabase): TimelineManager {
+    const timelineManager: TimelineManager = document.createElement(
+      "timeline-manager"
+    ) as any;
+    timelineManager.db = db;
+
+    // List the timelines.
+    db.listTimelines().then((timelines) =>
+      timelineManager.updateTimelinesView(timelines)
+    );
+    timelineManager.reactive();
+
+    return timelineManager;
+  }
+
+  constructor() {
+    super();
+
     this.elements = TimelineManager.createElements();
-    addStylesheet("../html/timeline.css");
+    this.#shadowRoot = this.attachShadow({ mode: "open" });
+    addStylesheet("../html/timeline.css", this.#shadowRoot);
 
     this.setupHandlers();
 
-    db.listTimelines().then((timelines) => this.updateTimelinesView(timelines));
-
-    this.reactive();
-    parent.appendChild(this.elements.container);
+    this.#shadowRoot.appendChild(this.elements.container);
   }
 
   static createElements() {
     const { container, get } = createHTML(/* html */ `
-      <div class="timeline timeline-manager">
-        <div class="timeline-manager-start">
-          <label for="timeline-manager-dropdown">Timelines</label>
-          <select id="timeline-manager-dropdown">
+      <div class="manager">
+        <div class="manager-start">
+          <label for="manager-dropdown">Timelines</label>
+          <select id="manager-dropdown">
             <option value="">Select a timeline</option>
           </select>
         </div>
-        <div class="timeline-manager-end">
+        <div class="manager-end">
           <input type="text" placeholder="timeline name" />
           <button type="button">add timeline</button>
         </div>
@@ -48,6 +83,32 @@ export class TimelineManager {
       input: get<HTMLInputElement>("input[type=text]"),
       button: get<HTMLInputElement>("button"),
     };
+  }
+
+  static get observedAttributes() {
+    // The observed attributes for the web component.
+    return [];
+  }
+
+  attributeChangedCallback(
+    _name: string,
+    _oldValue: unknown,
+    _newValue: unknown
+  ) {
+    // When an attribute changes.
+  }
+
+  connectedCallback() {
+    // The component was added to the DOM.
+    if (!this.db) {
+      throw new Error(
+        "TimelineManager was not created through TimelineManager.create."
+      );
+    }
+  }
+
+  disconnectedCallback() {
+    // The component was removed from the DOM.
   }
 
   reactive() {
@@ -72,7 +133,8 @@ export class TimelineManager {
           this.db,
           this.timelineName,
           this.timelineRecord,
-          this.closeTimeline
+          this.closeTimeline,
+          this.shadowRoot
         );
       }
     } else if (this.timelineView) {
@@ -204,3 +266,5 @@ export class TimelineManager {
     this.timelineView?.draw();
   }
 }
+
+customElements.define(COMPONENT_NAME, TimelineManager);

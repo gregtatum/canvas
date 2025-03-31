@@ -14,7 +14,7 @@ export class NewRow extends Row {
     const get = appendHTML(
       this.container,
       /* html */ `
-        <div class="timeline-row-start">
+        <div class="_start">
           <select>
             <option value="audio">Audio</option>
             <option value="dance">Dance</option>
@@ -22,7 +22,7 @@ export class NewRow extends Row {
           </select>
           <button type="button">Add</button>
         </div>
-        <div class="timeline-row-end"></div>
+        <div class="_end"></div>
       `
     );
     return {
