@@ -1,7 +1,6 @@
 import { type DanceDatabase } from "lib/posecam";
 import type { Timeline, TimelineRecord } from "lib/timeline/types";
 import {
-  addCSS,
   createHTML,
   ensureExists,
   reactiveInvalidator,
@@ -40,7 +39,6 @@ export class TimelineView {
     this.timelineRecord = timelineRecord;
     this.closeTimeline = closeTimeline;
 
-    TimelineView.addCSS();
     this.elements = TimelineView.createElements();
     this.setupHandlers();
     this.ctx = ensureExists(
@@ -94,110 +92,6 @@ export class TimelineView {
       timelines: get(".timeline-view-items"),
       time: get<HTMLElement>(".timeline-view-time"),
     };
-  }
-
-  static cssAdded = false;
-  static addCSS() {
-    if (TimelineView.cssAdded) {
-      return;
-    }
-    TimelineView.cssAdded = true;
-
-    addCSS(/* css */ `
-      .timeline-view {
-        position: absolute;
-        inset: auto 0 0 0;
-        background: #fff;
-        display: flex;
-        border-top: 1px solid var(--border-color-subtle);
-        background-color: var(--background-color);
-        color: var(--font-color);
-        align-items: center;
-        flex-direction: column;
-
-        --sidebar-width: 300px;
-      }
-
-      .timeline-view-header {
-        display: flex;
-
-      }
-
-      .timeline-view-controls {
-        display: flex;
-        align-items: center;
-        border-right: 1px solid var(--border-color-subtle);
-        width: var(--sidebar-width);
-        box-sizing: border-box;
-        padding: 0.7rem 0.7rem;
-        gap: 0.7rem;
-        justify-content: end;
-
-        & button {
-          cursor: pointer;
-          opacity: 0.8;
-          &:hover {
-            opacity: 1;
-          }
-        }
-      }
-
-      .timeline-view-controls {
-        & button {
-          border: none;
-          background: none;
-          padding: 0;
-          width: 20px;
-          height: 20px;
-
-          & img {
-            width: 20px;
-            height: 20px;
-          }
-        }
-      }
-      .timeline-view-time {
-        flex: 1;
-      }
-      .timeline-view-play {
-
-      }
-      .timeline-view-record {
-        & div {
-          width: 14px;
-          height: 14px;
-          border-radius: 12px;
-          outline: 2px solid red;
-          position: relative;
-          box-sizing: border-box;
-          background: red;
-          border: 2px solid var(--background-color);
-          left: 3px;
-        }
-      }
-      .timeline-view-close {
-        
-      }
-      .timeline-view-timeline {
-        flex: 1;
-        & canvas {
-          /* Override all of the default canvas styles from style.css */
-          width: calc(100vw - var(--sidebar-width));
-          height: 1.5rem;
-          background-color: red;
-          transition: none;
-          position: relative;
-          z-index: 0;
-          /* Additional properties. */
-        }
-      }
-      .timeline-view-zoom {
-
-      }
-      .timeline-view-items {
-        width: 100%;
-      }
-    `);
   }
 
   prevWindowWidth = -1;

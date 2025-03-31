@@ -1,6 +1,6 @@
 import { type DanceDatabase } from "lib/posecam";
 import type { TimelineRecord } from "lib/timeline/types";
-import { addCSS, createHTML, LocationManager } from "lib/utils";
+import { addStylesheet, createHTML, LocationManager } from "lib/utils";
 import { TimelineView } from "lib/timeline/components/TimelineView";
 
 /**
@@ -16,6 +16,8 @@ export class TimelineManager {
   constructor(parent: HTMLElement, db: DanceDatabase) {
     this.db = db;
     this.elements = TimelineManager.createElements();
+    addStylesheet("../html/timeline.css");
+
     this.setupHandlers();
 
     db.listTimelines().then((timelines) => this.updateTimelinesView(timelines));
@@ -38,77 +40,6 @@ export class TimelineManager {
           <button type="button">add timeline</button>
         </div>
       </div>
-    `);
-
-    addCSS(/* css */ `
-      .timeline {
-        --accent-color: #44b9ff;
-        --background-color: #333;
-        --background-color-outset: #444;
-        --background-color-inset: #111;
-        --border-color: #888;
-        --border-color-focus: #000;
-        --border-color-subtle: #666;
-        --border-radius: 3px;
-        --font-color: #fff;
-        --font-color-inverted: #000;
-        --font-family: system-ui, sans-serif;
-        --padding: 0.3rem;
-
-        font-family: var(--font-family);
-        font-size: 0.9rem;
-        font-weight: normal;
-      }
-
-      .timeline-manager {
-        position: absolute;
-        inset: auto 0 0 0;
-        background: #fff;
-        display: flex;
-        padding: 0.3rem;
-        border-top: 1px solid var(--border-color-subtle);
-        justify-content: space-between;
-        background-color: var(--background-color);
-        color: var(--font-color);
-        align-items: center;
-
-        & select, & button, & input[type=text] {
-          &:is(:active, :focus, :focus-visible):not(:disabled) {
-            outline: 2px solid var(--accent-color);
-            border: 1px solid var(--border-color-focus);
-          }
-
-          &:disabled {
-            opacity: 0.5  ;
-          }
-        }
-
-        & select {
-
-        }
-
-        & button {
-          background: var(--outset-background-color);
-          border: 1px solid var(--accent-color);
-          padding: var(--padding);
-          border-radius: 3px;
-          color: var(--accent-color);
-
-          &:hover {
-            background: var(--accent-color);
-            color: var(--font-color-inverted);
-          }
-        }
-
-        & :is(input[type="text"], select) {
-          padding: var(--padding);
-          border-radius: var(--border-radius);
-          border: 1px solid var(--border-color);
-          width: 12rem;
-          background-color: var(--background-color-inset);
-          color: var(--font-color);
-        }
-      }
     `);
 
     return {
