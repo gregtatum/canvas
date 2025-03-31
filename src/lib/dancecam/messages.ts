@@ -55,6 +55,7 @@ export interface TimelineRecord {
   name: string;
   created: number;
   lastModified: number;
+  // In seconds.
   duration: number;
   timeline: Timeline[];
 }

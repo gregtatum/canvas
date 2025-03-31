@@ -12,8 +12,15 @@ import {
   ensureExists,
   LocationManager,
   reactiveInvalidator,
+  UnhandledCaseError,
 } from "lib/utils";
-import { UnhandledCaseError } from "../../lib/utils";
+
+/**
+ * This is the context that must be provided by the visualization.
+ */
+interface TimelineContext {
+  time: Seconds;
+}
 
 /**
  * Manages adding and removing timelines
@@ -21,10 +28,9 @@ import { UnhandledCaseError } from "../../lib/utils";
 export class TimelineManager {
   elements: ReturnType<typeof TimelineManager.createElements>;
   db: DanceDatabase;
-  timelineName: string | null =
-    LocationManager.getString("timelineName") ?? null;
-  timelineRecord: TimelineRecord | null = null;
-  timelineView: TimelineView | null = null;
+  timelineName?: string = LocationManager.getString("timelineName");
+  timelineRecord?: TimelineRecord;
+  timelineView?: TimelineView;
 
   constructor(parent: HTMLElement, db: DanceDatabase) {
     this.db = db;
@@ -146,7 +152,7 @@ export class TimelineManager {
       ) {
         // The timeline changed.
         this.timelineView.destroy();
-        this.timelineView = null;
+        delete this.timelineView;
       }
       if (!this.timelineView) {
         // The timeline needs to be created.
@@ -160,7 +166,7 @@ export class TimelineManager {
     } else if (this.timelineView) {
       // There is no timeline loaded, but the view is still initialized.
       this.timelineView.destroy();
-      this.timelineView = null;
+      delete this.timelineView;
     }
 
     if (this.elements.select.value !== this.timelineName) {
@@ -169,8 +175,8 @@ export class TimelineManager {
   }
 
   closeTimeline = () => {
-    this.timelineName = null;
-    this.timelineRecord = null;
+    delete this.timelineName;
+    delete this.timelineRecord;
     LocationManager.deleteValue("timelineName");
     this.reactive();
   };
@@ -189,14 +195,14 @@ export class TimelineManager {
     });
 
     select.addEventListener("change", () => {
-      this.timelineName = select.value || null;
+      this.timelineName = select.value || undefined;
 
       if (this.timelineName) {
         LocationManager.updateValue("timelineName", this.timelineName);
         this.loadTimeline(this.timelineName);
       } else {
-        this.timelineRecord = null;
-        this.timelineName = null;
+        delete this.timelineRecord;
+        delete this.timelineName;
       }
       this.reactive();
     });
@@ -273,7 +279,7 @@ export class TimelineManager {
     if (timelineName) {
       this.loadTimeline(timelineName);
     } else {
-      this.timelineName = null;
+      delete this.timelineName;
     }
     this.reactive();
   }
@@ -294,8 +300,12 @@ class TimelineView {
   timelineRecord: TimelineRecord;
   secondsRange: [number, number];
   closeTimeline: () => void;
-  needsSaving = false;
   ctx: CanvasRenderingContext2D;
+  needsSaving = false;
+  wasScrubbed = true;
+  isPlaying = false;
+  time: Seconds = 0;
+  startPosition: Seconds = 0;
 
   constructor(
     db: DanceDatabase,
@@ -355,10 +365,12 @@ class TimelineView {
       container,
       addButton: get<HTMLButtonElement>(".timeline-view-add"),
       playButton: get<HTMLButtonElement>(".timeline-view-play"),
+      playButtonImg: get<HTMLImageElement>(".timeline-view-play img"),
       recordButton: get<HTMLButtonElement>(".timeline-view-record"),
       closeButton: get<HTMLButtonElement>(".timeline-view-close"),
       canvas: get<HTMLCanvasElement>(".timeline-view-timeline canvas"),
       timelines: get(".timeline-view-items"),
+      time: get<HTMLElement>(".timeline-view-time"),
     };
   }
 
@@ -479,6 +491,10 @@ class TimelineView {
     if (!this.redrawTimeline()) {
       return;
     }
+    for (const timeline of this.timelineRecord.timeline) {
+      const rowView = this.rowViews.get(timeline);
+      rowView?.drawTimeline();
+    }
     const { secondsRange, ctx } = this;
     const { canvas } = this.elements;
     if (this.prevWindowWidth !== window.innerWidth) {
@@ -583,12 +599,14 @@ class TimelineView {
   }
 
   setupHandlers() {
-    this.elements.closeButton.addEventListener("click", this.closeTimeline);
-    this.elements.container.addEventListener("wheel", this.wheelHandler, {
+    const { closeButton, container, addButton, playButton } = this.elements;
+    closeButton.addEventListener("click", this.closeTimeline);
+    container.addEventListener("wheel", this.wheelHandler, {
       passive: false,
     });
 
-    this.elements.addButton.addEventListener("click", this.addNewRow);
+    addButton.addEventListener("click", this.addNewRow);
+    playButton.addEventListener("click", this.togglePlay);
   }
 
   wheelHandler = (event: WheelEvent) => {
@@ -690,11 +708,33 @@ class TimelineView {
     this.reactive();
   }
 
+  togglePlay = () => {
+    const { playButtonImg } = this.elements;
+    if (this.isPlaying) {
+      // Pause the timeline.
+      playButtonImg.src = "../html/pause.svg";
+      this.time = this.startPosition;
+    } else {
+      // Play the timeline
+      this.wasScrubbed = true;
+      playButtonImg.src = "../html/play.svg";
+    }
+    this.isPlaying = !this.isPlaying;
+  };
+
   prevTimeline: Timeline[] = [];
   rowViews = new WeakMap<Timeline, Row>();
+  isDurationInvalidated = reactiveInvalidator([
+    () => this.timelineRecord.duration,
+  ]);
   reactive() {
     if (this.timelineRecord.timeline !== this.prevTimeline) {
       this.rebuildTimelines();
+    }
+
+    if (this.isDurationInvalidated()) {
+      const seconds = formatSecondsToTimecode(this.timelineRecord.duration);
+      this.elements.time.innerText = seconds;
     }
   }
 
@@ -778,7 +818,7 @@ function createTimelineRow(timeline: Timeline, timelineView: TimelineView) {
   }
 }
 
-class Row {
+abstract class Row {
   timeline: Timeline;
   timelineView: TimelineView;
   db: DanceDatabase;
@@ -815,6 +855,7 @@ class Row {
       }
       .timeline-row-end {
         flex: 1;
+        border-top: 1px solid var(--border-color-subtle);
       }
 
       .timeline-row-remove {
@@ -834,8 +875,17 @@ class Row {
           height: 12px;
         }
       }
+
+      .timeline-line {
+        height: 33px;
+        background-color: #74c0e4;
+        z-index: 1;
+      }
     `);
   }
+
+  update(time: { time: number }): void {}
+  drawTimeline() {}
 }
 
 class NewRow extends Row {
@@ -876,9 +926,13 @@ class NewRow extends Row {
 
 class AudioRow extends Row {
   timeline: TimelineAudio;
-  audioRecord: Promise<AudioRecord> | null = null;
+  audioRecord?: Promise<AudioRecord>;
   elements: ReturnType<typeof AudioRow.prototype.createElements>;
-  audioElement: Promise<HTMLAudioElement> | null = null;
+  audioElementPromise?: Promise<HTMLAudioElement>;
+  // This is only synchronously available
+  audioElement?: HTMLAudioElement;
+  audioWaveform?: AudioWaveform;
+  isPlaying = true;
 
   constructor(timeline: TimelineAudio, timelineView: TimelineView) {
     super(timeline, timelineView);
@@ -903,7 +957,7 @@ class AudioRow extends Row {
           </button>
         </div>
         <div class="timeline-row-end">
-          <div class="timeline-line timeline-audio-line"></div>
+          <canvas class="timeline-line timeline-audio-line" />
         </div>
       `
     );
@@ -912,13 +966,15 @@ class AudioRow extends Row {
       line: get<HTMLDivElement>(".timeline-line"),
       nameLabel: get<HTMLSpanElement>(".timeline-audio-name"),
       removeButton: get<HTMLButtonElement>(".timeline-row-remove"),
+      canvas: get<HTMLCanvasElement>("canvas"),
     };
   }
 
   isAudioBuilt = false;
 
   reactive() {
-    const { input, nameLabel } = this.elements;
+    const { input, nameLabel, canvas } = this.elements;
+
     if (this.timeline.hash && !this.audioRecord) {
       this.audioRecord = ensureNonNull(
         this.db.getAudioRecord(this.timeline.hash)
@@ -926,21 +982,51 @@ class AudioRow extends Row {
     }
     input.style.display = this.audioRecord ? "none" : "block";
 
-    if (this.audioRecord && !this.audioElement) {
-      this.audioElement = this.audioRecord.then((record) =>
+    if (this.audioRecord && !this.audioElementPromise) {
+      this.audioElementPromise = this.audioRecord.then((record) =>
         getHTMLAudioElement(record.audio)
       );
     }
 
-    if (this.audioRecord && this.audioElement && !this.isAudioBuilt) {
+    if (this.audioRecord && this.audioElementPromise && !this.isAudioBuilt) {
       this.isAudioBuilt = true;
-      this.audioRecord.then((record) => {
-        nameLabel.innerText = record.name;
+      this.audioRecord.then(({ name, audio }) => {
+        nameLabel.innerText = name;
+        AudioWaveform.create(audio, canvas, this.timelineView).then(
+          (audioWaveform) => {
+            this.audioWaveform = audioWaveform;
+          }
+        );
       });
+    }
+  }
 
-      this.audioElement.then((element) => {
-        console.log(`!!! element`, element);
-      });
+  drawTimeline() {
+    this.audioWaveform?.drawWaveform();
+  }
+
+  update(context: TimelineContext) {
+    const { audioElement, timelineView } = this;
+    const { time } = context;
+    const { offset } = this.timeline;
+
+    if (!audioElement || isNaN(audioElement.duration)) {
+      return;
+    }
+    const inRange = time >= offset && time < time + audioElement.duration;
+
+    if (inRange) {
+      if (timelineView.wasScrubbed) {
+        audioElement.currentTime = time - offset;
+      }
+      if (!this.isPlaying) {
+        this.isPlaying = false;
+        audioElement.play();
+      }
+    } else {
+      if (this.isPlaying) {
+        this.isPlaying = true;
+      }
     }
   }
 
@@ -951,17 +1037,17 @@ class AudioRow extends Row {
       // This was already stored in the Audio database.
       this.audioRecord = Promise.resolve(record);
       this.timeline.hash = record.hash;
-      this.audioElement = getHTMLAudioElement(record.audio);
+      this.audioElementPromise = getHTMLAudioElement(record.audio);
     } else {
       this.audioRecord = this.db.addAudio(file.name, hash, file);
       this.timeline.hash = hash;
-      this.audioElement = this.audioRecord.then((record) =>
+      this.audioElementPromise = this.audioRecord.then((record) =>
         getHTMLAudioElement(record.audio)
       );
     }
     this.timelineView.needsSaving = true;
 
-    this.audioElement.then((audioElement) => {
+    this.audioElementPromise.then((audioElement) => {
       const { timelineRecord } = this.timelineView;
       if (isNaN(audioElement.duration)) {
         console.error("The duration was not available", audioElement);
@@ -1111,4 +1197,112 @@ function ensureNonNull<T>(promise: Promise<T | null | undefined>): Promise<T> {
     }
     return value;
   });
+}
+
+class AudioWaveform {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  audioBuffer: AudioBuffer;
+  timelineView: TimelineView;
+
+  static async create(
+    blob: Blob,
+    canvas: HTMLCanvasElement,
+    timelineView: TimelineView
+  ): Promise<AudioWaveform> {
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(
+      await blob.arrayBuffer()
+    );
+    return new AudioWaveform(audioBuffer, canvas, timelineView);
+  }
+
+  constructor(
+    audioBuffer: AudioBuffer,
+    canvas: HTMLCanvasElement,
+    timelineView: TimelineView
+  ) {
+    this.audioBuffer = audioBuffer;
+    this.canvas = canvas;
+    this.timelineView = timelineView;
+    {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Could not load the canvas context.");
+      }
+      this.ctx = ctx;
+    }
+
+    this.initCanvas();
+    this.drawWaveform();
+  }
+
+  initCanvas() {
+    let { width, height } = this.canvas.getBoundingClientRect();
+    width *= devicePixelRatio;
+    height *= devicePixelRatio;
+    this.canvas.width = width;
+    this.canvas.height = height;
+  }
+
+  drawWaveform() {
+    const { width, height } = this.canvas;
+    const { audioBuffer } = this;
+    const [startSec, endSec] = this.timelineView.secondsRange;
+    const sampleRate = audioBuffer.sampleRate;
+
+    const startSample = Math.floor(startSec * sampleRate);
+    const endSample = Math.min(
+      Math.floor(endSec * sampleRate),
+      audioBuffer.length
+    );
+    const samplesToRender = endSample - startSample;
+
+    if (samplesToRender <= 0) return;
+
+    const leftChannel = audioBuffer.getChannelData(0);
+    const rightChannel =
+      audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
+
+    const samplesPerPixel = Math.floor(samplesToRender / width);
+    if (samplesPerPixel < 1) return;
+
+    this.ctx.clearRect(0, 0, width, height);
+    this.ctx.fillStyle = "#2593c7";
+
+    const tempValues = new Float32Array(width);
+    let maxOverall = 0;
+
+    for (let x = 0; x < width; x++) {
+      const start = startSample + x * samplesPerPixel;
+      const end = Math.min(start + samplesPerPixel, endSample);
+
+      let sum = 0;
+      for (let i = start; i < end; i++) {
+        sum += Math.abs(leftChannel[i]);
+        if (rightChannel) sum += Math.abs(rightChannel[i]);
+      }
+      const value = sum / (samplesPerPixel * (rightChannel ? 2 : 1));
+      tempValues[x] = value;
+      if (value > maxOverall) maxOverall = value;
+    }
+
+    for (let x = 0; x < width; x++) {
+      const value = tempValues[x];
+      const y = (1 - value / maxOverall) * height;
+      this.ctx.fillRect(x, y, 1, height);
+    }
+  }
+}
+
+function formatSecondsToTimecode(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  return [
+    hours.toString().padStart(2, "0"),
+    minutes.toString().padStart(2, "0"),
+    seconds.toString().padStart(2, "0"),
+  ].join(":");
 }
