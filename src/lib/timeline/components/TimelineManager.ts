@@ -1,7 +1,7 @@
 import { type DanceDatabase } from "lib/posecam";
-import type { TimelineRecord } from "./timeline.d.ts";
+import type { TimelineRecord } from "lib/timeline/types";
 import { addCSS, createHTML, LocationManager } from "lib/utils";
-import { TimelineView } from "./TimelineView";
+import { TimelineView } from "lib/timeline/components/TimelineView";
 
 /**
  * Manages adding and removing timelines

@@ -190,3 +190,23 @@ export function reactiveInvalidator(
     return isInvalidated;
   };
 }
+
+export function addStylesheet(path: string, root = document.head) {
+  const normalizedPath = new URL(path, document.baseURI).href;
+
+  // Check if stylesheet is already present in this root.
+  for (const linkElement of root.querySelectorAll('link[rel="stylesheet"]')) {
+    const linkHref = (linkElement as HTMLLinkElement).href;
+    const normalizedLinkHref = new URL(linkHref, document.baseURI).href;
+    if (normalizedLinkHref === normalizedPath) {
+      // The stylesheet already exists.
+      return;
+    }
+  }
+
+  // Add new stylesheet
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = path;
+  root.appendChild(link);
+}

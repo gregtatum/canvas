@@ -7,7 +7,7 @@ import type {
   DatabaseStores,
   Timeline,
   TimelineRecord,
-} from "lib/timeline/timeline.d.ts";
+} from "lib/timeline/types";
 import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";

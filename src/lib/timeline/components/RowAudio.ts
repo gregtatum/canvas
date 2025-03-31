@@ -1,13 +1,15 @@
-import type { AudioRecord, TimelineAudio } from "./timeline.d.ts";
-import { Row } from "./Row";
-import { type TimelineView } from "./TimelineView";
+import type {
+  AudioRecord,
+  TimelineAudio,
+  TimelineContext,
+} from "lib/timeline/types";
+import { Row, type TimelineView } from "lib/timeline/components";
 import { appendHTML } from "lib/utils";
-import { TimelineContext } from "./timeline";
 
-export class AudioRow extends Row {
+export class RowAudio extends Row {
   timeline: TimelineAudio;
   audioRecord?: Promise<AudioRecord>;
-  elements: ReturnType<typeof AudioRow.prototype.createElements>;
+  elements: ReturnType<typeof RowAudio.prototype.createElements>;
   audioElementPromise?: Promise<HTMLAudioElement>;
   // This is only synchronously available
   audioElement?: HTMLAudioElement;

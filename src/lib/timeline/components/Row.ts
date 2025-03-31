@@ -1,7 +1,7 @@
 import { type DanceDatabase } from "lib/posecam";
-import type { Timeline } from "./timeline.d.ts";
-import { addCSS, appendHTML } from "lib/utils";
-import { type TimelineView } from "./TimelineView";
+import type { Timeline } from "lib/timeline/types";
+import { addCSS } from "lib/utils";
+import { type TimelineView } from "lib/timeline/components/TimelineView";
 
 export abstract class Row {
   timeline: Timeline;
@@ -72,43 +72,3 @@ export abstract class Row {
   update(_time: { time: number }): void {}
   drawTimeline() {}
 }
-
-export class NewRow extends Row {
-  elements: ReturnType<typeof NewRow.prototype.createElements>;
-  constructor(timeline: Timeline, timelineView: TimelineView) {
-    super(timeline, timelineView);
-    this.elements = this.createElements();
-    this.addHandlers();
-  }
-
-  createElements() {
-    const get = appendHTML(
-      this.container,
-      /* html */ `
-        <div class="timeline-row-start">
-          <select>
-            <option value="audio">Audio</option>
-            <option value="dance">Dance</option>
-            <option value="keyframe">Keyframe</option>
-          </select>
-          <button type="button">Add</button>
-        </div>
-        <div class="timeline-row-end"></div>
-      `
-    );
-    return {
-      button: get<HTMLButtonElement>("button"),
-      select: get<HTMLButtonElement>("select"),
-    };
-  }
-
-  addHandlers() {
-    this.elements.button.addEventListener("click", () => {
-      this.timelineView.replaceNewRow(this.elements.select.value);
-    });
-  }
-}
-
-export class DanceRow extends Row {}
-
-export class KeyframeRow extends Row {}

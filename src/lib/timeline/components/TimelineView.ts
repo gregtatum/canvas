@@ -1,5 +1,5 @@
 import { type DanceDatabase } from "lib/posecam";
-import type { Timeline, TimelineRecord } from "./timeline.d.ts";
+import type { Timeline, TimelineRecord } from "lib/timeline/types";
 import {
   addCSS,
   createHTML,
@@ -7,8 +7,13 @@ import {
   reactiveInvalidator,
   UnhandledCaseError,
 } from "lib/utils";
-import { DanceRow, KeyframeRow, NewRow, Row } from "./Row";
-import { AudioRow } from "./AudioRow";
+import {
+  RowAudio,
+  RowDance,
+  RowKeyframe,
+  NewRow,
+  Row,
+} from "lib/timeline/components";
 
 export class TimelineView {
   db: DanceDatabase;
@@ -525,11 +530,11 @@ function createTimelineRow(timeline: Timeline, timelineView: TimelineView) {
     case "new":
       return new NewRow(timeline, timelineView);
     case "audio":
-      return new AudioRow(timeline, timelineView);
+      return new RowAudio(timeline, timelineView);
     case "dance":
-      return new DanceRow(timeline, timelineView);
+      return new RowDance(timeline, timelineView);
     case "keyframe":
-      return new KeyframeRow(timeline, timelineView);
+      return new RowKeyframe(timeline, timelineView);
     default:
       throw new UnhandledCaseError(timeline, "Timeline");
   }

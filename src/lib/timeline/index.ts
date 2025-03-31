@@ -1,2 +1,1 @@
-export * from "./TimelineManager";
-export * from "./TimelineView";
+export * from "./components/TimelineManager";
