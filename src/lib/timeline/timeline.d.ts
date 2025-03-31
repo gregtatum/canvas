@@ -1,20 +1,11 @@
-export type Landmark = [
-  x: number,
-  y: number,
-  z: number,
-  visibility: number,
-  presence: number
-];
+import { Dance } from "lib/posecam/messages";
 
-export interface PosesFrame {
-  poses: Pose[];
-  timestamp: number;
-  resolution: [number, number];
+/**
+ * This is the context that must be provided by the visualization.
+ */
+export interface TimelineContext {
+  time: Seconds;
 }
-
-export type Pose = Landmark[];
-
-export type Dance = Array<PosesFrame>;
 
 export interface AudioRecord {
   name: string;
@@ -65,28 +56,3 @@ export interface DatabaseStores {
   audio: AudioRecord;
   timelines: TimelineRecord;
 }
-
-export type DanceCamEventsToClient =
-  | {
-      type: "poses";
-      posesFrame: PosesFrame;
-    }
-  | {
-      type: "error";
-      message: string;
-    }
-  | { type: "models"; models: string[] }
-  | {
-      type: "frame";
-      image: string;
-    };
-
-export type DanceCamEventsToServer =
-  | { type: "watch-poses" }
-  | { type: "un-watch-poses" }
-  | { type: "request-models" }
-  | { type: "show-frame"; show: boolean }
-  | {
-      type: "switch-model";
-      model: string;
-    };

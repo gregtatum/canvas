@@ -6,23 +6,23 @@ import initializeShortcuts from "lib/shortcuts";
 import { setupCanvas, loop, generateSeed } from "lib/draw";
 import {
   Dance,
-  DanceCamEventsToClient,
+  PoseCamEventsToClient,
   Landmark,
   Pose,
-} from "lib/dancecam/messages";
+} from "lib/posecam/messages";
 import lerp from "lerp";
 import {
   BezierOnPath,
-  DanceCam,
+  PoseCam,
   DanceDatabase,
   LandmarkNames as LandmarkName,
   landmarks,
   LerpOnPath,
   PoseAnalysis,
-} from "lib/dancecam";
+} from "lib/posecam";
 import { exposeAsGlobal, LocationManager } from "lib/utils";
 import { mat3, mat4, vec3, vec4 } from "lib/vec-math";
-import { TimelineManager } from "./timeline";
+import { TimelineManager } from "lib/timeline";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = Awaited<ReturnType<typeof getCurrent>>;
@@ -46,14 +46,14 @@ async function main() {
   exposeAsGlobal("current", current);
   exposeAsGlobal("config", config);
 
-  current.danceCam.onStartRecording = () => {
+  current.poseCam.onStartRecording = () => {
     current.danceRecording = [];
   };
-  current.danceCam.onStopRecording = () => {
+  current.poseCam.onStopRecording = () => {
     return current.danceRecording;
   };
-  current.danceCam.onChangeDance = (dance) => {
-    LocationManager.updateValue("dance", current.danceCam.selectedDance);
+  current.poseCam.onChangeDance = (dance) => {
+    LocationManager.updateValue("dance", current.poseCam.selectedDance);
     // Reset any smoothing.
     current.smoothedPoses = [];
     current.poses = [];
@@ -188,13 +188,13 @@ async function getCurrent(config: Config) {
     .add(config, "showDebugInfo")
     .onChange((value) => LocationManager.updateValue("showDebugInfo", value));
 
-  const danceCam = await DanceCam.create(
+  const poseCam = await PoseCam.create(
     danceDB,
     document.body,
     LocationManager.getString("dance")
   );
 
-  const dance = await danceCam.getSelectedDance();
+  const dance = await poseCam.getSelectedDance();
   const danceReplay = dance ? new DanceReplay(dance) : null;
 
   const controls = createControls({
@@ -220,7 +220,7 @@ async function getCurrent(config: Config) {
     camera,
     controls,
     danceDB,
-    danceCam,
+    poseCam,
     danceReplay,
     pointPaths: new PointPaths(config),
     lerpOnPath: new LerpOnPath(),
@@ -622,7 +622,7 @@ function connectClient(current: Current) {
   });
 
   socket.addEventListener("message", (event) => {
-    const data: DanceCamEventsToClient = JSON.parse(event.data);
+    const data: PoseCamEventsToClient = JSON.parse(event.data);
     switch (data.type) {
       case "models":
         console.log("Available models:", data.models);
@@ -649,7 +649,7 @@ function connectClient(current: Current) {
           return;
         }
         current.poses = poses;
-        if (current.danceCam.isRecording) {
+        if (current.poseCam.isRecording) {
           current.danceRecording.push(posesFrame);
         }
 

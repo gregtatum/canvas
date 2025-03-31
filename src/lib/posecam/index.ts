@@ -1,14 +1,13 @@
 /* eslint-disable no-alert */
 import { vec2, vec3 } from "lib/vec-math";
-import {
+import { Dance, Pose } from "./messages";
+import type {
   AudioRecord,
-  Dance,
   DanceRecord,
   DatabaseStores,
-  Pose,
   Timeline,
   TimelineRecord,
-} from "./messages";
+} from "lib/timeline/timeline.d.ts";
 import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";
@@ -271,13 +270,13 @@ export class DanceDatabase {
   }
 }
 
-export class DanceCam {
+export class PoseCam {
   #danceDB: DanceDatabase;
   #danceNames: string[] = [];
   mount: HTMLElement;
   selectedDance: string;
   isRecording = false;
-  elements: ReturnType<typeof DanceCam.getElements>;
+  elements: ReturnType<typeof PoseCam.getElements>;
 
   // These are meant to be overridden.
   onStartRecording: () => void;
@@ -291,7 +290,7 @@ export class DanceCam {
     selectedDance: string = LIVE_CAMERA
   ) {
     const danceNames = await danceDB.listDances();
-    return new DanceCam(danceDB, danceNames, mount, selectedDance);
+    return new PoseCam(danceDB, danceNames, mount, selectedDance);
   }
 
   constructor(
@@ -313,14 +312,14 @@ export class DanceCam {
     const parser = new DOMParser();
     const parsedHTML = parser.parseFromString(
       /* html */ `
-      <div id="dancecam">
-        <div class="dancecam-controls">
-          <button id="dancecam-discard">Discard</button>
-          <button id="dancecam-save">Save</button>
-          <button id="dancecam-delete">Delete</button>
-          <button id="dancecam-download">Download</button>
-          <button id="dancecam-record">Record</button>
-          <select id="dancecam-dropdown">
+      <div id="posecam">
+        <div class="posecam-controls">
+          <button id="posecam-discard">Discard</button>
+          <button id="posecam-save">Save</button>
+          <button id="posecam-delete">Delete</button>
+          <button id="posecam-download">Download</button>
+          <button id="posecam-record">Record</button>
+          <select id="posecam-dropdown">
             <option>Live Camera</option>
             <!-- The rest will be added here -->
           </select>
@@ -331,25 +330,25 @@ export class DanceCam {
     );
 
     addCSS(/* css */ `
-      #dancecam {
+      #posecam {
         position: absolute;
         bottom: 50px;
         width: 100%;
       }
-      .dancecam-controls {
+      .posecam-controls {
         display: flex;
         justify-content: end;
         margin: 5px;
         gap: 5px;
       }
-      .hide-ui #dancecam {
+      .hide-ui #posecam {
         display: none;
       }
     `);
 
     const root = ensureExists(parsedHTML.body.firstElementChild);
     this.mount.appendChild(root);
-    this.elements = DanceCam.getElements(root);
+    this.elements = PoseCam.getElements(root);
 
     this.addHandlers();
     this.refreshDances(danceNames);
@@ -373,12 +372,12 @@ export class DanceCam {
     };
 
     return {
-      danceDropdown: getElement<HTMLSelectElement>("#dancecam-dropdown"),
-      recordButton: getElement<HTMLButtonElement>("#dancecam-record"),
-      saveButton: getElement<HTMLButtonElement>("#dancecam-save"),
-      discardButton: getElement<HTMLButtonElement>("#dancecam-discard"),
-      deleteButton: getElement<HTMLButtonElement>("#dancecam-delete"),
-      downloadButton: getElement<HTMLButtonElement>("#dancecam-download"),
+      danceDropdown: getElement<HTMLSelectElement>("#posecam-dropdown"),
+      recordButton: getElement<HTMLButtonElement>("#posecam-record"),
+      saveButton: getElement<HTMLButtonElement>("#posecam-save"),
+      discardButton: getElement<HTMLButtonElement>("#posecam-discard"),
+      deleteButton: getElement<HTMLButtonElement>("#posecam-delete"),
+      downloadButton: getElement<HTMLButtonElement>("#posecam-download"),
     };
   }
 
@@ -454,7 +453,7 @@ export class DanceCam {
       this.selectedDance = danceName;
       this.elements.danceDropdown.value = danceName;
       this.changeDance();
-      console.log("[DanceCam] saved", danceName, dance);
+      console.log("[posecam] saved", danceName, dance);
     } else {
       this.onDiscardRecording();
     }
@@ -498,7 +497,7 @@ export class DanceCam {
       this.changeDance();
 
       await this.#danceDB.deleteDance(danceName);
-      console.log("[DanceCam] deleted", danceName);
+      console.log("[posecam] deleted", danceName);
       this.refreshDances(await this.#danceDB.listDances());
     }
   };
