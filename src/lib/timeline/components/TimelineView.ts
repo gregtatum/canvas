@@ -25,19 +25,19 @@ export class TimelineView {
   needsSaving = false;
   wasScrubbed = true;
   isPlaying = false;
+  width: CssPixels = 0;
+  prevNow: Seconds | null = null;
   time: Seconds = 0;
   startPosition: Seconds = 0;
-
-  // Umm... so layout and bounding box size is wonky here, so redraw 5 times
-  // until it's settled. This is not great, but it works?
-  firstRedraws = 5;
+  mouseAtTime: CssPixels = 0;
+  pressedMouseTime: Seconds | null = null;
 
   constructor(
     db: DanceDatabase,
     timelineName: string,
     timelineRecord: TimelineRecord,
     closeTimeline: () => void,
-    shadowRoot: HTMLElement
+    shadowRoot: ShadowRoot
   ) {
     this.db = db;
     this.timelineName = timelineName;
@@ -76,8 +76,10 @@ export class TimelineView {
             </button>
           </div>
           <div class="_tickmarks">
-            <canvas />
+            <canvas></canvas>
             <div class="_zoom"></div>
+            <div class="_scrubberStart"></div>
+            <div class="_scrubberTime"></div>
           </div>
         </div>
         <div class="view-rows">
@@ -93,7 +95,10 @@ export class TimelineView {
       playButtonImg: get<HTMLImageElement>("._play img"),
       recordButton: get<HTMLButtonElement>("._record"),
       closeButton: get<HTMLButtonElement>("._close"),
+      tickmarks: get<HTMLDivElement>("._tickmarks"),
       canvas: get<HTMLCanvasElement>("._tickmarks canvas"),
+      scrubberStart: get<HTMLCanvasElement>("._scrubberStart"),
+      scrubberTime: get<HTMLCanvasElement>("._scrubberTime"),
       rows: get(".view-rows"),
       time: get<HTMLElement>("._time"),
     };
@@ -106,15 +111,11 @@ export class TimelineView {
     () => this.timelineRecord.duration,
     () => this.secondsRange[0],
     () => this.secondsRange[1],
-    () => this.firstRedraws,
     () => window.innerWidth,
   ]);
   reactiveDrawTimeline() {
     if (!this.redrawTimeline()) {
       return;
-    }
-    if (this.firstRedraws > 0) {
-      this.firstRedraws--;
     }
     for (const timeline of this.timelineRecord.timeline) {
       const rowView = this.rowViews.get(timeline);
@@ -126,6 +127,7 @@ export class TimelineView {
     // Properly size the canvas.
     this.prevWindowWidth = window.innerWidth;
     const rect = this.elements.canvas.getBoundingClientRect();
+    this.width = rect.width;
     canvas.width = rect.width * devicePixelRatio;
     canvas.height = rect.height * devicePixelRatio;
 
@@ -223,7 +225,8 @@ export class TimelineView {
   }
 
   setupHandlers() {
-    const { closeButton, container, addButton, playButton } = this.elements;
+    const { closeButton, container, addButton, playButton, tickmarks } =
+      this.elements;
     closeButton.addEventListener("click", this.closeTimeline);
     container.addEventListener("wheel", this.wheelHandler, {
       passive: false,
@@ -231,7 +234,77 @@ export class TimelineView {
 
     addButton.addEventListener("click", this.addNewRow);
     playButton.addEventListener("click", this.togglePlay);
+    container.addEventListener("mousemove", this.mouseMoveHandler);
+    tickmarks.addEventListener("mousedown", this.tickmarksMouseDown);
+    window.addEventListener("mouseup", this.tickmarksMouseUp);
+    window.addEventListener("blur", this.tickmarksMouseUp);
+    window.addEventListener("keydown", this.keydown);
   }
+
+  keydown = (event: KeyboardEvent) => {
+    let key = event.code.toLowerCase();
+    if (event.shiftKey) {
+      key = `shift-${key}`;
+    }
+    if (event.ctrlKey || event.metaKey) {
+      key = `ctrl-${key}`;
+    }
+    switch (key) {
+      case "space": {
+        this.togglePlay();
+        break;
+      }
+      case "ctrl-arrowleft": {
+        event.preventDefault();
+        this.time = 0;
+        this.startPosition = 0;
+        this.wasScrubbed = true;
+        break;
+      }
+      case "arrowright":
+      case "arrowleft":
+      case "shift-arrowright":
+      case "shift-arrowleft": {
+        const direction = key.endsWith("right") ? 1 : -1;
+        const amount = key.startsWith("shift") ? 5 : 1;
+        this.time += direction * amount;
+        // Keep the time in bounds.
+        this.time = Math.min(
+          Math.max(0, this.time),
+          this.timelineRecord.duration
+        );
+        this.wasScrubbed = true;
+        if (!this.isPlaying) {
+          this.startPosition = this.time;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
+  mouseMoveHandler = (event: MouseEvent) => {
+    const timelineLeft: CssPixels =
+      event.clientX - window.innerWidth + this.width;
+    const [start, end] = this.secondsRange;
+    const duration: Seconds = end - start;
+    const rangeRatio = timelineLeft / this.width;
+    this.mouseAtTime = start + duration * rangeRatio;
+  };
+
+  tickmarksMouseDown = () => {
+    this.pressedMouseTime = this.mouseAtTime;
+  };
+
+  tickmarksMouseUp = () => {
+    if (this.pressedMouseTime === this.mouseAtTime) {
+      this.time = this.mouseAtTime;
+      this.startPosition = this.mouseAtTime;
+      this.wasScrubbed = true;
+    }
+    this.pressedMouseTime = null;
+  };
 
   wheelHandler = (event: WheelEvent) => {
     const { canvas } = this.elements;
@@ -240,7 +313,7 @@ export class TimelineView {
     const rangeDuration = end - start;
     let newStart = 0;
     let newEnd = 0;
-    const minimumRange = Math.min(timelineDuration, 4); // seconds
+    const minimumRange: Seconds = Math.min(timelineDuration, 4);
 
     const canvasRect = canvas.getBoundingClientRect();
 
@@ -249,7 +322,7 @@ export class TimelineView {
       event.preventDefault(); // Prevent default scrolling when zooming
 
       const deltaY = getNormalizedScrollDelta(event, "deltaY");
-      const zoomFactor = 1 / 100;
+      const zoomFactor = 1 / 50;
       const zoomAmount = rangeDuration * zoomFactor * -Math.sign(deltaY);
 
       if (rangeDuration <= minimumRange && deltaY < 0) {
@@ -336,12 +409,14 @@ export class TimelineView {
     const { playButtonImg } = this.elements;
     if (this.isPlaying) {
       // Pause the timeline.
-      playButtonImg.src = "../html/pause.svg";
       this.time = this.startPosition;
+      playButtonImg.src = "../html/play.svg";
     } else {
       // Play the timeline
+      this.time = this.startPosition;
+      this.prevNow = null;
       this.wasScrubbed = true;
-      playButtonImg.src = "../html/play.svg";
+      playButtonImg.src = "../html/pause.svg";
     }
     this.isPlaying = !this.isPlaying;
   };
@@ -397,9 +472,64 @@ export class TimelineView {
   }
 
   update() {
-    // this.secondsRange[1] += 0.2;
-    // this.secondsRange[0] += 0.1;
-    // this.timelineRecord.boundsInSeconds = this.secondsRange[1];
+    this.updateTiming();
+    this.updateScrubbers();
+    this.updateRows();
+    this.wasScrubbed = false;
+  }
+
+  updateTiming() {
+    if (!this.isPlaying) {
+      return;
+    }
+    const now: Seconds = performance.now() / 1000;
+    const prevNow: Seconds = this.prevNow ?? now;
+    this.time += now - prevNow;
+    this.prevNow = now;
+    const [start, end] = this.secondsRange;
+    const duration = end - start;
+    if (this.time < start) {
+      this.secondsRange[0] = this.time;
+      this.secondsRange[1] = this.time + duration;
+    }
+    const step = duration / 10;
+    if (this.time + step > end) {
+      this.secondsRange[1] = Math.min(
+        this.secondsRange[1] + step,
+        this.timelineRecord.duration
+      );
+      this.secondsRange[0] = Math.max(0, this.secondsRange[1] - duration);
+    }
+    if (this.time > this.timelineRecord.duration) {
+      this.togglePlay();
+    }
+  }
+
+  updateRows() {
+    for (const timeline of this.timelineRecord.timeline) {
+      const rowView = ensureExists(
+        this.rowViews.get(timeline),
+        "Expected a Row view to be in the rowViews WeakMap."
+      );
+      rowView.update();
+    }
+  }
+
+  updateScrubbers() {
+    this.elements.scrubberStart.style.left = `${this.secondsToCssPixels(
+      this.startPosition
+    )}px`;
+    this.elements.scrubberTime.style.left = `${this.secondsToCssPixels(
+      this.time
+    )}px`;
+  }
+
+  secondsToCssPixels(seconds: Seconds): CssPixels {
+    const [start, end] = this.secondsRange;
+    const rangeDuration: Seconds = end - start;
+    const timeInRange: Seconds = seconds - start;
+    const rangeRatio = timeInRange / rangeDuration;
+    return this.width * rangeRatio;
   }
 
   draw() {

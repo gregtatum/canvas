@@ -10,10 +10,16 @@ const COMPONENT_NAME = "timeline-manager";
  */
 export class TimelineManager extends HTMLElement {
   elements: ReturnType<typeof TimelineManager.createElements>;
+  timelineName?: string = LocationManager.getString("timelineName");
+  timelineRecord?: TimelineRecord;
+  timelineView?: TimelineView;
+  #shadowRoot: ShadowRoot;
+  cssLoaded = false;
 
   // You can't use web components constructors, but the DanceDatabase must be defined
   // before creating one. Use the TimelineManager.create method to create an instance.
   #db?: DanceDatabase;
+
   get db() {
     if (!this.#db) {
       throw new Error(
@@ -25,11 +31,6 @@ export class TimelineManager extends HTMLElement {
   set db(db: DanceDatabase) {
     this.#db = db;
   }
-
-  timelineName?: string = LocationManager.getString("timelineName");
-  timelineRecord?: TimelineRecord;
-  timelineView?: TimelineView;
-  #shadowRoot: ShadowRoot;
 
   /**
    * The main entry into creating
@@ -54,11 +55,12 @@ export class TimelineManager extends HTMLElement {
 
     this.elements = TimelineManager.createElements();
     this.#shadowRoot = this.attachShadow({ mode: "open" });
-    addStylesheet("../html/timeline.css", this.#shadowRoot);
-
-    this.setupHandlers();
-
-    this.#shadowRoot.appendChild(this.elements.container);
+    addStylesheet("../html/timeline.css", this.#shadowRoot).then(() => {
+      this.setupHandlers();
+      this.#shadowRoot.appendChild(this.elements.container);
+      this.cssLoaded = true;
+      this.reactive();
+    });
   }
 
   static createElements() {
@@ -112,6 +114,9 @@ export class TimelineManager extends HTMLElement {
   }
 
   reactive() {
+    if (!this.cssLoaded) {
+      return;
+    }
     const { select, container } = this.elements;
     select.disabled = select.childElementCount === 1;
 
@@ -134,7 +139,7 @@ export class TimelineManager extends HTMLElement {
           this.timelineName,
           this.timelineRecord,
           this.closeTimeline,
-          this.shadowRoot
+          this.#shadowRoot
         );
       }
     } else if (this.timelineView) {

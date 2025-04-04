@@ -7,19 +7,14 @@ export abstract class Row {
   timelineView: TimelineView;
   db: DanceDatabase;
   container: HTMLElement;
-  static cssAdded = false;
   constructor(timeline: Timeline, timelineView: TimelineView) {
     this.timeline = timeline;
     this.timelineView = timelineView;
     this.db = timelineView.db;
     this.container = document.createElement("div");
     this.container.className = "row";
-    if (Row.cssAdded) {
-      return;
-    }
-    Row.cssAdded = true;
   }
 
-  update(_time: { time: number }): void {}
+  update(): void {}
   drawTimeline() {}
 }

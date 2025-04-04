@@ -194,7 +194,7 @@ export function reactiveInvalidator(
 export function addStylesheet(
   path: string,
   root: HTMLHeadElement | ShadowRoot = document.head
-) {
+): Promise<void> {
   const normalizedPath = new URL(path, document.baseURI).href;
 
   // Check if stylesheet is already present in this root.
@@ -203,7 +203,7 @@ export function addStylesheet(
     const normalizedLinkHref = new URL(linkHref, document.baseURI).href;
     if (normalizedLinkHref === normalizedPath) {
       // The stylesheet already exists.
-      return;
+      return Promise.resolve();
     }
   }
 
@@ -212,4 +212,13 @@ export function addStylesheet(
   link.rel = "stylesheet";
   link.href = path;
   root.appendChild(link);
+
+  return new Promise((resolve, reject) => {
+    link.addEventListener("load", () => {
+      resolve();
+    });
+    link.addEventListener("error", (error) => {
+      reject(error);
+    });
+  });
 }

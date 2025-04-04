@@ -40,10 +40,6 @@
     }
   }
 
-  & select {
-
-  }
-
   & button {
     background: var(--outset-background-color);
     border: 1px solid var(--accent-color);
@@ -132,7 +128,10 @@
 }
 
 .view-header {
+  --button-size: 20px;
+  --padding: 0.7rem;
   display: flex;
+  height: calc(var(--padding) * 2 + var(--button-size));
 
   & ._controls {
     display: flex;
@@ -140,8 +139,8 @@
     border-right: 1px solid var(--border-color-subtle);
     width: var(--sidebar-width);
     box-sizing: border-box;
-    padding: 0.7rem 0.7rem;
-    gap: 0.7rem;
+    padding: var(--padding) var(--padding);
+    gap: var(--padding);
     justify-content: end;
 
     & button {
@@ -150,16 +149,16 @@
       border: none;
       background: none;
       padding: 0;
-      width: 20px;
-      height: 20px;
+      width: var(--button-size);
+      height: var(--button-size);
 
       &:hover {
         opacity: 1;
       }
 
       & img {
-        width: 20px;
-        height: 20px;
+        width: var(--button-size);
+        height: var(--button-size);
       }
     }
 
@@ -184,6 +183,10 @@
 
   ._tickmarks {
     flex: 1;
+    height: calc(var(--padding) * 2 + var(--button-size));
+    position: relative; /* for scrubber positioning */
+    overflow: hidden;
+
     & canvas {
       /* Override all of the default canvas styles from style.css */
       width: calc(100vw - var(--sidebar-width));
@@ -194,6 +197,22 @@
       z-index: 0;
       /* Additional properties. */
     }
+  }
+
+  ._scrubberStart,
+  ._scrubberTime {
+    position: absolute;
+    width: 1px;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+  }
+  ._scrubberStart {
+    background-color: #fffd;
+  }
+  ._scrubberTime {
+    background-color: #fff7;
   }
 }
 

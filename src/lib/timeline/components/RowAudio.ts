@@ -1,8 +1,4 @@
-import type {
-  AudioRecord,
-  TimelineAudio,
-  TimelineContext,
-} from "lib/timeline/types";
+import type { AudioRecord, TimelineAudio } from "lib/timeline/types";
 import { Row, type TimelineView } from "lib/timeline/components";
 import { appendHTML } from "lib/utils";
 
@@ -10,11 +6,10 @@ export class RowAudio extends Row {
   timeline: TimelineAudio;
   audioRecord?: Promise<AudioRecord>;
   elements: ReturnType<typeof RowAudio.prototype.createElements>;
-  audioElementPromise?: Promise<HTMLAudioElement>;
-  // This is only synchronously available
-  audioElement?: HTMLAudioElement;
+  audioElement?: SyncPromise<HTMLAudioElement>;
   audioWaveform?: AudioWaveform;
   isPlaying = true;
+  currentTimeNeedsSetting = true;
 
   constructor(timeline: TimelineAudio, timelineView: TimelineView) {
     super(timeline, timelineView);
@@ -64,13 +59,13 @@ export class RowAudio extends Row {
     }
     input.style.display = this.audioRecord ? "none" : "block";
 
-    if (this.audioRecord && !this.audioElementPromise) {
-      this.audioElementPromise = this.audioRecord.then((record) =>
-        getHTMLAudioElement(record.audio)
+    if (this.audioRecord && !this.audioElement) {
+      this.audioElement = getHTMLAudioElement(
+        this.audioRecord.then((record) => record.audio)
       );
     }
 
-    if (this.audioRecord && this.audioElementPromise && !this.isAudioBuilt) {
+    if (this.audioRecord && this.audioElement && !this.isAudioBuilt) {
       this.isAudioBuilt = true;
       this.audioRecord.then(({ name, audio }) => {
         nameLabel.innerText = name;
@@ -87,27 +82,49 @@ export class RowAudio extends Row {
     this.audioWaveform?.drawWaveform();
   }
 
-  update(context: TimelineContext) {
+  update() {
     const { audioElement, timelineView } = this;
-    const { time } = context;
+    const { time, isPlaying, wasScrubbed } = timelineView;
     const { offset } = this.timeline;
 
-    if (!audioElement || isNaN(audioElement.duration)) {
+    if (!isPlaying) {
+      if (this.isPlaying) {
+        // The timeline stopped playing, but the audio still is, stop it here.
+        this.isPlaying = false;
+        audioElement?.value?.pause();
+      }
       return;
     }
-    const inRange = time >= offset && time < time + audioElement.duration;
+
+    if (wasScrubbed) {
+      // Remember that the audio's time needs setting, even if it's not availablel yet.
+      this.currentTimeNeedsSetting = true;
+    }
+
+    if (!audioElement?.value || isNaN(audioElement.value.duration)) {
+      // The audio element is not ready to play yet.
+      return;
+    }
+    const inRange = time >= offset && time < time + audioElement.value.duration;
 
     if (inRange) {
-      if (timelineView.wasScrubbed) {
-        audioElement.currentTime = time - offset;
+      if (this.currentTimeNeedsSetting) {
+        // Either the timeline was scrubbed, or this is the first time the audio is
+        // ready to play.
+        audioElement.value.currentTime = time - offset;
+        this.currentTimeNeedsSetting = false;
       }
       if (!this.isPlaying) {
-        this.isPlaying = false;
-        audioElement.play();
+        // We're in range, but the audio is not playing yet. Start playing it.
+        this.isPlaying = true;
+        audioElement.value.play();
       }
     } else {
+      // This audio is out of range.
       if (this.isPlaying) {
-        this.isPlaying = true;
+        this.isPlaying = false;
+        this.currentTimeNeedsSetting = true;
+        audioElement.value.pause();
       }
     }
   }
@@ -119,17 +136,17 @@ export class RowAudio extends Row {
       // This was already stored in the Audio database.
       this.audioRecord = Promise.resolve(record);
       this.timeline.hash = record.hash;
-      this.audioElementPromise = getHTMLAudioElement(record.audio);
+      this.audioElement = getHTMLAudioElement(record.audio);
     } else {
       this.audioRecord = this.db.addAudio(file.name, hash, file);
       this.timeline.hash = hash;
-      this.audioElementPromise = this.audioRecord.then((record) =>
-        getHTMLAudioElement(record.audio)
+      this.audioElement = getHTMLAudioElement(
+        this.audioRecord.then((record) => record.audio)
       );
     }
     this.timelineView.needsSaving = true;
 
-    this.audioElementPromise.then((audioElement) => {
+    this.audioElement.promise.then((audioElement) => {
       const { timelineRecord } = this.timelineView;
       if (isNaN(audioElement.duration)) {
         console.error("The duration was not available", audioElement);
@@ -200,25 +217,31 @@ async function hashBlob(blob: Blob): Promise<string> {
     .join("");
 }
 
-function getHTMLAudioElement(blob: Blob): Promise<HTMLAudioElement> {
-  return new Promise((resolve, reject) => {
-    const audio = new Audio();
-    const url = URL.createObjectURL(blob);
+function getHTMLAudioElement(
+  blob: Blob | Promise<Blob>
+): SyncPromise<HTMLAudioElement> {
+  const promise = Promise.resolve(blob).then((blob) => {
+    return new Promise<HTMLAudioElement>((resolve, reject) => {
+      const audio = new Audio();
+      const url = URL.createObjectURL(blob);
 
-    audio.preload = "metadata";
+      audio.preload = "metadata";
 
-    audio.addEventListener("loadedmetadata", () => {
-      resolve(audio);
+      audio.addEventListener("loadedmetadata", () => {
+        resolve(audio);
+      });
+
+      audio.addEventListener("error", (error) => {
+        console.error(error);
+        URL.revokeObjectURL(url);
+        reject(new Error("Error loading audio metadata"));
+      });
+
+      audio.src = url;
     });
-
-    audio.addEventListener("error", (error) => {
-      console.error(error);
-      URL.revokeObjectURL(url);
-      reject(new Error("Error loading audio metadata"));
-    });
-
-    audio.src = url;
   });
+
+  return makeSyncPromise(promise);
 }
 
 class AudioWaveform {
@@ -330,4 +353,20 @@ function ensureNonNull<T>(promise: Promise<T | null | undefined>): Promise<T> {
     }
     return value;
   });
+}
+
+interface SyncPromise<T> {
+  promise: Promise<T>;
+  value: T | null;
+}
+
+function makeSyncPromise<T>(promise: Promise<T>): SyncPromise<T> {
+  const result: SyncPromise<T> = {
+    promise,
+    value: null,
+  };
+  promise.then((value) => {
+    result.value = value;
+  });
+  return result;
 }
