@@ -6,7 +6,7 @@ export class RowAudio extends Row {
   timeline: TimelineAudio;
   audioRecord?: Promise<AudioRecord>;
   elements: ReturnType<typeof RowAudio.prototype.createElements>;
-  audioElement?: SyncPromise<HTMLAudioElement>;
+  audioPlayer?: SyncPromise<AudioPlayer>;
   audioWaveform?: AudioWaveform;
   isPlaying = true;
   currentTimeNeedsSetting = true;
@@ -60,13 +60,13 @@ export class RowAudio extends Row {
     }
     input.style.display = this.audioRecord ? "none" : "block";
 
-    if (this.audioRecord && !this.audioElement) {
-      this.audioElement = getHTMLAudioElement(
+    if (this.audioRecord && !this.audioPlayer) {
+      this.audioPlayer = getAudioPlayer(
         this.audioRecord.then((record) => record.audio)
       );
     }
 
-    if (this.audioRecord && this.audioElement && !this.isAudioBuilt) {
+    if (this.audioRecord && this.audioPlayer && !this.isAudioBuilt) {
       this.isAudioBuilt = true;
       this.audioRecord.then(({ name, audio }) => {
         nameLabel.innerText = name;
@@ -87,48 +87,64 @@ export class RowAudio extends Row {
   }
 
   update() {
-    const { audioElement, timelineView } = this;
+    const { timelineView } = this;
     const { time, isPlaying, wasScrubbed } = timelineView;
     const { offset } = this.timeline;
+
+    const audioPlayer = this.audioPlayer?.value;
 
     if (!isPlaying) {
       if (this.isPlaying) {
         // The timeline stopped playing, but the audio still is, stop it here.
         this.isPlaying = false;
-        audioElement?.value?.pause();
+        audioPlayer?.pause();
       }
       return;
     }
 
     if (wasScrubbed) {
-      // Remember that the audio's time needs setting, even if it's not availablel yet.
+      // Remember that the audio's time needs setting, even if it's not available yet.
+      this.currentTimeNeedsSetting = true;
+      // Always stop audio immediately on scrub
+      audioPlayer?.pause();
+      this.isPlaying = false;
       this.currentTimeNeedsSetting = true;
     }
 
-    if (!audioElement?.value || isNaN(audioElement.value.duration)) {
+    if (!audioPlayer || isNaN(audioPlayer.duration)) {
       // The audio element is not ready to play yet.
       return;
     }
-    const inRange = time >= offset && time < time + audioElement.value.duration;
+    const inRange = time >= offset && time < time + audioPlayer.duration;
 
     if (inRange) {
       if (this.currentTimeNeedsSetting) {
         // Either the timeline was scrubbed, or this is the first time the audio is
         // ready to play.
-        audioElement.value.currentTime = time - offset;
+        audioPlayer.currentTime = time - offset;
         this.currentTimeNeedsSetting = false;
       }
       if (!this.isPlaying) {
         // We're in range, but the audio is not playing yet. Start playing it.
         this.isPlaying = true;
-        audioElement.value.play();
+        audioPlayer.play();
+      }
+      if (this.currentTimeNeedsSetting) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = time - offset;
+        audioPlayer.play();
+        this.currentTimeNeedsSetting = false;
+      }
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        audioPlayer.play();
       }
     } else {
       // This audio is out of range.
       if (this.isPlaying) {
         this.isPlaying = false;
         this.currentTimeNeedsSetting = true;
-        audioElement.value.pause();
+        audioPlayer.pause();
       }
     }
   }
@@ -140,25 +156,25 @@ export class RowAudio extends Row {
       // This was already stored in the Audio database.
       this.audioRecord = Promise.resolve(record);
       this.timeline.hash = record.hash;
-      this.audioElement = getHTMLAudioElement(record.audio);
+      this.audioPlayer = getAudioPlayer(record.audio);
     } else {
       this.audioRecord = this.db.addAudio(file.name, hash, file);
       this.timeline.hash = hash;
-      this.audioElement = getHTMLAudioElement(
+      this.audioPlayer = getAudioPlayer(
         this.audioRecord.then((record) => record.audio)
       );
     }
     this.timelineView.needsSaving = true;
 
-    this.audioElement.promise.then((audioElement) => {
+    this.audioPlayer.promise.then((audioPlayer) => {
       const { timelineRecord } = this.timelineView;
-      if (isNaN(audioElement.duration)) {
-        console.error("The duration was not available", audioElement);
+      if (isNaN(audioPlayer.duration)) {
+        console.error("The duration was not available", audioPlayer);
         return;
       }
-      if (timelineRecord.duration < audioElement.duration) {
+      if (timelineRecord.duration < audioPlayer.duration) {
         this.timelineView.needsSaving = true;
-        timelineRecord.duration = audioElement.duration;
+        timelineRecord.duration = audioPlayer.duration;
       }
     });
     this.reactive();
@@ -221,31 +237,97 @@ async function hashBlob(blob: Blob): Promise<string> {
     .join("");
 }
 
-function getHTMLAudioElement(
-  blob: Blob | Promise<Blob>
-): SyncPromise<HTMLAudioElement> {
-  const promise = Promise.resolve(blob).then((blob) => {
-    return new Promise<HTMLAudioElement>((resolve, reject) => {
-      const audio = new Audio();
-      const url = URL.createObjectURL(blob);
-
-      audio.preload = "metadata";
-
-      audio.addEventListener("loadedmetadata", () => {
-        resolve(audio);
-      });
-
-      audio.addEventListener("error", (error) => {
-        console.error(error);
-        URL.revokeObjectURL(url);
-        reject(new Error("Error loading audio metadata"));
-      });
-
-      audio.src = url;
-    });
+function getAudioPlayer(blob: Blob | Promise<Blob>): SyncPromise<AudioPlayer> {
+  const promise = Promise.resolve(blob).then(async (blob) => {
+    const context = new AudioContext();
+    const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+    return new AudioPlayer(context, buffer);
   });
 
   return makeSyncPromise(promise);
+}
+
+/**
+ * Use the WebAudio API's AudioContext to accurately play back an MP3. The
+ * HTMLAudioElement is not high fidelity enough.
+ */
+class AudioPlayer {
+  /**
+   * The audio-processing graph.
+   */
+  context: AudioContext;
+
+  /**
+   * The PCM decoded audio from the source mp3 or other file. This is the entire song
+   */
+  buffer: AudioBuffer;
+
+  /**
+   * An AudioScheduledSourceNode which represents an audio source consisting of
+   * in-memory audio data, stored in an AudioBuffer. It's especially useful for
+   * playing back audio which has particularly stringent timing accuracy requirements,
+   * such as for sounds that must match a specific rhythm and can be kept in memory
+   * rather than being played from disk or the network.
+   *
+   * [MDN Reference](https://developer.mozilla.org/docs/Web/API/AudioBufferSourceNode)
+   */
+  source: AudioBufferSourceNode | null = null;
+
+  startTime = 0;
+  offset = 0;
+  isPlaying = false;
+
+  constructor(context: AudioContext, buffer: AudioBuffer) {
+    this.context = context;
+    this.buffer = buffer;
+  }
+
+  get currentTime(): number {
+    if (this.isPlaying) {
+      return this.context.currentTime - this.startTime + this.offset;
+    }
+    return this.offset;
+  }
+
+  set currentTime(value: number) {
+    if (this.isPlaying) {
+      this.pause();
+      this.offset = value;
+      this.play();
+    } else {
+      this.offset = value;
+    }
+  }
+
+  get duration(): number {
+    return this.buffer.duration;
+  }
+
+  play() {
+    if (this.isPlaying) {
+      return;
+    }
+    console.log("[AudioPlayer] play");
+    this.source = this.context.createBufferSource();
+    this.source.buffer = this.buffer;
+    this.source.connect(this.context.destination);
+    this.startTime = this.context.currentTime;
+    this.source.start(0, this.offset);
+    this.isPlaying = true;
+
+    this.source.onended = () => {
+      this.isPlaying = false;
+      this.offset = 0;
+    };
+  }
+
+  pause() {
+    console.log("[AudioPlayer] pause");
+    if (!this.isPlaying || !this.source) return;
+    this.source.stop();
+    this.offset = this.currentTime;
+    this.isPlaying = false;
+  }
 }
 
 class AudioWaveform {
