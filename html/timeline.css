@@ -15,12 +15,14 @@
   font-family: var(--font-family);
   font-size: 0.9rem;
   font-weight: normal;
+  background-color: var(--background-color);
+  position: absolute;
+  inset: auto 0 0 0;
 }
 
 .manager {
   position: absolute;
   inset: auto 0 0 0;
-  background: #fff;
   display: flex;
   padding: 0.3rem;
   border-top: 1px solid var(--border-color-subtle);
@@ -123,6 +125,15 @@
   color: var(--font-color);
   align-items: center;
   flex-direction: column;
+  opacity: 0.9;
+  outline: 2px solid transparent;
+  transition: opacity 200ms, outline-color 200ms;
+
+  &:focus {
+    opacity: 1.0;
+    outline-color: var(--accent-color);
+    border-top: 1px solid #000;
+  }
 
   --sidebar-width: 300px;
 }
@@ -153,6 +164,19 @@
       height: var(--button-size);
 
       &:hover {
+        opacity: 0.9;
+      }
+
+      &:focus {
+        border: 0;
+        outline: 2px solid var(--accent-color);
+        border-radius: var(--border-radius);
+        opacity: 0.9;
+      }
+
+      &:active {
+        border: 0;
+        outline: 0;
         opacity: 1;
       }
 
@@ -160,10 +184,6 @@
         width: var(--button-size);
         height: var(--button-size);
       }
-    }
-
-    ._time {
-      flex: 1;
     }
   }
 
@@ -198,24 +218,70 @@
       /* Additional properties. */
     }
   }
+}
 
-  ._scrubberStart,
-  ._scrubberTime {
+.scrubbers {
+  position: absolute;
+  inset: 0 0 0 var(--sidebar-width);
+  overflow: hidden;
+  pointer-events: none;
+
+  ._start,
+  ._time {
     position: absolute;
     width: 1px;
-    top: 0;
+    top: 3px;
     bottom: 0;
     left: 0;
-    pointer-events: none;
   }
-  ._scrubberStart {
-    background-color: #fffd;
+  ._start {
+    --color: #90fcf2;
+    background-color: var(--color);
+
+    /* Arrow at the top. */
+    &:after {
+      --height: 6px;
+      --width: 8px;
+      content: "";
+      display: block;
+      width: 0px;
+      height: 0px;
+      margin-left: -7.5px;
+      border-style: solid;
+      border-width: var(--height) var(--width) 0 var(--width);
+      border-color: var(--color) transparent transparent transparent;
+    }
   }
-  ._scrubberTime {
-    background-color: #fff7;
+  ._time {
+    background-color: #f8fbac;
   }
 }
 
 .view-rows {
   width: 100%;
+}
+
+.duration-editor {
+  display: inline-flex;
+  font-family: monospace;
+  align-items: center;
+  flex: 1;
+  font-size: 0.8rem;
+
+  input {
+    color: #fff;
+    width: 2ch;
+    font: inherit;
+    text-align: center;
+    border: none;
+    background: none;
+    appearance: textfield;
+    padding: 0;
+
+    &:focus {
+      border: none;
+      outline: 1px solid var(--accent-color);
+      background: var(--border-color-focus);
+    }
+  }
 }

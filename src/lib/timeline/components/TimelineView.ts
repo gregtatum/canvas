@@ -13,13 +13,15 @@ import {
   NewRow,
   Row,
 } from "lib/timeline/components";
+import { DurationEditor } from "./DurationEditor";
 
 export class TimelineView {
   db: DanceDatabase;
   elements: ReturnType<typeof TimelineView.createElements>;
+  durationEditor: DurationEditor;
   timelineName: string;
   timelineRecord: TimelineRecord;
-  secondsRange: [number, number];
+  range: [Seconds, Seconds];
   closeTimeline: () => void;
   ctx: CanvasRenderingContext2D;
   needsSaving = false;
@@ -44,24 +46,31 @@ export class TimelineView {
     this.timelineRecord = timelineRecord;
     this.closeTimeline = closeTimeline;
 
-    this.elements = TimelineView.createElements();
+    this.elements = TimelineView.createElements(shadowRoot);
+    this.durationEditor = new DurationEditor(
+      this.elements.durationEditorMount,
+      this
+    );
     this.setupHandlers();
     this.ctx = ensureExists(
       this.elements.canvas.getContext("2d", { alpha: false })
     );
 
-    this.secondsRange = [0, this.timelineRecord.duration];
+    this.range = [0, this.timelineRecord.duration];
 
     this.reactive();
     shadowRoot.appendChild(this.elements.container);
+    this.elements.container.focus();
   }
 
-  static createElements() {
+  static createElements(shadowRoot: ShadowRoot) {
     const { container, get } = createHTML(/* html */ `
-      <div class="view">
+      <div class="view" tabindex="0">
         <div class="view-header">
           <div class="_controls">
-            <div class="_time">00:10:00</div>
+            <div class="duration-editor">
+              <div class="_time"></div>
+            </div>
             <button class="_add" title="Add" type="button">
               <img src="../html/plus.svg" />
             </button>
@@ -78,17 +87,20 @@ export class TimelineView {
           <div class="_tickmarks">
             <canvas></canvas>
             <div class="_zoom"></div>
-            <div class="_scrubberStart"></div>
-            <div class="_scrubberTime"></div>
           </div>
         </div>
         <div class="view-rows">
           <!-- Timeline rows get appended here. -->
         </div>
+        <div class="scrubbers">
+          <div class="_time"></div>
+          <div class="_start"></div>
+        </div>
       </div>
     `);
 
     return {
+      shadowRoot,
       container,
       addButton: get<HTMLButtonElement>("._add"),
       playButton: get<HTMLButtonElement>("._play"),
@@ -97,10 +109,10 @@ export class TimelineView {
       closeButton: get<HTMLButtonElement>("._close"),
       tickmarks: get<HTMLDivElement>("._tickmarks"),
       canvas: get<HTMLCanvasElement>("._tickmarks canvas"),
-      scrubberStart: get<HTMLCanvasElement>("._scrubberStart"),
-      scrubberTime: get<HTMLCanvasElement>("._scrubberTime"),
+      scrubberStart: get<HTMLCanvasElement>(".scrubbers ._start"),
+      scrubberTime: get<HTMLCanvasElement>(".scrubbers ._time"),
       rows: get(".view-rows"),
-      time: get<HTMLElement>("._time"),
+      durationEditorMount: get<HTMLElement>(".duration-editor"),
     };
   }
 
@@ -109,8 +121,8 @@ export class TimelineView {
   tickIntervals = [1, 5, 10, 30, 60, 300, 600, 1800, 3600];
   redrawTimeline = reactiveInvalidator([
     () => this.timelineRecord.duration,
-    () => this.secondsRange[0],
-    () => this.secondsRange[1],
+    () => this.range[0],
+    () => this.range[1],
     () => window.innerWidth,
   ]);
   reactiveDrawTimeline() {
@@ -121,7 +133,7 @@ export class TimelineView {
       const rowView = this.rowViews.get(timeline);
       rowView?.drawTimeline();
     }
-    const { secondsRange, ctx } = this;
+    const { range: secondsRange, ctx } = this;
     const { canvas } = this.elements;
 
     // Properly size the canvas.
@@ -227,18 +239,59 @@ export class TimelineView {
   setupHandlers() {
     const { closeButton, container, addButton, playButton, tickmarks } =
       this.elements;
-    closeButton.addEventListener("click", this.closeTimeline);
+
     container.addEventListener("wheel", this.wheelHandler, {
       passive: false,
     });
 
-    addButton.addEventListener("click", this.addNewRow);
-    playButton.addEventListener("click", this.togglePlay);
+    this.clickNoFocus(closeButton, this.closeTimeline);
+    this.clickNoFocus(addButton, this.addNewRow);
+    this.clickNoFocus(playButton, this.togglePlay);
     container.addEventListener("mousemove", this.mouseMoveHandler);
     tickmarks.addEventListener("mousedown", this.tickmarksMouseDown);
     window.addEventListener("mouseup", this.tickmarksMouseUp);
     window.addEventListener("blur", this.tickmarksMouseUp);
-    window.addEventListener("keydown", this.keydown);
+    this.elements.container.addEventListener("keydown", this.keydown);
+  }
+
+  /**
+   * Clicks a button but doesn't steal focus.
+   */
+  clickNoFocus(element: HTMLElement, handler: (ev: MouseEvent) => any) {
+    let prevActiveElement: Element | null = null;
+    element.addEventListener(
+      "mouseup",
+      (event) => {
+        event.stopImmediatePropagation();
+        event.stopPropagation();
+        event.preventDefault();
+        handler(event);
+      },
+      true
+    );
+    element.addEventListener("mousedown", (event) => {
+      prevActiveElement =
+        this.elements.shadowRoot.activeElement ?? this.elements.container;
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+      event.preventDefault();
+    });
+    element.addEventListener("click", (event) => {
+      const element = prevActiveElement;
+      if (element) {
+        prevActiveElement = null;
+        requestAnimationFrame(() => {
+          (element as HTMLElement).focus();
+        });
+      } else {
+        handler(event);
+      }
+    });
+  }
+
+  isActiveElement() {
+    const { container, shadowRoot } = this.elements;
+    return shadowRoot.activeElement === container;
   }
 
   keydown = (event: KeyboardEvent) => {
@@ -248,6 +301,12 @@ export class TimelineView {
     }
     if (event.ctrlKey || event.metaKey) {
       key = `ctrl-${key}`;
+    }
+    if (!this.isActiveElement()) {
+      if (key === "escape" && this.elements.shadowRoot.activeElement) {
+        this.elements.container.focus();
+      }
+      return;
     }
     switch (key) {
       case "space": {
@@ -287,7 +346,7 @@ export class TimelineView {
   mouseMoveHandler = (event: MouseEvent) => {
     const timelineLeft: CssPixels =
       event.clientX - window.innerWidth + this.width;
-    const [start, end] = this.secondsRange;
+    const [start, end] = this.range;
     const duration: Seconds = end - start;
     const rangeRatio = timelineLeft / this.width;
     this.mouseAtTime = start + duration * rangeRatio;
@@ -307,9 +366,12 @@ export class TimelineView {
   };
 
   wheelHandler = (event: WheelEvent) => {
+    if (!this.isActiveElement()) {
+      return;
+    }
     const { canvas } = this.elements;
     const timelineDuration = this.timelineRecord.duration; // End time, implied start is always 0
-    const [start, end] = this.secondsRange;
+    const [start, end] = this.range;
     const rangeDuration = end - start;
     let newStart = 0;
     let newEnd = 0;
@@ -372,8 +434,8 @@ export class TimelineView {
         newStart = newEnd - rangeDuration;
       }
     }
-    this.secondsRange[0] = newStart;
-    this.secondsRange[1] = newEnd;
+    this.range[0] = newStart;
+    this.range[1] = newEnd;
   };
 
   updateTimeline(callback: (timelineRecord: TimelineRecord) => void) {
@@ -431,10 +493,7 @@ export class TimelineView {
       this.rebuildTimelines();
     }
 
-    if (this.isDurationInvalidated()) {
-      const seconds = formatSecondsToTimecode(this.timelineRecord.duration);
-      this.elements.time.innerText = seconds;
-    }
+    this.durationEditor.reactive();
   }
 
   /**
@@ -475,6 +534,7 @@ export class TimelineView {
     this.updateTiming();
     this.updateScrubbers();
     this.updateRows();
+    this.durationEditor.update();
     this.wasScrubbed = false;
   }
 
@@ -486,19 +546,19 @@ export class TimelineView {
     const prevNow: Seconds = this.prevNow ?? now;
     this.time += now - prevNow;
     this.prevNow = now;
-    const [start, end] = this.secondsRange;
+    const [start, end] = this.range;
     const duration = end - start;
     if (this.time < start) {
-      this.secondsRange[0] = this.time;
-      this.secondsRange[1] = this.time + duration;
+      this.range[0] = this.time;
+      this.range[1] = this.time + duration;
     }
     const step = duration / 10;
     if (this.time + step > end) {
-      this.secondsRange[1] = Math.min(
-        this.secondsRange[1] + step,
+      this.range[1] = Math.min(
+        this.range[1] + step,
         this.timelineRecord.duration
       );
-      this.secondsRange[0] = Math.max(0, this.secondsRange[1] - duration);
+      this.range[0] = Math.max(0, this.range[1] - duration);
     }
     if (this.time > this.timelineRecord.duration) {
       this.togglePlay();
@@ -525,7 +585,7 @@ export class TimelineView {
   }
 
   secondsToCssPixels(seconds: Seconds): CssPixels {
-    const [start, end] = this.secondsRange;
+    const [start, end] = this.range;
     const rangeDuration: Seconds = end - start;
     const timeInRange: Seconds = seconds - start;
     const rangeRatio = timeInRange / rangeDuration;
@@ -589,16 +649,4 @@ function getNormalizedScrollDelta(
   }
   // Scroll by pixel.
   return delta;
-}
-
-function formatSecondsToTimecode(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-
-  return [
-    hours.toString().padStart(2, "0"),
-    minutes.toString().padStart(2, "0"),
-    seconds.toString().padStart(2, "0"),
-  ].join(":");
 }

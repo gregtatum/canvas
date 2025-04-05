@@ -73,7 +73,10 @@ export function appendHTML(container: Element, html: string) {
     container.appendChild(node);
   }
   return <T extends Element>(querySelector: string): T =>
-    ensureExists(container.querySelector<T>(querySelector));
+    ensureExists(
+      container.querySelector<T>(querySelector),
+      `Could not find "${querySelector}"`
+    );
 }
 
 /**
@@ -94,7 +97,10 @@ export function createHTML(html: string) {
   return {
     container,
     get: <T extends Element>(querySelector: string): T =>
-      ensureExists(container.querySelector<T>(querySelector)),
+      ensureExists(
+        container.querySelector<T>(querySelector),
+        `Could not find "${querySelector}"`
+      ),
   };
 }
 

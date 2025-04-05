@@ -1,6 +1,11 @@
 import { type DanceDatabase } from "lib/posecam";
 import type { TimelineRecord } from "lib/timeline/types";
-import { addStylesheet, createHTML, LocationManager } from "lib/utils";
+import {
+  addStylesheet,
+  createHTML,
+  exposeAsGlobal,
+  LocationManager,
+} from "lib/utils";
 import { TimelineView } from "lib/timeline/components/TimelineView";
 
 const COMPONENT_NAME = "timeline-manager";
@@ -141,6 +146,7 @@ export class TimelineManager extends HTMLElement {
           this.closeTimeline,
           this.#shadowRoot
         );
+        exposeAsGlobal("timelineView", this.timelineView);
       }
     } else if (this.timelineView) {
       // There is no timeline loaded, but the view is still initialized.

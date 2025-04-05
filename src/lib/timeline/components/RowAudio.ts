@@ -17,6 +17,7 @@ export class RowAudio extends Row {
     this.timeline = timeline;
     this.addHandlers();
     this.reactive();
+    console.log("[RowAudio]", this);
   }
 
   createElements() {
@@ -69,11 +70,14 @@ export class RowAudio extends Row {
       this.isAudioBuilt = true;
       this.audioRecord.then(({ name, audio }) => {
         nameLabel.innerText = name;
-        AudioWaveform.create(audio, canvas, this.timelineView).then(
-          (audioWaveform) => {
-            this.audioWaveform = audioWaveform;
-          }
-        );
+        AudioWaveform.create(
+          audio,
+          canvas,
+          this.timelineView,
+          this.timeline
+        ).then((audioWaveform) => {
+          this.audioWaveform = audioWaveform;
+        });
       });
     }
   }
@@ -197,7 +201,7 @@ export class RowAudio extends Row {
       this.handleFile(file);
     });
 
-    removeButton.addEventListener("click", () => {
+    this.timelineView.clickNoFocus(removeButton, () => {
       if (confirm("Are you sure you want to delete that row?")) {
         this.timelineView.updateTimeline((timelineRecord) => {
           timelineRecord.timeline = timelineRecord.timeline.filter(
@@ -249,29 +253,33 @@ class AudioWaveform {
   ctx: CanvasRenderingContext2D;
   audioBuffer: AudioBuffer;
   timelineView: TimelineView;
+  timelineAudio: TimelineAudio;
 
   static async create(
     blob: Blob,
     canvas: HTMLCanvasElement,
-    timelineView: TimelineView
+    timelineView: TimelineView,
+    timelineAudio: TimelineAudio
   ): Promise<AudioWaveform> {
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(
       await blob.arrayBuffer()
     );
-    return new AudioWaveform(audioBuffer, canvas, timelineView);
+    return new AudioWaveform(audioBuffer, canvas, timelineView, timelineAudio);
   }
 
   constructor(
     audioBuffer: AudioBuffer,
     canvas: HTMLCanvasElement,
-    timelineView: TimelineView
+    timelineView: TimelineView,
+    timelineAudio: TimelineAudio
   ) {
     this.audioBuffer = audioBuffer;
     this.canvas = canvas;
     this.timelineView = timelineView;
+    this.timelineAudio = timelineAudio;
     {
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { alpha: false });
       if (!ctx) {
         throw new Error("Could not load the canvas context.");
       }
@@ -292,50 +300,76 @@ class AudioWaveform {
 
   drawWaveform() {
     const { width, height } = this.canvas;
-    const { audioBuffer } = this;
-    const [startSec, endSec] = this.timelineView.secondsRange;
-    const sampleRate = audioBuffer.sampleRate;
+    const { audioBuffer, ctx } = this;
 
-    const startSample = Math.floor(startSec * sampleRate);
-    const endSample = Math.min(
-      Math.floor(endSec * sampleRate),
-      audioBuffer.length
+    // Clear background
+    ctx.fillStyle = "#2e2e2e";
+    ctx.fillRect(0, 0, width, height);
+
+    const { range } = this.timelineView;
+    const [rangeStart, rangeEnd] = range;
+    const rangeDuration = rangeEnd - rangeStart;
+
+    const audioDuration = audioBuffer.length / audioBuffer.sampleRate;
+    const audioStart = this.timelineAudio.offset;
+    const audioEnd = audioStart + audioDuration;
+
+    const visibleStart = Math.max(rangeStart, audioStart);
+    const visibleEnd = Math.min(rangeEnd, audioEnd);
+    const visibleDuration = visibleEnd - visibleStart;
+
+    const startSample = Math.floor(
+      (visibleStart - audioStart) * audioBuffer.sampleRate
     );
-    const samplesToRender = endSample - startSample;
+    const endSample = Math.floor(
+      (visibleEnd - audioStart) * audioBuffer.sampleRate
+    );
+    const samplesInRange = endSample - startSample;
 
-    if (samplesToRender <= 0) return;
+    if (visibleDuration <= 0 || samplesInRange <= 0) return;
 
     const leftChannel = audioBuffer.getChannelData(0);
-    const rightChannel =
-      audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
 
-    const samplesPerPixel = Math.floor(samplesToRender / width);
-    if (samplesPerPixel < 1) return;
+    const pixelsToDraw = Math.floor((visibleDuration / rangeDuration) * width);
+    const pixelsStart = Math.floor(
+      ((visibleStart - rangeStart) / rangeDuration) * width
+    );
 
-    this.ctx.clearRect(0, 0, width, height);
-    this.ctx.fillStyle = "#2593c7";
+    if (pixelsToDraw <= 0) return;
 
-    const tempValues = new Float32Array(width);
-    let maxOverall = 0;
+    // Fill background under waveform range
+    ctx.fillStyle = "#74c0e4";
+    ctx.fillRect(pixelsStart, 0, pixelsToDraw, height);
 
-    for (let x = 0; x < width; x++) {
-      const start = startSample + x * samplesPerPixel;
-      const end = Math.min(start + samplesPerPixel, endSample);
+    // Draw waveform
+    ctx.fillStyle = "#2593c7";
+    const halfHeight = height / 2;
 
-      let sum = 0;
-      for (let i = start; i < end; i++) {
-        sum += Math.abs(leftChannel[i]);
-        if (rightChannel) sum += Math.abs(rightChannel[i]);
+    const samplesPerPixel = samplesInRange / pixelsToDraw;
+
+    for (let x = 0; x < pixelsToDraw; x++) {
+      const sampleStart = startSample + Math.floor(x * samplesPerPixel);
+      const sampleEnd = Math.min(
+        startSample + Math.floor((x + 1) * samplesPerPixel),
+        leftChannel.length
+      );
+
+      let min = 1;
+      let max = -1;
+
+      for (let i = sampleStart; i < sampleEnd; i++) {
+        const sample = leftChannel[i];
+        if (sample < min) min = sample;
+        if (sample > max) max = sample;
       }
-      const value = sum / (samplesPerPixel * (rightChannel ? 2 : 1));
-      tempValues[x] = value;
-      if (value > maxOverall) maxOverall = value;
-    }
 
-    for (let x = 0; x < width; x++) {
-      const value = tempValues[x];
-      const y = (1 - value / maxOverall) * height;
-      this.ctx.fillRect(x, y, 1, height);
+      const yMin = halfHeight * (1 - min);
+      const yMax = halfHeight * (1 - max);
+
+      const drawX = pixelsStart + x;
+      ctx.fillRect(drawX, yMax, 1, yMin - yMax);
+
+      ctx.fillRect(drawX, 0, 1, 3);
     }
   }
 }

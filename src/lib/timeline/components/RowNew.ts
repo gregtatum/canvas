@@ -32,7 +32,7 @@ export class NewRow extends Row {
   }
 
   addHandlers() {
-    this.elements.button.addEventListener("click", () => {
+    this.timelineView.clickNoFocus(this.elements.button, () => {
       this.timelineView.replaceNewRow(this.elements.select.value);
     });
   }
