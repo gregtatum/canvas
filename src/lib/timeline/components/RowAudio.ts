@@ -8,7 +8,6 @@ export class RowAudio extends Row {
   elements: ReturnType<typeof RowAudio.prototype.createElements>;
   audioPlayer?: SyncPromise<AudioPlayer>;
   audioWaveform?: AudioWaveform;
-  isPlaying = true;
   currentTimeNeedsSetting = true;
 
   constructor(cue: CueAudio, timeline: Timeline) {
@@ -59,7 +58,8 @@ export class RowAudio extends Row {
     input.style.display = this.audioRecord ? "none" : "block";
 
     if (this.audioRecord && !this.audioPlayer) {
-      this.audioPlayer = getAudioPlayer(
+      this.audioPlayer = AudioPlayer.create(
+        this.timeline,
         this.audioRecord.then((record) => record.audio)
       );
     }
@@ -82,64 +82,46 @@ export class RowAudio extends Row {
   }
 
   update() {
-    const { timeline } = this;
-    const { time, isPlaying, wasScrubbed } = timeline;
-    const { offset } = this.cue;
+    const { timeline, cue } = this;
+    const { time } = timeline;
 
     const audioPlayer = this.audioPlayer?.value;
 
-    if (!isPlaying) {
-      if (this.isPlaying) {
+    if (!timeline.time.isPlaying) {
+      if (audioPlayer?.isPlaying) {
         // The timeline stopped playing, but the audio still is, stop it here.
-        this.isPlaying = false;
-        audioPlayer?.pause();
+        audioPlayer.stop();
       }
       return;
     }
 
-    if (wasScrubbed) {
+    if (time.wasScrubbed) {
       // Remember that the audio's time needs setting, even if it's not available yet.
       this.currentTimeNeedsSetting = true;
       // Always stop audio immediately on scrub
-      audioPlayer?.pause();
-      this.isPlaying = false;
-      this.currentTimeNeedsSetting = true;
+      audioPlayer?.stop();
     }
 
-    if (!audioPlayer || isNaN(audioPlayer.duration)) {
-      // The audio element is not ready to play yet.
+    if (!audioPlayer) {
+      // The audio player is not ready to play yet.
       return;
     }
-    const inRange = time >= offset && time < time + audioPlayer.duration;
+    const inRange =
+      time.now >= cue.offset && time.now < cue.offset + audioPlayer.duration;
 
     if (inRange) {
       if (this.currentTimeNeedsSetting) {
-        // Either the timeline was scrubbed, or this is the first time the audio is
-        // ready to play.
-        audioPlayer.currentTime = time - offset;
+        audioPlayer.stop();
         this.currentTimeNeedsSetting = false;
       }
-      if (!this.isPlaying) {
+      if (!audioPlayer.isPlaying) {
         // We're in range, but the audio is not playing yet. Start playing it.
-        this.isPlaying = true;
-        audioPlayer.play();
-      }
-      if (this.currentTimeNeedsSetting) {
-        audioPlayer.pause();
-        audioPlayer.currentTime = time - offset;
-        audioPlayer.play();
-        this.currentTimeNeedsSetting = false;
-      }
-      if (!this.isPlaying) {
-        this.isPlaying = true;
-        audioPlayer.play();
+        audioPlayer.play(time.now - cue.offset);
       }
     } else {
       // This audio is out of range.
-      if (this.isPlaying) {
-        this.isPlaying = false;
-        this.currentTimeNeedsSetting = true;
-        audioPlayer.pause();
+      if (audioPlayer.isPlaying) {
+        audioPlayer.stop();
       }
     }
   }
@@ -151,11 +133,12 @@ export class RowAudio extends Row {
       // This was already stored in the Audio database.
       this.audioRecord = Promise.resolve(record);
       this.cue.hash = record.hash;
-      this.audioPlayer = getAudioPlayer(record.audio);
+      this.audioPlayer = AudioPlayer.create(this.timeline, record.audio);
     } else {
       this.audioRecord = this.db.addAudio(file.name, hash, file);
       this.cue.hash = hash;
-      this.audioPlayer = getAudioPlayer(
+      this.audioPlayer = AudioPlayer.create(
+        this.timeline,
         this.audioRecord.then((record) => record.audio)
       );
     }
@@ -232,25 +215,12 @@ async function hashBlob(blob: Blob): Promise<string> {
     .join("");
 }
 
-function getAudioPlayer(blob: Blob | Promise<Blob>): SyncPromise<AudioPlayer> {
-  const promise = Promise.resolve(blob).then(async (blob) => {
-    const context = new AudioContext();
-    const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-    return new AudioPlayer(context, buffer);
-  });
-
-  return makeSyncPromise(promise);
-}
-
 /**
  * Use the WebAudio API's AudioContext to accurately play back an MP3. The
  * HTMLAudioElement is not high fidelity enough.
  */
 class AudioPlayer {
-  /**
-   * The audio-processing graph.
-   */
-  context: AudioContext;
+  timeline: Timeline;
 
   /**
    * The PCM decoded audio from the source mp3 or other file. This is the entire song
@@ -259,70 +229,70 @@ class AudioPlayer {
   buffer: AudioBuffer;
 
   /**
-   * An AudioScheduledSourceNode which represents an audio source consisting of
-   * in-memory audio data, stored in an AudioBuffer. It's especially useful for
-   * playing back audio which has particularly stringent timing accuracy requirements,
-   * such as for sounds that must match a specific rhythm and can be kept in memory
-   * rather than being played from disk or the network.
-   *
-   * [MDN Reference](https://developer.mozilla.org/docs/Web/API/AudioBufferSourceNode)
+   * Schedules the AudioBuffer for playback in the current context. Only exists if the
+   * player is playing.
    */
   source: AudioBufferSourceNode | null = null;
 
-  startTime = 0;
-  offset = 0;
-  isPlaying = false;
+  sourceGeneration = 0;
 
-  constructor(context: AudioContext, buffer: AudioBuffer) {
-    this.context = context;
+  get isPlaying() {
+    return Boolean(this.source);
+  }
+
+  static create(
+    timeline: Timeline,
+    blobOrPromise: Blob | Promise<Blob>
+  ): SyncPromise<AudioPlayer> {
+    const promise = Promise.resolve(blobOrPromise).then(async (blob) => {
+      const buffer = await timeline.audioContext.decodeAudioData(
+        await blob.arrayBuffer()
+      );
+      return new AudioPlayer(timeline, buffer);
+    });
+
+    return makeSyncPromise(promise);
+  }
+
+  constructor(timeline: Timeline, buffer: AudioBuffer) {
+    this.timeline = timeline;
     this.buffer = buffer;
   }
 
-  get currentTime(): number {
-    if (this.isPlaying) {
-      return this.context.currentTime - this.startTime + this.offset;
-    }
-    return this.offset;
-  }
-
-  set currentTime(value: number) {
-    if (this.isPlaying) {
-      this.pause();
-      this.offset = value;
-      this.play();
-    } else {
-      this.offset = value;
-    }
-  }
-
-  get duration(): number {
+  get duration(): Seconds {
     return this.buffer.duration;
   }
 
-  play() {
-    if (this.isPlaying) {
-      return;
+  play(time: Seconds) {
+    if (this.source) {
+      this.stop();
     }
-    console.log("[AudioPlayer] play");
-    this.source = this.context.createBufferSource();
-    this.source.buffer = this.buffer;
-    this.source.connect(this.context.destination);
-    this.startTime = this.context.currentTime;
-    this.source.start(0, this.offset);
-    this.isPlaying = true;
+    const { audioContext } = this.timeline;
 
-    this.source.onended = () => {
-      this.isPlaying = false;
-      this.offset = 0;
-    };
+    // A new buffer source must be created every time.
+    const source = audioContext.createBufferSource();
+
+    source.buffer = this.buffer;
+    source.connect(audioContext.destination);
+    source.start(0, time);
+
+    this.sourceGeneration++;
+    const sourceGeneration = this.sourceGeneration;
+    source.addEventListener("ended", () => {
+      if (sourceGeneration === this.sourceGeneration) {
+        this.source = null;
+      }
+    });
+
+    this.source = source;
   }
 
-  pause() {
-    console.log("[AudioPlayer] pause");
-    if (!this.isPlaying || !this.source) return;
-    this.source.stop();
-    this.offset = this.currentTime;
-    this.isPlaying = false;
+  stop() {
+    const source = this.source;
+    if (source) {
+      source.stop();
+      this.source = null;
+    }
   }
 }
 

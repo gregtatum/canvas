@@ -109,10 +109,9 @@ export class DurationEditor {
   }
 
   update() {
-    if (this.timeline.isPlaying || this.timeline.wasScrubbed) {
-      this.elements.time.innerText = formatSecondsToTimecode(
-        this.timeline.time
-      );
+    const { time } = this.timeline;
+    if (time.isPlaying || time.wasScrubbed) {
+      this.elements.time.innerText = formatSecondsToTimecode(time.now);
     }
   }
 }

@@ -25,14 +25,16 @@ export class Timeline {
   closeTimeline: () => void;
   ctx: CanvasRenderingContext2D;
   needsSaving = false;
-  wasScrubbed = true;
-  isPlaying = false;
   width: CssPixels = 0;
-  prevNow: Seconds | null = null;
-  time: Seconds = 0;
-  startPosition: Seconds = 0;
+  time: SynchronizedTime;
   mouseAtTime: CssPixels = 0;
   pressedMouseTime: Seconds | null = null;
+
+  /**
+   * The audio context is the source of truth for timing in order to be able to do
+   * high fidelity timing. Access the seconds via audioContext.currentTime.
+   */
+  audioContext = new AudioContext();
 
   constructor(
     db: DanceDatabase,
@@ -44,6 +46,7 @@ export class Timeline {
     this.db = db;
     this.timelineName = timelineName;
     this.record = record;
+    this.time = new SynchronizedTime(this.audioContext);
     this.closeTimeline = closeTimeline;
 
     this.elements = Timeline.createElements(shadowRoot);
@@ -315,9 +318,8 @@ export class Timeline {
       }
       case "ctrl-arrowleft": {
         event.preventDefault();
-        this.time = 0;
-        this.startPosition = 0;
-        this.wasScrubbed = true;
+        this.time.start = 0;
+        this.time.seek(0);
         break;
       }
       case "arrowright":
@@ -326,13 +328,10 @@ export class Timeline {
       case "shift-arrowleft": {
         const direction = key.endsWith("right") ? 1 : -1;
         const amount = key.startsWith("shift") ? 5 : 1;
-        this.time += direction * amount;
+        let newTime = this.time.now + direction * amount;
         // Keep the time in bounds.
-        this.time = Math.min(Math.max(0, this.time), this.record.duration);
-        this.wasScrubbed = true;
-        if (!this.isPlaying) {
-          this.startPosition = this.time;
-        }
+        newTime = Math.min(Math.max(0, newTime), this.record.duration);
+        this.time.seek(newTime);
         break;
       }
       default:
@@ -355,9 +354,8 @@ export class Timeline {
 
   tickmarksMouseUp = () => {
     if (this.pressedMouseTime === this.mouseAtTime) {
-      this.time = this.mouseAtTime;
-      this.startPosition = this.mouseAtTime;
-      this.wasScrubbed = true;
+      this.time.seek(this.mouseAtTime);
+      this.time.start = this.mouseAtTime;
     }
     this.pressedMouseTime = null;
   };
@@ -464,18 +462,15 @@ export class Timeline {
 
   togglePlay = () => {
     const { playButtonImg } = this.elements;
-    if (this.isPlaying) {
-      // Pause the timeline.
-      this.time = this.startPosition;
+    if (this.time.isPlaying) {
+      // Stop the timeline.
+      this.time.stop();
       playButtonImg.src = "../html/play.svg";
     } else {
       // Play the timeline
-      this.time = this.startPosition;
-      this.prevNow = null;
-      this.wasScrubbed = true;
+      this.time.play();
       playButtonImg.src = "../html/pause.svg";
     }
-    this.isPlaying = !this.isPlaying;
   };
 
   prevCues: Cue[] = [];
@@ -522,33 +517,30 @@ export class Timeline {
   }
 
   update() {
-    this.updateTiming();
+    this.time.updateStart();
+    this.updateTimeRange();
     this.updateScrubbers();
     this.updateRows();
     this.durationEditor.update();
-    this.wasScrubbed = false;
+    this.time.updateEnd();
   }
 
-  updateTiming() {
-    if (!this.isPlaying) {
+  updateTimeRange() {
+    if (!this.time.isPlaying) {
       return;
     }
-    const now: Seconds = performance.now() / 1000;
-    const prevNow: Seconds = this.prevNow ?? now;
-    this.time += now - prevNow;
-    this.prevNow = now;
     const [start, end] = this.range;
     const duration = end - start;
-    if (this.time < start) {
-      this.range[0] = this.time;
-      this.range[1] = this.time + duration;
+    if (this.time.now < start) {
+      this.range[0] = this.time.now;
+      this.range[1] = this.time.now + duration;
     }
     const step = duration / 10;
-    if (this.time + step > end) {
+    if (this.time.now + step > end) {
       this.range[1] = Math.min(this.range[1] + step, this.record.duration);
       this.range[0] = Math.max(0, this.range[1] - duration);
     }
-    if (this.time > this.record.duration) {
+    if (this.time.now > this.record.duration) {
       this.togglePlay();
     }
   }
@@ -565,10 +557,10 @@ export class Timeline {
 
   updateScrubbers() {
     this.elements.scrubberStart.style.left = `${this.secondsToCssPixels(
-      this.startPosition
+      this.time.start
     )}px`;
     this.elements.scrubberTime.style.left = `${this.secondsToCssPixels(
-      this.time
+      this.time.now
     )}px`;
   }
 
@@ -637,4 +629,88 @@ function getNormalizedScrollDelta(
   }
   // Scroll by pixel.
   return delta;
+}
+
+/**
+ * Synchronizes the Timeline time to the AudioContext time to allow for high fidelity
+ * synchronziations between visuals and audio.
+ */
+class SynchronizedTime {
+  #time: Seconds = 0;
+  #audioContextOffset: Seconds = 0;
+  #audioContext: AudioContext;
+
+  /**
+   * Where to start the time when playing.
+   */
+  start: Seconds = 0;
+
+  /**
+   * Is the time playing?
+   */
+  #isPlaying = false;
+
+  /**
+   * If the time was changed programmatically, mark it is as scrubbed so that Cues
+   * can react.
+   */
+  #wasScrubbed = true;
+
+  constructor(audioContext: AudioContext) {
+    this.#audioContext = audioContext;
+  }
+
+  /**
+   * Called once at the top update tick.
+   */
+  updateStart() {
+    if (this.isPlaying) {
+      this.#time = this.#audioContext.currentTime - this.#audioContextOffset;
+    } else {
+      this.#time = this.start;
+    }
+  }
+
+  /**
+   * Called once at the bottom oof the update tick.
+   */
+  updateEnd() {
+    this.#wasScrubbed = false;
+  }
+
+  /**
+   * The time will remain stable throughout an update/draw tick. It is the seconds
+   * relative to the Timeline.
+   */
+  get now(): Seconds {
+    return this.#time;
+  }
+
+  get isPlaying(): boolean {
+    return this.#isPlaying;
+  }
+
+  get wasScrubbed(): boolean {
+    return this.#wasScrubbed;
+  }
+
+  seek(time: Seconds) {
+    if (this.isPlaying) {
+      this.#audioContextOffset += this.#time - time;
+    } else {
+      this.start = time;
+    }
+    this.#wasScrubbed = true;
+  }
+
+  play() {
+    this.#isPlaying = true;
+    this.#audioContextOffset = this.#audioContext.currentTime - this.start;
+  }
+
+  stop() {
+    this.#isPlaying = false;
+    this.#time = this.start;
+    this.#wasScrubbed = true;
+  }
 }
