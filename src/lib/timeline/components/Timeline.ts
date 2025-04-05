@@ -1,5 +1,5 @@
 import { type DanceDatabase } from "lib/posecam";
-import type { Timeline, TimelineRecord } from "lib/timeline/types";
+import type { Cue, TimelineRecord } from "lib/timeline/types";
 import {
   createHTML,
   ensureExists,
@@ -15,12 +15,12 @@ import {
 } from "lib/timeline/components";
 import { DurationEditor } from "./DurationEditor";
 
-export class TimelineView {
+export class Timeline {
   db: DanceDatabase;
-  elements: ReturnType<typeof TimelineView.createElements>;
+  elements: ReturnType<typeof Timeline.createElements>;
   durationEditor: DurationEditor;
   timelineName: string;
-  timelineRecord: TimelineRecord;
+  record: TimelineRecord;
   range: [Seconds, Seconds];
   closeTimeline: () => void;
   ctx: CanvasRenderingContext2D;
@@ -37,16 +37,16 @@ export class TimelineView {
   constructor(
     db: DanceDatabase,
     timelineName: string,
-    timelineRecord: TimelineRecord,
+    record: TimelineRecord,
     closeTimeline: () => void,
     shadowRoot: ShadowRoot
   ) {
     this.db = db;
     this.timelineName = timelineName;
-    this.timelineRecord = timelineRecord;
+    this.record = record;
     this.closeTimeline = closeTimeline;
 
-    this.elements = TimelineView.createElements(shadowRoot);
+    this.elements = Timeline.createElements(shadowRoot);
     this.durationEditor = new DurationEditor(
       this.elements.durationEditorMount,
       this
@@ -56,7 +56,7 @@ export class TimelineView {
       this.elements.canvas.getContext("2d", { alpha: false })
     );
 
-    this.range = [0, this.timelineRecord.duration];
+    this.range = [0, this.record.duration];
 
     this.reactive();
     shadowRoot.appendChild(this.elements.container);
@@ -65,8 +65,8 @@ export class TimelineView {
 
   static createElements(shadowRoot: ShadowRoot) {
     const { container, get } = createHTML(/* html */ `
-      <div class="view" tabindex="0">
-        <div class="view-header">
+      <div class="timeline" tabindex="0">
+        <div class="header">
           <div class="_controls">
             <div class="duration-editor">
               <div class="_time"></div>
@@ -89,7 +89,7 @@ export class TimelineView {
             <div class="_zoom"></div>
           </div>
         </div>
-        <div class="view-rows">
+        <div class="rows">
           <!-- Timeline rows get appended here. -->
         </div>
         <div class="scrubbers">
@@ -111,7 +111,7 @@ export class TimelineView {
       canvas: get<HTMLCanvasElement>("._tickmarks canvas"),
       scrubberStart: get<HTMLCanvasElement>(".scrubbers ._start"),
       scrubberTime: get<HTMLCanvasElement>(".scrubbers ._time"),
-      rows: get(".view-rows"),
+      rows: get(".rows"),
       durationEditorMount: get<HTMLElement>(".duration-editor"),
     };
   }
@@ -120,7 +120,7 @@ export class TimelineView {
   // 1 second to 1 hour.
   tickIntervals = [1, 5, 10, 30, 60, 300, 600, 1800, 3600];
   redrawTimeline = reactiveInvalidator([
-    () => this.timelineRecord.duration,
+    () => this.record.duration,
     () => this.range[0],
     () => this.range[1],
     () => window.innerWidth,
@@ -129,8 +129,8 @@ export class TimelineView {
     if (!this.redrawTimeline()) {
       return;
     }
-    for (const timeline of this.timelineRecord.timeline) {
-      const rowView = this.rowViews.get(timeline);
+    for (const cue of this.record.cues) {
+      const rowView = this.rowViews.get(cue);
       rowView?.drawTimeline();
     }
     const { range: secondsRange, ctx } = this;
@@ -148,7 +148,7 @@ export class TimelineView {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const timeRange = secondsRange[1] - secondsRange[0];
-    this.timelineRecord.duration;
+    this.record.duration;
 
     // Determine an appropriate tick interval
     const majorTickInterval =
@@ -223,7 +223,7 @@ export class TimelineView {
 
     ctx.stroke();
 
-    const { duration: boundsInSeconds } = this.timelineRecord;
+    const { duration: boundsInSeconds } = this.record;
     // Draw progress bar (small bar at the top)
     const progressBarHeight = 5;
 
@@ -328,10 +328,7 @@ export class TimelineView {
         const amount = key.startsWith("shift") ? 5 : 1;
         this.time += direction * amount;
         // Keep the time in bounds.
-        this.time = Math.min(
-          Math.max(0, this.time),
-          this.timelineRecord.duration
-        );
+        this.time = Math.min(Math.max(0, this.time), this.record.duration);
         this.wasScrubbed = true;
         if (!this.isPlaying) {
           this.startPosition = this.time;
@@ -370,7 +367,7 @@ export class TimelineView {
       return;
     }
     const { canvas } = this.elements;
-    const timelineDuration = this.timelineRecord.duration; // End time, implied start is always 0
+    const timelineDuration = this.record.duration; // End time, implied start is always 0
     const [start, end] = this.range;
     const rangeDuration = end - start;
     let newStart = 0;
@@ -439,31 +436,29 @@ export class TimelineView {
   };
 
   updateTimeline(callback: (timelineRecord: TimelineRecord) => void) {
-    callback(this.timelineRecord);
+    callback(this.record);
     this.needsSaving = true;
     this.reactive();
   }
 
   addNewRow = () => {
-    const newRow = this.timelineRecord.timeline.find(
-      (timeline) => timeline.type === "new"
-    );
-    if (newRow) {
-      this.rowViews.get(newRow)?.container?.querySelector("select")?.focus();
+    const newCue = this.record.cues.find((timeline) => timeline.type === "new");
+    if (newCue) {
+      this.rowViews.get(newCue)?.container?.querySelector("select")?.focus();
       // Don't add a second one here.
       return;
     }
-    this.timelineRecord.timeline = this.timelineRecord.timeline.slice();
-    this.timelineRecord.timeline.push({ type: "new" });
+    this.record.cues = this.record.cues.slice();
+    this.record.cues.push({ type: "new" });
     this.reactive();
   };
 
   replaceNewRow(timelineType: string) {
-    const index = this.timelineRecord.timeline.findIndex(
+    const index = this.record.cues.findIndex(
       (timeline) => timeline.type === "new"
     );
-    this.timelineRecord.timeline = this.timelineRecord.timeline.slice();
-    this.timelineRecord.timeline[index] = createDefaultTimeline(timelineType);
+    this.record.cues = this.record.cues.slice();
+    this.record.cues[index] = createDefaultTimeline(timelineType);
     this.reactive();
   }
 
@@ -483,13 +478,11 @@ export class TimelineView {
     this.isPlaying = !this.isPlaying;
   };
 
-  prevTimeline: Timeline[] = [];
-  rowViews = new WeakMap<Timeline, Row>();
-  isDurationInvalidated = reactiveInvalidator([
-    () => this.timelineRecord.duration,
-  ]);
+  prevCues: Cue[] = [];
+  rowViews = new WeakMap<Cue, Row>();
+  isDurationInvalidated = reactiveInvalidator([() => this.record.duration]);
   reactive() {
-    if (this.timelineRecord.timeline !== this.prevTimeline) {
+    if (this.record.cues !== this.prevCues) {
       this.rebuildTimelines();
     }
 
@@ -501,8 +494,8 @@ export class TimelineView {
    */
   rebuildTimelines() {
     const rowsElements = this.elements.rows;
-    for (let i = 0; i < this.timelineRecord.timeline.length; i++) {
-      const timeline = this.timelineRecord.timeline[i];
+    for (let i = 0; i < this.record.cues.length; i++) {
+      const timeline = this.record.cues[i];
       const element: Element | undefined = rowsElements.children[i];
       const nextElement: Element | undefined = rowsElements.children[i - 1];
       let rowView = this.rowViews.get(timeline);
@@ -523,9 +516,7 @@ export class TimelineView {
       }
     }
     // Ensure there are no extra elements left over.
-    while (
-      rowsElements.childElementCount > this.timelineRecord.timeline.length
-    ) {
+    while (rowsElements.childElementCount > this.record.cues.length) {
       rowsElements.lastElementChild?.remove();
     }
   }
@@ -554,19 +545,16 @@ export class TimelineView {
     }
     const step = duration / 10;
     if (this.time + step > end) {
-      this.range[1] = Math.min(
-        this.range[1] + step,
-        this.timelineRecord.duration
-      );
+      this.range[1] = Math.min(this.range[1] + step, this.record.duration);
       this.range[0] = Math.max(0, this.range[1] - duration);
     }
-    if (this.time > this.timelineRecord.duration) {
+    if (this.time > this.record.duration) {
       this.togglePlay();
     }
   }
 
   updateRows() {
-    for (const timeline of this.timelineRecord.timeline) {
+    for (const timeline of this.record.cues) {
       const rowView = ensureExists(
         this.rowViews.get(timeline),
         "Expected a Row view to be in the rowViews WeakMap."
@@ -601,7 +589,7 @@ export class TimelineView {
   }
 }
 
-function createDefaultTimeline(timelineType: string): Timeline {
+function createDefaultTimeline(timelineType: string): Cue {
   switch (timelineType) {
     case "new":
       return { type: "new" };
@@ -616,18 +604,18 @@ function createDefaultTimeline(timelineType: string): Timeline {
   }
 }
 
-function createTimelineRow(timeline: Timeline, timelineView: TimelineView) {
-  switch (timeline.type) {
+function createTimelineRow(cue: Cue, timeline: Timeline) {
+  switch (cue.type) {
     case "new":
-      return new NewRow(timeline, timelineView);
+      return new NewRow(cue, timeline);
     case "audio":
-      return new RowAudio(timeline, timelineView);
+      return new RowAudio(cue, timeline);
     case "dance":
-      return new RowDance(timeline, timelineView);
+      return new RowDance(cue, timeline);
     case "keyframe":
-      return new RowKeyframe(timeline, timelineView);
+      return new RowKeyframe(cue, timeline);
     default:
-      throw new UnhandledCaseError(timeline, "Timeline");
+      throw new UnhandledCaseError(cue, "Timeline");
   }
 }
 

@@ -1,11 +1,11 @@
-import { Row, TimelineView } from "lib/timeline/components";
-import type { Timeline } from "lib/timeline/types";
+import { Row, Timeline } from "lib/timeline/components";
+import type { Cue } from "lib/timeline/types";
 import { appendHTML } from "lib/utils";
 
 export class NewRow extends Row {
   elements: ReturnType<typeof NewRow.prototype.createElements>;
-  constructor(timeline: Timeline, timelineView: TimelineView) {
-    super(timeline, timelineView);
+  constructor(cue: Cue, timeline: Timeline) {
+    super(cue, timeline);
     this.elements = this.createElements();
     this.addHandlers();
   }
@@ -32,8 +32,8 @@ export class NewRow extends Row {
   }
 
   addHandlers() {
-    this.timelineView.clickNoFocus(this.elements.button, () => {
-      this.timelineView.replaceNewRow(this.elements.select.value);
+    this.timeline.clickNoFocus(this.elements.button, () => {
+      this.timeline.replaceNewRow(this.elements.select.value);
     });
   }
 }

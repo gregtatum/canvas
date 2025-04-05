@@ -115,7 +115,7 @@
   width: 100%;
 }
 
-.view {
+.timeline {
   position: absolute;
   inset: auto 0 0 0;
   background: #fff;
@@ -138,7 +138,7 @@
   --sidebar-width: 300px;
 }
 
-.view-header {
+.header {
   --button-size: 20px;
   --padding: 0.7rem;
   display: flex;
@@ -257,7 +257,7 @@
   }
 }
 
-.view-rows {
+.rows {
   width: 100%;
 }
 

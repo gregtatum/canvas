@@ -1,16 +1,16 @@
 import { appendHTML, reactiveInvalidator } from "lib/utils";
-import { type TimelineView } from "lib/timeline/components";
+import { type Timeline } from "lib/timeline/components";
 
 /**
  * Edit duration time like 00:03:26.
  */
 export class DurationEditor {
   elements: ReturnType<typeof DurationEditor.prototype.createElements>;
-  timelineView: TimelineView;
+  timeline: Timeline;
   isFocused = false;
 
-  constructor(container: HTMLElement, timelineView: TimelineView) {
-    this.timelineView = timelineView;
+  constructor(container: HTMLElement, timeline: Timeline) {
+    this.timeline = timeline;
     this.elements = this.createElements(container);
     this.addHandlers();
     this.reactive();
@@ -48,7 +48,7 @@ export class DurationEditor {
   }
 
   handleInput = () => {
-    const { timelineView } = this;
+    const { timeline } = this;
     const { hours, minutes, seconds } = this.elements;
     const h = parseInt(hours.value) || 0;
     let m = parseInt(minutes.value) || 0;
@@ -61,17 +61,14 @@ export class DurationEditor {
     }
     const newDuration = h * 3600 + m * 60 + s;
     const minRange = 1;
-    if (timelineView.range[1] > timelineView.timelineRecord.duration - 1) {
+    if (timeline.range[1] > timeline.record.duration - 1) {
       // We're within 1 second of the full range, expand the range when adding on.
-      timelineView.range[1] = newDuration;
+      timeline.range[1] = newDuration;
     }
     // Keep the range in bounds.
-    timelineView.range[0] = Math.min(
-      timelineView.range[0],
-      newDuration - minRange
-    );
-    timelineView.range[1] = Math.min(timelineView.range[1], newDuration);
-    timelineView.timelineRecord.duration = newDuration;
+    timeline.range[0] = Math.min(timeline.range[0], newDuration - minRange);
+    timeline.range[1] = Math.min(timeline.range[1], newDuration);
+    timeline.record.duration = newDuration;
     this.reactive();
   };
 
@@ -88,17 +85,17 @@ export class DurationEditor {
   handleEnter = (event: KeyboardEvent) => {
     if (event.key === "Enter") {
       (event.target as HTMLInputElement).blur();
-      this.timelineView.elements.container.focus();
+      this.timeline.elements.container.focus();
     }
   };
 
   isDurationInvalidated = reactiveInvalidator([
     () => this.isFocused,
-    () => this.timelineView.timelineRecord.duration,
+    () => this.timeline.record.duration,
   ]);
   reactive() {
     if (this.isDurationInvalidated() && !this.isFocused) {
-      const { duration } = this.timelineView.timelineRecord;
+      const { duration } = this.timeline.record;
       const { hours, minutes, seconds } = this.elements;
 
       const h = Math.floor(duration / 3600);
@@ -112,9 +109,9 @@ export class DurationEditor {
   }
 
   update() {
-    if (this.timelineView.isPlaying || this.timelineView.wasScrubbed) {
+    if (this.timeline.isPlaying || this.timeline.wasScrubbed) {
       this.elements.time.innerText = formatSecondsToTimecode(
-        this.timelineView.time
+        this.timeline.time
       );
     }
   }

@@ -6,18 +6,18 @@ import {
   exposeAsGlobal,
   LocationManager,
 } from "lib/utils";
-import { TimelineView } from "lib/timeline/components/TimelineView";
+import { Timeline } from "lib/timeline/components/Timeline";
 
 const COMPONENT_NAME = "timeline-manager";
 
 /**
  * Manages adding and removing timelines
  */
-export class TimelineManager extends HTMLElement {
-  elements: ReturnType<typeof TimelineManager.createElements>;
+export class Manager extends HTMLElement {
+  elements: ReturnType<typeof Manager.createElements>;
   timelineName?: string = LocationManager.getString("timelineName");
   timelineRecord?: TimelineRecord;
-  timelineView?: TimelineView;
+  timeline?: Timeline;
   #shadowRoot: ShadowRoot;
   cssLoaded = false;
 
@@ -40,8 +40,8 @@ export class TimelineManager extends HTMLElement {
   /**
    * The main entry into creating
    */
-  static create(db: DanceDatabase): TimelineManager {
-    const timelineManager: TimelineManager = document.createElement(
+  static create(db: DanceDatabase): Manager {
+    const timelineManager: Manager = document.createElement(
       "timeline-manager"
     ) as any;
     timelineManager.db = db;
@@ -58,7 +58,7 @@ export class TimelineManager extends HTMLElement {
   constructor() {
     super();
 
-    this.elements = TimelineManager.createElements();
+    this.elements = Manager.createElements();
     this.#shadowRoot = this.attachShadow({ mode: "open" });
     addStylesheet("../html/timeline.css", this.#shadowRoot).then(() => {
       this.setupHandlers();
@@ -129,29 +129,26 @@ export class TimelineManager extends HTMLElement {
 
     if (this.timelineRecord && this.timelineName) {
       // A timeline is loaded.
-      if (
-        this.timelineView &&
-        this.timelineView.timelineName !== this.timelineName
-      ) {
+      if (this.timeline && this.timeline.timelineName !== this.timelineName) {
         // The timeline changed.
-        this.timelineView.destroy();
-        delete this.timelineView;
+        this.timeline.destroy();
+        delete this.timeline;
       }
-      if (!this.timelineView) {
+      if (!this.timeline) {
         // The timeline needs to be created.
-        this.timelineView = new TimelineView(
+        this.timeline = new Timeline(
           this.db,
           this.timelineName,
           this.timelineRecord,
           this.closeTimeline,
           this.#shadowRoot
         );
-        exposeAsGlobal("timelineView", this.timelineView);
+        exposeAsGlobal("timeline", this.timeline);
       }
-    } else if (this.timelineView) {
+    } else if (this.timeline) {
       // There is no timeline loaded, but the view is still initialized.
-      this.timelineView.destroy();
-      delete this.timelineView;
+      this.timeline.destroy();
+      delete this.timeline;
     }
 
     if (this.elements.select.value !== this.timelineName) {
@@ -270,12 +267,12 @@ export class TimelineManager extends HTMLElement {
   }
 
   update() {
-    this.timelineView?.update();
+    this.timeline?.update();
   }
 
   draw() {
-    this.timelineView?.draw();
+    this.timeline?.draw();
   }
 }
 
-customElements.define(COMPONENT_NAME, TimelineManager);
+customElements.define(COMPONENT_NAME, Manager);

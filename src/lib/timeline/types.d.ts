@@ -20,27 +20,23 @@ export interface DanceRecord {
   timestamp: number;
 }
 
-export interface TimelineAudio {
+export interface CueAudio {
   offset: number;
   type: "audio";
   hash: string | null;
 }
-export interface TimelineDance {
+export interface CueDance {
   offset: number;
   type: "dance";
 }
-export interface TimelineKeyframe {
+export interface CueKeyframe {
   offset: number;
   type: "keyframe";
   key: string;
   value: any;
 }
 
-export type Timeline =
-  | { type: "new" }
-  | TimelineAudio
-  | TimelineDance
-  | TimelineKeyframe;
+export type Cue = { type: "new" } | CueAudio | CueDance | CueKeyframe;
 
 export interface TimelineRecord {
   name: string;
@@ -48,7 +44,7 @@ export interface TimelineRecord {
   lastModified: number;
   // In seconds.
   duration: number;
-  timeline: Timeline[];
+  cues: Cue[];
 }
 
 export interface DatabaseStores {

@@ -1,16 +1,16 @@
 import { type DanceDatabase } from "lib/posecam";
-import type { Timeline } from "lib/timeline/types";
-import { type TimelineView } from "lib/timeline/components/TimelineView";
+import type { Cue } from "lib/timeline/types";
+import { type Timeline } from "lib/timeline/components";
 
 export abstract class Row {
+  cue: Cue;
   timeline: Timeline;
-  timelineView: TimelineView;
   db: DanceDatabase;
   container: HTMLElement;
-  constructor(timeline: Timeline, timelineView: TimelineView) {
+  constructor(cue: Cue, timeline: Timeline) {
+    this.cue = cue;
     this.timeline = timeline;
-    this.timelineView = timelineView;
-    this.db = timelineView.db;
+    this.db = timeline.db;
     this.container = document.createElement("div");
     this.container.className = "row";
   }

@@ -5,7 +5,7 @@ import type {
   AudioRecord,
   DanceRecord,
   DatabaseStores,
-  Timeline,
+  Cue,
   TimelineRecord,
 } from "lib/timeline/types";
 import { addCSS, ensureExists } from "lib/utils";
@@ -170,7 +170,7 @@ export class DanceDatabase {
   async addTimeline(
     name: string,
     boundsInSeconds: number,
-    timeline: Timeline[]
+    timeline: Cue[]
   ): Promise<TimelineRecord> {
     const now = Date.now();
     return this.put("timelines", {
@@ -178,7 +178,7 @@ export class DanceDatabase {
       created: now,
       lastModified: now,
       duration: boundsInSeconds,
-      timeline,
+      cues: timeline,
     });
   }
 

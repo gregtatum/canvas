@@ -22,7 +22,7 @@ import {
 } from "lib/posecam";
 import { exposeAsGlobal, LocationManager } from "lib/utils";
 import { mat3, mat4, vec3, vec4 } from "lib/vec-math";
-import { TimelineManager } from "lib/timeline";
+import * as Timeline from "lib/timeline";
 
 type Config = ReturnType<typeof getConfig>;
 type Current = Awaited<ReturnType<typeof getCurrent>>;
@@ -215,7 +215,7 @@ async function getCurrent(config: Config) {
     position: [0, 0, 3],
   });
 
-  const timelineManager = TimelineManager.create(danceDB);
+  const timelineManager = Timeline.Manager.create(danceDB);
   document.body.appendChild(timelineManager);
 
   return {

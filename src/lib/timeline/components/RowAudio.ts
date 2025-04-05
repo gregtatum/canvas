@@ -1,9 +1,9 @@
-import type { AudioRecord, TimelineAudio } from "lib/timeline/types";
-import { Row, type TimelineView } from "lib/timeline/components";
+import type { AudioRecord, CueAudio } from "lib/timeline/types";
+import { Row, type Timeline } from "lib/timeline/components";
 import { appendHTML } from "lib/utils";
 
 export class RowAudio extends Row {
-  timeline: TimelineAudio;
+  cue: CueAudio;
   audioRecord?: Promise<AudioRecord>;
   elements: ReturnType<typeof RowAudio.prototype.createElements>;
   audioPlayer?: SyncPromise<AudioPlayer>;
@@ -11,10 +11,10 @@ export class RowAudio extends Row {
   isPlaying = true;
   currentTimeNeedsSetting = true;
 
-  constructor(timeline: TimelineAudio, timelineView: TimelineView) {
-    super(timeline, timelineView);
+  constructor(cue: CueAudio, timeline: Timeline) {
+    super(cue, timeline);
     this.elements = this.createElements();
-    this.timeline = timeline;
+    this.cue = cue;
     this.addHandlers();
     this.reactive();
     console.log("[RowAudio]", this);
@@ -53,10 +53,8 @@ export class RowAudio extends Row {
   reactive() {
     const { input, nameLabel, canvas } = this.elements;
 
-    if (this.timeline.hash && !this.audioRecord) {
-      this.audioRecord = ensureNonNull(
-        this.db.getAudioRecord(this.timeline.hash)
-      );
+    if (this.cue.hash && !this.audioRecord) {
+      this.audioRecord = ensureNonNull(this.db.getAudioRecord(this.cue.hash));
     }
     input.style.display = this.audioRecord ? "none" : "block";
 
@@ -70,14 +68,11 @@ export class RowAudio extends Row {
       this.isAudioBuilt = true;
       this.audioRecord.then(({ name, audio }) => {
         nameLabel.innerText = name;
-        AudioWaveform.create(
-          audio,
-          canvas,
-          this.timelineView,
-          this.timeline
-        ).then((audioWaveform) => {
-          this.audioWaveform = audioWaveform;
-        });
+        AudioWaveform.create(audio, canvas, this.timeline, this.cue).then(
+          (audioWaveform) => {
+            this.audioWaveform = audioWaveform;
+          }
+        );
       });
     }
   }
@@ -87,9 +82,9 @@ export class RowAudio extends Row {
   }
 
   update() {
-    const { timelineView } = this;
-    const { time, isPlaying, wasScrubbed } = timelineView;
-    const { offset } = this.timeline;
+    const { timeline } = this;
+    const { time, isPlaying, wasScrubbed } = timeline;
+    const { offset } = this.cue;
 
     const audioPlayer = this.audioPlayer?.value;
 
@@ -155,26 +150,26 @@ export class RowAudio extends Row {
     if (record) {
       // This was already stored in the Audio database.
       this.audioRecord = Promise.resolve(record);
-      this.timeline.hash = record.hash;
+      this.cue.hash = record.hash;
       this.audioPlayer = getAudioPlayer(record.audio);
     } else {
       this.audioRecord = this.db.addAudio(file.name, hash, file);
-      this.timeline.hash = hash;
+      this.cue.hash = hash;
       this.audioPlayer = getAudioPlayer(
         this.audioRecord.then((record) => record.audio)
       );
     }
-    this.timelineView.needsSaving = true;
+    this.timeline.needsSaving = true;
 
     this.audioPlayer.promise.then((audioPlayer) => {
-      const { timelineRecord } = this.timelineView;
+      const { record } = this.timeline;
       if (isNaN(audioPlayer.duration)) {
         console.error("The duration was not available", audioPlayer);
         return;
       }
-      if (timelineRecord.duration < audioPlayer.duration) {
-        this.timelineView.needsSaving = true;
-        timelineRecord.duration = audioPlayer.duration;
+      if (record.duration < audioPlayer.duration) {
+        this.timeline.needsSaving = true;
+        record.duration = audioPlayer.duration;
       }
     });
     this.reactive();
@@ -217,11 +212,11 @@ export class RowAudio extends Row {
       this.handleFile(file);
     });
 
-    this.timelineView.clickNoFocus(removeButton, () => {
+    this.timeline.clickNoFocus(removeButton, () => {
       if (confirm("Are you sure you want to delete that row?")) {
-        this.timelineView.updateTimeline((timelineRecord) => {
-          timelineRecord.timeline = timelineRecord.timeline.filter(
-            (timeline) => timeline !== this.timeline
+        this.timeline.updateTimeline((timelineRecord) => {
+          timelineRecord.cues = timelineRecord.cues.filter(
+            (timeline) => timeline !== this.cue
           );
         });
       }
@@ -259,6 +254,7 @@ class AudioPlayer {
 
   /**
    * The PCM decoded audio from the source mp3 or other file. This is the entire song
+   * in our case, even thought it's typically recommended for only short audio snippets.
    */
   buffer: AudioBuffer;
 
@@ -334,32 +330,32 @@ class AudioWaveform {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   audioBuffer: AudioBuffer;
-  timelineView: TimelineView;
-  timelineAudio: TimelineAudio;
+  timeline: Timeline;
+  cueAudio: CueAudio;
 
   static async create(
     blob: Blob,
     canvas: HTMLCanvasElement,
-    timelineView: TimelineView,
-    timelineAudio: TimelineAudio
+    timeline: Timeline,
+    cueAudio: CueAudio
   ): Promise<AudioWaveform> {
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(
       await blob.arrayBuffer()
     );
-    return new AudioWaveform(audioBuffer, canvas, timelineView, timelineAudio);
+    return new AudioWaveform(audioBuffer, canvas, timeline, cueAudio);
   }
 
   constructor(
     audioBuffer: AudioBuffer,
     canvas: HTMLCanvasElement,
-    timelineView: TimelineView,
-    timelineAudio: TimelineAudio
+    timeline: Timeline,
+    cueAudio: CueAudio
   ) {
     this.audioBuffer = audioBuffer;
     this.canvas = canvas;
-    this.timelineView = timelineView;
-    this.timelineAudio = timelineAudio;
+    this.timeline = timeline;
+    this.cueAudio = cueAudio;
     {
       const ctx = canvas.getContext("2d", { alpha: false });
       if (!ctx) {
@@ -388,12 +384,12 @@ class AudioWaveform {
     ctx.fillStyle = "#2e2e2e";
     ctx.fillRect(0, 0, width, height);
 
-    const { range } = this.timelineView;
+    const { range } = this.timeline;
     const [rangeStart, rangeEnd] = range;
     const rangeDuration = rangeEnd - rangeStart;
 
     const audioDuration = audioBuffer.length / audioBuffer.sampleRate;
-    const audioStart = this.timelineAudio.offset;
+    const audioStart = this.cueAudio.offset;
     const audioEnd = audioStart + audioDuration;
 
     const visibleStart = Math.max(rangeStart, audioStart);
