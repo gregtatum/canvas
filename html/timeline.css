@@ -111,7 +111,6 @@
 
 .row-line {
   height: 33px;
-  background-color: #74c0e4;
   width: 100%;
 }
 
@@ -283,5 +282,12 @@
       outline: 1px solid var(--accent-color);
       background: var(--border-color-focus);
     }
+  }
+}
+
+.row-new {
+  &._start {
+    display: flex;
+    gap: 5px;
   }
 }

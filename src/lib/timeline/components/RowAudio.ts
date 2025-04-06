@@ -65,6 +65,15 @@ export class RowAudio extends Row {
       );
     }
 
+    if (!this.audioRecord) {
+      // Cleanup from an undo.
+      nameLabel.innerText = "Audio";
+      if (this.audioWaveform) {
+        this.audioWaveform.clear();
+        delete this.audioWaveform;
+      }
+    }
+
     if (this.audioRecord && this.audioPlayer && !this.isAudioBuilt) {
       this.isAudioBuilt = true;
       this.audioRecord.then(({ name, audio }) => {
@@ -128,35 +137,69 @@ export class RowAudio extends Row {
   }
 
   async handleFile(file: File) {
+    let audioRecord: Promise<AudioRecord>;
+    let audioPlayer: SyncPromise<AudioPlayer>;
+
     const hash = await hashBlob(file);
     const record = await this.db.getAudioRecord(hash);
     if (record) {
       // This was already stored in the Audio database.
-      this.audioRecord = Promise.resolve(record);
-      this.cue.hash = record.hash;
-      this.audioPlayer = AudioPlayer.create(this.timeline, record.audio);
+      audioRecord = Promise.resolve(record);
+      audioPlayer = AudioPlayer.create(this.timeline, record.audio);
     } else {
-      this.audioRecord = this.db.addAudio(file.name, hash, file);
-      this.cue.hash = hash;
-      this.audioPlayer = AudioPlayer.create(
+      audioRecord = this.db.addAudio(file.name, hash, file);
+      audioPlayer = AudioPlayer.create(
         this.timeline,
-        this.audioRecord.then((record) => record.audio)
+        audioRecord.then((record) => record.audio)
       );
     }
-    this.timeline.needsSaving = true;
 
-    this.audioPlayer.promise.then((audioPlayer) => {
+    this.timeline.undos.apply(
+      () => {
+        this.cue.hash = hash;
+        this.audioRecord = audioRecord;
+        this.audioPlayer = audioPlayer;
+        this.reactive();
+      },
+      () => {
+        this.cue.hash = null;
+        delete this.audioRecord;
+        delete this.audioPlayer;
+        this.isAudioBuilt = false;
+        this.reactive();
+      }
+    );
+
+    audioPlayer.promise.then((audioPlayer) => {
       const { record } = this.timeline;
       if (isNaN(audioPlayer.duration)) {
         console.error("The duration was not available", audioPlayer);
         return;
       }
       if (record.duration < audioPlayer.duration) {
-        this.timeline.needsSaving = true;
-        record.duration = audioPlayer.duration;
+        const oldDuration = record.duration;
+        const newDuration = audioPlayer.duration;
+        const oldRange = this.timeline.range;
+        const newRange = [oldRange[0], oldRange[1]];
+        if (oldRange[1] === oldDuration) {
+          newRange[1] = newDuration;
+        }
+        this.timeline.undos.apply(
+          () => {
+            record.duration = newDuration;
+            this.timeline.range = newRange;
+            this.timeline.reactive();
+            this.reactive();
+          },
+          () => {
+            record.duration = oldDuration;
+            this.timeline.range = oldRange;
+            this.timeline.reactive();
+            this.reactive();
+          }
+        );
       }
     });
-    this.reactive();
   }
 
   addFileHandlers() {
@@ -198,11 +241,20 @@ export class RowAudio extends Row {
 
     this.timeline.clickNoFocus(removeButton, () => {
       if (confirm("Are you sure you want to delete that row?")) {
-        this.timeline.updateTimeline((timelineRecord) => {
-          timelineRecord.cues = timelineRecord.cues.filter(
-            (timeline) => timeline !== this.cue
-          );
-        });
+        const oldCues = this.timeline.record.cues;
+        const newCues = this.timeline.record.cues.filter(
+          (timeline) => timeline !== this.cue
+        );
+        this.timeline.undos.apply(
+          () => {
+            this.timeline.record.cues = newCues;
+            this.timeline.reactive();
+          },
+          () => {
+            this.timeline.record.cues = oldCues;
+            this.timeline.reactive();
+          }
+        );
       }
     });
   }
@@ -236,6 +288,21 @@ export class RowAudio extends Row {
       canvas.style.cursor = "grabbing";
       document.body.style.cursor = "grabbing";
 
+      const oldOffset = this.cue.offset;
+      let newOffset = this.cue.offset;
+
+      const apply = () => {
+        this.cue.offset = newOffset;
+        this.drawTimeline();
+        this.timeline.time.wasScrubbed = true;
+      };
+
+      const undo = () => {
+        this.cue.offset = oldOffset;
+        this.drawTimeline();
+        this.timeline.time.wasScrubbed = true;
+      };
+
       const onMouseMove = (moveEvent: MouseEvent) => {
         const [start, end] = timeline.range;
         const timeSpan = end - start;
@@ -243,12 +310,13 @@ export class RowAudio extends Row {
 
         const dx = moveEvent.clientX - startX;
         const deltaSeconds = dx / pixelsPerSecond;
-        this.cue.offset = initialOffset + deltaSeconds;
-        if (Math.abs(this.cue.offset) < 1) {
-          // Snape the timeline
-          this.cue.offset = 0;
+        newOffset = initialOffset + deltaSeconds;
+
+        if (Math.abs(newOffset) < 1) {
+          // Snap the timeline
+          newOffset = 0;
         }
-        this.drawTimeline();
+        apply();
       };
 
       const onMouseUp = () => {
@@ -257,7 +325,8 @@ export class RowAudio extends Row {
         document.body.style.cursor = "";
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
-        this.timeline.needsSaving = true;
+
+        timeline.undos.push(apply, undo);
       };
 
       window.addEventListener("mousemove", onMouseMove);
@@ -405,13 +474,20 @@ class AudioWaveform {
     this.canvas.height = height;
   }
 
-  drawWaveform() {
+  clear() {
     const { width, height } = this.canvas;
-    const { audioBuffer, ctx } = this;
+    const { ctx } = this;
 
     // Clear background
     ctx.fillStyle = "#2e2e2e";
     ctx.fillRect(0, 0, width, height);
+  }
+
+  drawWaveform() {
+    const { width, height } = this.canvas;
+    const { audioBuffer, ctx } = this;
+
+    this.clear();
 
     const { range } = this.timeline;
     const [rangeStart, rangeEnd] = range;

@@ -24,11 +24,11 @@ export class Timeline {
   range: [Seconds, Seconds];
   closeTimeline: () => void;
   ctx: CanvasRenderingContext2D;
-  needsSaving = false;
   width: CssPixels = 0;
   time: SynchronizedTime;
   mouseAtTime: CssPixels = 0;
   pressedMouseTime: Seconds | null = null;
+  undos = new UndoHistory();
 
   /**
    * The audio context is the source of truth for timing in order to be able to do
@@ -133,7 +133,7 @@ export class Timeline {
       return;
     }
     for (const cue of this.record.cues) {
-      const rowView = this.rowViews.get(cue);
+      const rowView = this.rowViewsByCue.get(cue);
       rowView?.drawTimeline();
     }
     const { range: secondsRange, ctx } = this;
@@ -298,7 +298,10 @@ export class Timeline {
   }
 
   keydown = (event: KeyboardEvent) => {
-    let key = event.code.toLowerCase();
+    let key = event.key.toLowerCase();
+    if (key === " ") {
+      key = "space";
+    }
     if (event.shiftKey) {
       key = `shift-${key}`;
     }
@@ -314,6 +317,14 @@ export class Timeline {
     switch (key) {
       case "space": {
         this.togglePlay();
+        break;
+      }
+      case "ctrl-z": {
+        this.undos.undo();
+        break;
+      }
+      case "ctrl-shift-z": {
+        this.undos.redo();
         break;
       }
       case "ctrl-arrowleft": {
@@ -433,32 +444,31 @@ export class Timeline {
     this.range[1] = newEnd;
   };
 
-  updateTimeline(callback: (timelineRecord: TimelineRecord) => void) {
-    callback(this.record);
-    this.needsSaving = true;
-    this.reactive();
-  }
-
   addNewRow = () => {
     const newCue = this.record.cues.find((timeline) => timeline.type === "new");
     if (newCue) {
-      this.rowViews.get(newCue)?.container?.querySelector("select")?.focus();
+      this.rowViewsByCue
+        .get(newCue)
+        ?.container?.querySelector("select")
+        ?.focus();
       // Don't add a second one here.
       return;
     }
-    this.record.cues = this.record.cues.slice();
-    this.record.cues.push({ type: "new" });
-    this.reactive();
-  };
+    const oldCues = this.record.cues;
+    const newCues = this.record.cues.slice();
+    newCues.push({ type: "new" });
 
-  replaceNewRow(timelineType: string) {
-    const index = this.record.cues.findIndex(
-      (timeline) => timeline.type === "new"
+    this.undos.apply(
+      () => {
+        this.record.cues = newCues;
+        this.reactive();
+      },
+      () => {
+        this.record.cues = oldCues;
+        this.reactive();
+      }
     );
-    this.record.cues = this.record.cues.slice();
-    this.record.cues[index] = createDefaultTimeline(timelineType);
-    this.reactive();
-  }
+  };
 
   togglePlay = () => {
     const { playButtonImg } = this.elements;
@@ -474,7 +484,7 @@ export class Timeline {
   };
 
   prevCues: Cue[] = [];
-  rowViews = new WeakMap<Cue, Row>();
+  rowViewsByCue = new WeakMap<Cue, Row>();
   isDurationInvalidated = reactiveInvalidator([() => this.record.duration]);
   reactive() {
     if (this.record.cues !== this.prevCues) {
@@ -484,22 +494,26 @@ export class Timeline {
     this.durationEditor.reactive();
   }
 
+  getRowViews() {
+    return this.record.cues.map((cue) => this.rowViewsByCue.get(cue));
+  }
+
   /**
    * Synchronize the timeline views.
    */
   rebuildTimelines() {
     const rowsElements = this.elements.rows;
     for (let i = 0; i < this.record.cues.length; i++) {
-      const timeline = this.record.cues[i];
+      const cue = this.record.cues[i];
       const element: Element | undefined = rowsElements.children[i];
       const nextElement: Element | undefined = rowsElements.children[i - 1];
-      let rowView = this.rowViews.get(timeline);
+      let rowView = this.rowViewsByCue.get(cue);
       if (element && element === rowView?.container) {
         continue;
       }
       if (!rowView) {
-        rowView = createTimelineRow(timeline, this);
-        this.rowViews.set(timeline, rowView);
+        rowView = createTimelineRow(cue, this);
+        this.rowViewsByCue.set(cue, rowView);
       }
       if (nextElement) {
         rowsElements.insertBefore(rowView.container, nextElement);
@@ -548,7 +562,7 @@ export class Timeline {
   updateRows() {
     for (const timeline of this.record.cues) {
       const rowView = ensureExists(
-        this.rowViews.get(timeline),
+        this.rowViewsByCue.get(timeline),
         "Expected a Row view to be in the rowViews WeakMap."
       );
       rowView.update();
@@ -578,21 +592,6 @@ export class Timeline {
 
   destroy() {
     this.elements.container.remove();
-  }
-}
-
-function createDefaultTimeline(timelineType: string): Cue {
-  switch (timelineType) {
-    case "new":
-      return { type: "new" };
-    case "audio":
-      return { offset: 0, type: "audio", hash: null };
-    case "dance":
-      return { offset: 0, type: "dance" };
-    case "keyframe":
-      return { offset: 0, type: "keyframe", key: "", value: null };
-    default:
-      throw new Error("Unknown timeline " + timelineType);
   }
 }
 
@@ -654,7 +653,7 @@ class SynchronizedTime {
    * If the time was changed programmatically, mark it is as scrubbed so that Cues
    * can react.
    */
-  #wasScrubbed = true;
+  wasScrubbed = true;
 
   constructor(audioContext: AudioContext) {
     this.#audioContext = audioContext;
@@ -672,10 +671,10 @@ class SynchronizedTime {
   }
 
   /**
-   * Called once at the bottom oof the update tick.
+   * Called once at the bottom of the update tick.
    */
   updateEnd() {
-    this.#wasScrubbed = false;
+    this.wasScrubbed = false;
   }
 
   /**
@@ -690,17 +689,13 @@ class SynchronizedTime {
     return this.#isPlaying;
   }
 
-  get wasScrubbed(): boolean {
-    return this.#wasScrubbed;
-  }
-
   seek(time: Seconds) {
     if (this.isPlaying) {
       this.#audioContextOffset += this.#time - time;
     } else {
       this.start = time;
     }
-    this.#wasScrubbed = true;
+    this.wasScrubbed = true;
   }
 
   play() {
@@ -711,6 +706,62 @@ class SynchronizedTime {
   stop() {
     this.#isPlaying = false;
     this.#time = this.start;
-    this.#wasScrubbed = true;
+    this.wasScrubbed = true;
+  }
+}
+
+interface UndoRedo {
+  undo: () => void;
+  redo: () => void;
+}
+
+class UndoHistory {
+  undos: Array<UndoRedo> = [];
+  redos: Array<UndoRedo> = [];
+  savedAt?: UndoRedo;
+
+  undo() {
+    const undoRedo = this.undos.pop();
+    if (undoRedo) {
+      undoRedo.undo();
+      this.redos.push(undoRedo);
+    }
+  }
+
+  redo() {
+    const undoRedo = this.redos.pop();
+    if (undoRedo) {
+      undoRedo.redo();
+      this.undos.push(undoRedo);
+    }
+  }
+
+  /**
+   * Immediately apply an action, and add it to the history.
+   */
+  apply(apply: () => void, undo: () => void) {
+    apply();
+    this.push(apply, undo);
+  }
+
+  /**
+   * Just push onto the history without applying the action.
+   */
+  push(redo: () => void, undo: () => void) {
+    if (this.redos.length) {
+      this.redos.length = 0;
+    }
+    this.undos.push({ undo, redo });
+  }
+
+  needsSaving(): boolean {
+    if (this.savedAt) {
+      return this.undos[this.undos.length - 1] !== this.savedAt;
+    }
+    return this.undos.length !== 0;
+  }
+
+  markSaved() {
+    this.savedAt = this.undos[this.undos.length - 1];
   }
 }

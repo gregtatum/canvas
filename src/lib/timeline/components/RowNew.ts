@@ -14,7 +14,7 @@ export class NewRow extends Row {
     const get = appendHTML(
       this.container,
       /* html */ `
-        <div class="_start">
+        <div class="row-new _start">
           <select>
             <option value="audio">Audio</option>
             <option value="dance">Dance</option>
@@ -32,8 +32,41 @@ export class NewRow extends Row {
   }
 
   addHandlers() {
-    this.timeline.clickNoFocus(this.elements.button, () => {
-      this.timeline.replaceNewRow(this.elements.select.value);
+    const { timeline, elements } = this;
+    const { record } = timeline;
+    const oldCues = timeline.record.cues;
+    const newCues = record.cues.slice();
+
+    // Replace the cue.
+    const index = record.cues.findIndex((timeline) => timeline.type === "new");
+    newCues[index] = createDefaultTimeline(this.elements.select.value);
+
+    timeline.clickNoFocus(elements.button, () => {
+      timeline.undos.apply(
+        () => {
+          record.cues = newCues;
+          timeline.reactive();
+        },
+        () => {
+          record.cues = oldCues;
+          timeline.reactive();
+        }
+      );
     });
+  }
+}
+
+function createDefaultTimeline(timelineType: string): Cue {
+  switch (timelineType) {
+    case "new":
+      return { type: "new" };
+    case "audio":
+      return { offset: 0, type: "audio", hash: null };
+    case "dance":
+      return { offset: 0, type: "dance" };
+    case "keyframe":
+      return { offset: 0, type: "keyframe", key: "", value: null };
+    default:
+      throw new Error("Unknown timeline " + timelineType);
   }
 }
