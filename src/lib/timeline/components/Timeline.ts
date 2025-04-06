@@ -27,7 +27,7 @@ export class Timeline {
   width: CssPixels = 0;
   time: SynchronizedTime;
   mouseAtTime: CssPixels = 0;
-  pressedMouseTime: Seconds | null = null;
+  isTickmarksPressed = false;
   undos = new UndoHistory();
 
   /**
@@ -357,19 +357,26 @@ export class Timeline {
     const duration: Seconds = end - start;
     const rangeRatio = timelineLeft / this.width;
     this.mouseAtTime = start + duration * rangeRatio;
+    if (this.isTickmarksPressed) {
+      this.moveScrubber();
+    }
   };
 
   tickmarksMouseDown = () => {
-    this.pressedMouseTime = this.mouseAtTime;
+    this.isTickmarksPressed = true;
+    this.moveScrubber();
   };
 
   tickmarksMouseUp = () => {
-    if (this.pressedMouseTime === this.mouseAtTime) {
-      this.time.seek(this.mouseAtTime);
+    this.isTickmarksPressed = false;
+  };
+
+  moveScrubber() {
+    this.time.seek(this.mouseAtTime);
+    if (!this.time.isPlaying) {
       this.time.start = this.mouseAtTime;
     }
-    this.pressedMouseTime = null;
-  };
+  }
 
   wheelHandler = (event: WheelEvent) => {
     if (!this.isActiveElement()) {
