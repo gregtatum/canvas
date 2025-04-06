@@ -180,7 +180,7 @@ export class RowAudio extends Row {
         const oldDuration = record.duration;
         const newDuration = audioPlayer.duration;
         const oldRange = this.timeline.range;
-        const newRange = [oldRange[0], oldRange[1]];
+        const newRange: [Seconds, Seconds] = [oldRange[0], oldRange[1]];
         if (oldRange[1] === oldDuration) {
           newRange[1] = newDuration;
         }

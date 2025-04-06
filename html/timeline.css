@@ -199,23 +199,23 @@
       left: 3px;
     }
   }
+}
 
-  ._tickmarks {
-    flex: 1;
-    height: calc(var(--padding) * 2 + var(--button-size));
-    position: relative; /* for scrubber positioning */
-    overflow: hidden;
+.tickmarks {
+  flex: 1;
+  height: calc(var(--padding) * 2 + var(--button-size));
+  position: relative; /* for scrubber positioning */
+  overflow: hidden;
 
-    & canvas {
-      /* Override all of the default canvas styles from style.css */
-      width: calc(100vw - var(--sidebar-width));
-      height: 1.5rem;
-      background-color: red;
-      transition: none;
-      position: relative;
-      z-index: 0;
-      /* Additional properties. */
-    }
+  & canvas {
+    /* Override all of the default canvas styles from style.css */
+    width: calc(100vw - var(--sidebar-width));
+    height: 1.5rem;
+    background-color: red;
+    transition: none;
+    position: relative;
+    z-index: 0;
+    /* Additional properties. */
   }
 }
 

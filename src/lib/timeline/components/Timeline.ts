@@ -12,8 +12,9 @@ import {
   RowKeyframe,
   NewRow,
   Row,
+  DurationEditor,
+  Tickmarks,
 } from "lib/timeline/components";
-import { DurationEditor } from "./DurationEditor";
 
 export class Timeline {
   db: DanceDatabase;
@@ -23,12 +24,10 @@ export class Timeline {
   record: TimelineRecord;
   range: [Seconds, Seconds];
   closeTimeline: () => void;
-  ctx: CanvasRenderingContext2D;
-  width: CssPixels = 0;
   time: SynchronizedTime;
   mouseAtTime: CssPixels = 0;
-  isTickmarksPressed = false;
   undos = new UndoHistory();
+  tickmarks: Tickmarks;
 
   /**
    * The audio context is the source of truth for timing in order to be able to do
@@ -50,14 +49,12 @@ export class Timeline {
     this.closeTimeline = closeTimeline;
 
     this.elements = Timeline.createElements(shadowRoot);
+    this.tickmarks = new Tickmarks(this, this.elements.tickmarks);
     this.durationEditor = new DurationEditor(
       this.elements.durationEditorMount,
       this
     );
     this.setupHandlers();
-    this.ctx = ensureExists(
-      this.elements.canvas.getContext("2d", { alpha: false })
-    );
 
     this.range = [0, this.record.duration];
 
@@ -87,9 +84,8 @@ export class Timeline {
               <img src="../html/xmark.svg" />
             </button>
           </div>
-          <div class="_tickmarks">
-            <canvas></canvas>
-            <div class="_zoom"></div>
+          <div class="tickmarks">
+            <!-- class Tickmark -->
           </div>
         </div>
         <div class="rows">
@@ -110,8 +106,7 @@ export class Timeline {
       playButtonImg: get<HTMLImageElement>("._play img"),
       recordButton: get<HTMLButtonElement>("._record"),
       closeButton: get<HTMLButtonElement>("._close"),
-      tickmarks: get<HTMLDivElement>("._tickmarks"),
-      canvas: get<HTMLCanvasElement>("._tickmarks canvas"),
+      tickmarks: get<HTMLDivElement>(".tickmarks"),
       scrubberStart: get<HTMLCanvasElement>(".scrubbers ._start"),
       scrubberTime: get<HTMLCanvasElement>(".scrubbers ._time"),
       rows: get(".rows"),
@@ -119,9 +114,6 @@ export class Timeline {
     };
   }
 
-  prevWindowWidth = -1;
-  // 1 second to 1 hour.
-  tickIntervals = [1, 5, 10, 30, 60, 300, 600, 1800, 3600];
   redrawTimeline = reactiveInvalidator([
     () => this.record.duration,
     () => this.range[0],
@@ -132,116 +124,15 @@ export class Timeline {
     if (!this.redrawTimeline()) {
       return;
     }
+    this.tickmarks.draw();
     for (const cue of this.record.cues) {
       const rowView = this.rowViewsByCue.get(cue);
       rowView?.drawTimeline();
     }
-    const { range: secondsRange, ctx } = this;
-    const { canvas } = this.elements;
-
-    // Properly size the canvas.
-    this.prevWindowWidth = window.innerWidth;
-    const rect = this.elements.canvas.getBoundingClientRect();
-    this.width = rect.width;
-    canvas.width = rect.width * devicePixelRatio;
-    canvas.height = rect.height * devicePixelRatio;
-
-    // Clear the canvas
-    ctx.fillStyle = "#433";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const timeRange = secondsRange[1] - secondsRange[0];
-    this.record.duration;
-
-    // Determine an appropriate tick interval
-    const majorTickInterval =
-      this.tickIntervals.find((tick) => timeRange / tick <= 10) || 3600; // Max 10 ticks
-
-    // Define minor tick interval (divide major by 5 or 10)
-    let minorTickInterval = majorTickInterval / 5;
-    if (minorTickInterval < 1) minorTickInterval = 1; // Minimum 1-second interval
-
-    // Canvas dimensions
-    const width = canvas.width;
-    const height = canvas.height;
-    const textBottom = 12 * devicePixelRatio; // Where the bottom of the text is.
-    const textMargin = 3 * devicePixelRatio; // The margin between text and the marks.
-    const majorTickTop = textBottom + textMargin;
-    const minorTickTop = (majorTickTop + height) / 2;
-    const majorTickWidth = 1 * devicePixelRatio;
-    const minorTickWidth = 0.5 * devicePixelRatio;
-
-    // Convert time to X-coordinate
-    const timeToX = (time: number) =>
-      ((time - secondsRange[0]) / timeRange) * width;
-
-    // Draw major ticks
-    ctx.font = `${12 * devicePixelRatio}px Arial`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = "#fff";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = majorTickWidth;
-
-    // Major ticks and number labels.
-    ctx.beginPath();
-    for (
-      let t =
-        Math.ceil(secondsRange[0] / majorTickInterval) * majorTickInterval;
-      t <= secondsRange[1];
-      t += majorTickInterval
-    ) {
-      const x = timeToX(t);
-      ctx.moveTo(x, majorTickTop);
-      ctx.lineTo(x, height);
-
-      // Convert seconds to a readable format (MM:SS)
-      const minutes = Math.floor(t / 60);
-      const seconds = t % 60;
-      const label =
-        minutes > 0
-          ? `${minutes}:${seconds.toString().padStart(2, "0")}`
-          : `${seconds}s`;
-      ctx.fillText(label, x, textBottom);
-    }
-    ctx.stroke();
-
-    // Minor ticks
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = minorTickWidth;
-    ctx.beginPath();
-    for (
-      let t =
-        Math.ceil(secondsRange[0] / minorTickInterval) * minorTickInterval;
-      t <= secondsRange[1];
-      t += minorTickInterval
-    ) {
-      if (t % majorTickInterval === 0) continue; // Skip if it's already a major tick
-      const x = timeToX(t);
-      ctx.moveTo(x, minorTickTop);
-      ctx.lineTo(x, height); // Minor tick size
-    }
-    ctx.moveTo(0, height - minorTickWidth);
-    ctx.lineTo(width, height - minorTickWidth);
-
-    ctx.stroke();
-
-    const { duration: boundsInSeconds } = this.record;
-    // Draw progress bar (small bar at the top)
-    const progressBarHeight = 5;
-
-    ctx.fillStyle = "#ff0";
-    ctx.fillRect(
-      (secondsRange[0] / boundsInSeconds) * width,
-      0,
-      ((secondsRange[1] - secondsRange[0]) / boundsInSeconds) * width,
-      progressBarHeight
-    );
   }
 
   setupHandlers() {
-    const { closeButton, container, addButton, playButton, tickmarks } =
-      this.elements;
+    const { closeButton, container, addButton, playButton } = this.elements;
 
     container.addEventListener("wheel", this.wheelHandler, {
       passive: false,
@@ -251,9 +142,6 @@ export class Timeline {
     this.clickNoFocus(addButton, this.addNewRow);
     this.clickNoFocus(playButton, this.togglePlay);
     container.addEventListener("mousemove", this.mouseMoveHandler);
-    tickmarks.addEventListener("mousedown", this.tickmarksMouseDown);
-    window.addEventListener("mouseup", this.tickmarksMouseUp);
-    window.addEventListener("blur", this.tickmarksMouseUp);
     this.elements.container.addEventListener("keydown", this.keydown);
   }
 
@@ -351,38 +239,19 @@ export class Timeline {
   };
 
   mouseMoveHandler = (event: MouseEvent) => {
-    const timelineLeft: CssPixels =
-      event.clientX - window.innerWidth + this.width;
+    const { width } = this.elements.tickmarks.getBoundingClientRect();
+    const timelineLeft: CssPixels = event.clientX - window.innerWidth + width;
     const [start, end] = this.range;
     const duration: Seconds = end - start;
-    const rangeRatio = timelineLeft / this.width;
+    const rangeRatio = timelineLeft / width;
     this.mouseAtTime = start + duration * rangeRatio;
-    if (this.isTickmarksPressed) {
-      this.moveScrubber();
-    }
+    this.tickmarks.mouseMoved();
   };
-
-  tickmarksMouseDown = () => {
-    this.isTickmarksPressed = true;
-    this.moveScrubber();
-  };
-
-  tickmarksMouseUp = () => {
-    this.isTickmarksPressed = false;
-  };
-
-  moveScrubber() {
-    this.time.seek(this.mouseAtTime);
-    if (!this.time.isPlaying) {
-      this.time.start = this.mouseAtTime;
-    }
-  }
 
   wheelHandler = (event: WheelEvent) => {
     if (!this.isActiveElement()) {
       return;
     }
-    const { canvas } = this.elements;
     const timelineDuration = this.record.duration; // End time, implied start is always 0
     const [start, end] = this.range;
     const rangeDuration = end - start;
@@ -390,7 +259,7 @@ export class Timeline {
     let newEnd = 0;
     const minimumRange: Seconds = Math.min(timelineDuration, 4);
 
-    const canvasRect = canvas.getBoundingClientRect();
+    const { left, width } = this.elements.tickmarks.getBoundingClientRect();
 
     if (event.shiftKey) {
       // Zoom in.
@@ -405,8 +274,8 @@ export class Timeline {
       }
 
       // Get mouse position relative to the timeline
-      const mouseDevicePixelX = event.clientX - canvasRect.left;
-      const mouseViewRatio = mouseDevicePixelX / canvasRect.width;
+      const mouseDevicePixelX = event.clientX - left;
+      const mouseViewRatio = mouseDevicePixelX / width;
 
       // Adjust the range based on the mouse position
       newStart = start + zoomAmount * mouseViewRatio;
@@ -590,7 +459,8 @@ export class Timeline {
     const rangeDuration: Seconds = end - start;
     const timeInRange: Seconds = seconds - start;
     const rangeRatio = timeInRange / rangeDuration;
-    return this.width * rangeRatio;
+    const { width } = this.elements.tickmarks.getBoundingClientRect();
+    return width * rangeRatio;
   }
 
   draw() {
@@ -698,7 +568,7 @@ class SynchronizedTime {
 
   seek(time: Seconds) {
     if (this.isPlaying) {
-      this.#audioContextOffset += this.#time - time;
+      this.#audioContextOffset = this.#audioContext.currentTime - time;
     } else {
       this.start = time;
     }
