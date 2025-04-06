@@ -14,7 +14,8 @@ export class RowAudio extends Row {
     super(cue, timeline);
     this.elements = this.createElements();
     this.cue = cue;
-    this.addHandlers();
+    this.addFileHandlers();
+    this.addGrabberHandlers();
     this.reactive();
     console.log("[RowAudio]", this);
   }
@@ -158,7 +159,7 @@ export class RowAudio extends Row {
     this.reactive();
   }
 
-  addHandlers() {
+  addFileHandlers() {
     const { input, removeButton } = this.elements;
 
     // Handle file selection via input.
@@ -203,6 +204,64 @@ export class RowAudio extends Row {
           );
         });
       }
+    });
+  }
+
+  addGrabberHandlers() {
+    const { timeline } = this;
+    const { canvas } = this.elements;
+
+    let isDragging = false;
+    let startX = 0;
+    let initialOffset = 0;
+
+    canvas.style.cursor = "default";
+
+    canvas.addEventListener("mouseenter", () => {
+      if (!isDragging) {
+        canvas.style.cursor = "grab";
+      }
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      if (!isDragging) {
+        canvas.style.cursor = "default";
+      }
+    });
+
+    canvas.addEventListener("mousedown", (event) => {
+      isDragging = true;
+      startX = event.clientX;
+      initialOffset = this.cue.offset;
+      canvas.style.cursor = "grabbing";
+      document.body.style.cursor = "grabbing";
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        const [start, end] = timeline.range;
+        const timeSpan = end - start;
+        const pixelsPerSecond = timeSpan > 0 ? timeline.width / timeSpan : 0;
+
+        const dx = moveEvent.clientX - startX;
+        const deltaSeconds = dx / pixelsPerSecond;
+        this.cue.offset = initialOffset + deltaSeconds;
+        if (Math.abs(this.cue.offset) < 1) {
+          // Snape the timeline
+          this.cue.offset = 0;
+        }
+        this.drawTimeline();
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
+        canvas.style.cursor = "grab";
+        document.body.style.cursor = "";
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        this.timeline.needsSaving = true;
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
     });
   }
 }
