@@ -8,7 +8,6 @@ import type {
   Cue,
   TimelineRecord,
 } from "lib/timeline/types";
-import { addCSS, ensureExists } from "lib/utils";
 
 const DB_NAME = "dancecam";
 const DB_VERSION = 7;
@@ -272,11 +271,9 @@ export class DanceDatabase {
 
 export class PoseCam {
   #danceDB: DanceDatabase;
-  #danceNames: string[] = [];
-  mount: HTMLElement;
+  danceNames: string[] = [];
   selectedDance: string;
   isRecording = false;
-  elements: ReturnType<typeof PoseCam.getElements>;
 
   // These are meant to be overridden.
   onStartRecording: () => void;
@@ -286,22 +283,19 @@ export class PoseCam {
 
   static async create(
     danceDB: DanceDatabase,
-    mount: HTMLElement,
     selectedDance: string = LIVE_CAMERA
   ) {
     const danceNames = await danceDB.listDances();
-    return new PoseCam(danceDB, danceNames, mount, selectedDance);
+    return new PoseCam(danceDB, danceNames, selectedDance);
   }
 
   constructor(
     danceDB: DanceDatabase,
     danceNames: string[],
-    mount: HTMLElement,
     selectedDance: string
   ) {
     this.#danceDB = danceDB;
-    this.#danceNames = danceNames;
-    this.mount = mount;
+    this.danceNames = danceNames;
     this.selectedDance = selectedDance;
 
     this.onStartRecording = () => {};
@@ -309,50 +303,8 @@ export class PoseCam {
     this.onDiscardRecording = () => {};
     this.onChangeDance = () => {};
 
-    const parser = new DOMParser();
-    const parsedHTML = parser.parseFromString(
-      /* html */ `
-      <div id="posecam">
-        <div class="posecam-controls">
-          <button id="posecam-discard">Discard</button>
-          <button id="posecam-save">Save</button>
-          <button id="posecam-delete">Delete</button>
-          <button id="posecam-download">Download</button>
-          <button id="posecam-record">Record</button>
-          <select id="posecam-dropdown">
-            <option>Live Camera</option>
-            <!-- The rest will be added here -->
-          </select>
-        </div>
-      </div>
-    `,
-      "text/html"
-    );
-
-    addCSS(/* css */ `
-      #posecam {
-        position: absolute;
-        bottom: 50px;
-        width: 100%;
-      }
-      .posecam-controls {
-        display: flex;
-        justify-content: end;
-        margin: 5px;
-        gap: 5px;
-      }
-      .hide-ui #posecam {
-        display: none;
-      }
-    `);
-
-    const root = ensureExists(parsedHTML.body.firstElementChild);
-    this.mount.appendChild(root);
-    this.elements = PoseCam.getElements(root);
-
-    this.addHandlers();
     this.refreshDances(danceNames);
-    this.updateVisibility();
+    this.reactive();
   }
 
   getSelectedDance() {
@@ -362,96 +314,28 @@ export class PoseCam {
     return this.#danceDB.getDance(this.selectedDance);
   }
 
-  static getElements(root: Element) {
-    const getElement = <T extends HTMLElement>(selector: string): T => {
-      const element = root.querySelector(selector);
-      if (!element) {
-        throw new Error(`Could not find element by selector "${selector}"`);
-      }
-      return element as T;
-    };
-
-    return {
-      danceDropdown: getElement<HTMLSelectElement>("#posecam-dropdown"),
-      recordButton: getElement<HTMLButtonElement>("#posecam-record"),
-      saveButton: getElement<HTMLButtonElement>("#posecam-save"),
-      discardButton: getElement<HTMLButtonElement>("#posecam-discard"),
-      deleteButton: getElement<HTMLButtonElement>("#posecam-delete"),
-      downloadButton: getElement<HTMLButtonElement>("#posecam-download"),
-    };
-  }
-
-  addHandlers() {
-    const {
-      recordButton,
-      danceDropdown,
-      saveButton,
-      discardButton,
-      deleteButton,
-      downloadButton,
-    } = this.elements;
-
-    danceDropdown.addEventListener("change", this.changeDance);
-    recordButton.addEventListener("click", this.startRecording);
-    saveButton.addEventListener("click", this.saveRecording);
-    discardButton.addEventListener("click", this.discardRecording);
-    deleteButton.addEventListener("click", this.deleteDance);
-    downloadButton.addEventListener("click", this.downloadDance);
-  }
-
-  updateVisibility() {
-    const {
-      discardButton,
-      recordButton,
-      danceDropdown,
-      deleteButton,
-      saveButton,
-      downloadButton,
-    } = this.elements;
-
-    if (danceDropdown.value === LIVE_CAMERA) {
-      hide(deleteButton);
-      hide(downloadButton);
-      if (this.isRecording) {
-        hide(recordButton);
-        hide(danceDropdown);
-        show(discardButton);
-        show(saveButton);
-      } else {
-        show(recordButton);
-        show(danceDropdown);
-        hide(discardButton);
-        hide(saveButton);
-      }
-    } else {
-      hide(recordButton);
-      hide(saveButton);
-      hide(discardButton);
-      show(deleteButton);
-      show(downloadButton);
-    }
+  reactive() {
+    // TODO
   }
 
   startRecording = () => {
     console.log("Start recording");
     // Start recording
     this.isRecording = true;
-    this.updateVisibility();
+    this.reactive();
     this.onStartRecording();
   };
 
   saveRecording = async () => {
     // Stop recording
     this.isRecording = false;
-    this.updateVisibility();
+    this.reactive();
     const dance = this.onStopRecording();
     if (dance.length) {
       const danceName = prompt("Enter a name for the new dance:") || "untitled";
       await this.#danceDB.addDance(danceName, dance);
       this.refreshDances(await this.#danceDB.listDances());
-      this.elements.danceDropdown.value = danceName;
       this.selectedDance = danceName;
-      this.elements.danceDropdown.value = danceName;
       this.changeDance();
       console.log("[posecam] saved", danceName, dance);
     } else {
@@ -461,14 +345,13 @@ export class PoseCam {
 
   discardRecording = () => {
     this.isRecording = false;
-    this.updateVisibility();
+    this.reactive();
     this.onDiscardRecording();
   };
 
   changeDance = async () => {
-    const { danceDropdown } = this.elements;
-    this.updateVisibility();
-    this.selectedDance = danceDropdown.value;
+    this.reactive();
+    // this.selectedDance = danceDropdown.value;
 
     if (!this.selectedDance || this.selectedDance === LIVE_CAMERA) {
       this.onChangeDance(null);
@@ -478,12 +361,14 @@ export class PoseCam {
         this.onChangeDance(dance);
       }
     }
+    throw new Error("TODO");
   };
 
   deleteDance = async () => {
     if (!confirm(`Are you sure you want to delete "${this.selectedDance}"?`)) {
       return;
     }
+    // @ts-expect-error - TODO
     const { danceDropdown } = this.elements;
     if (this.selectedDance) {
       const danceName = this.selectedDance;
@@ -509,31 +394,25 @@ export class PoseCam {
   };
 
   refreshDances(danceNames: string[]) {
-    this.#danceNames = danceNames;
-    const { danceDropdown } = this.elements;
-    const previousValue = this.selectedDance;
-    while (danceDropdown.children.length > 1) {
-      danceDropdown.lastChild!.remove();
-    }
-    for (const name of this.#danceNames) {
-      const option = document.createElement("option");
-      option.innerText = name;
-      danceDropdown.appendChild(option);
-    }
-    danceDropdown.value = previousValue;
-    if (!danceDropdown.value) {
-      this.selectedDance = LIVE_CAMERA;
-      this.changeDance();
-    }
+    this.danceNames = danceNames;
+    // TODO
+
+    // const { danceDropdown } = this.elements;
+    // const previousValue = this.selectedDance;
+    // while (danceDropdown.children.length > 1) {
+    //   danceDropdown.lastChild!.remove();
+    // }
+    // for (const name of this.#danceNames) {
+    //   const option = document.createElement("option");
+    //   option.innerText = name;
+    //   danceDropdown.appendChild(option);
+    // }
+    // danceDropdown.value = previousValue;
+    // if (!danceDropdown.value) {
+    //   this.selectedDance = LIVE_CAMERA;
+    //   this.changeDance();
+    // }
   }
-}
-
-function hide(element: HTMLElement) {
-  element.style.display = "none";
-}
-
-function show(element: HTMLElement) {
-  element.style.display = "block";
 }
 
 const _calculateAngle_v1 = vec3.create();

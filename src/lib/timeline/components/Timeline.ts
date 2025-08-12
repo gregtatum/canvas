@@ -1,4 +1,4 @@
-import { type DanceDatabase } from "lib/posecam";
+import { PoseCam, type DanceDatabase } from "lib/posecam";
 import type { Cue, TimelineRecord } from "lib/timeline/types";
 import {
   createHTML,
@@ -8,13 +8,16 @@ import {
 } from "lib/utils";
 import {
   RowAudio,
-  RowDance,
+  RowPoseCam,
   RowKeyframe,
   NewRow,
   Row,
   DurationEditor,
   Tickmarks,
 } from "lib/timeline/components";
+
+// Keep in sync with html/timeline.css
+const SIDEBAR_WIDTH: CssPixels = 300;
 
 export class Timeline {
   db: DanceDatabase;
@@ -28,6 +31,10 @@ export class Timeline {
   mouseAtTime: CssPixels = 0;
   undos = new UndoHistory();
   tickmarks: Tickmarks;
+  poseCam: PoseCam;
+  get width(): CssPixels {
+    return window.innerWidth - SIDEBAR_WIDTH;
+  }
 
   /**
    * The audio context is the source of truth for timing in order to be able to do
@@ -37,6 +44,7 @@ export class Timeline {
 
   constructor(
     db: DanceDatabase,
+    poseCam: PoseCam,
     timelineName: string,
     record: TimelineRecord,
     closeTimeline: () => void,
@@ -47,6 +55,7 @@ export class Timeline {
     this.record = record;
     this.time = new SynchronizedTime(this.audioContext);
     this.closeTimeline = closeTimeline;
+    this.poseCam = poseCam;
 
     this.elements = Timeline.createElements(shadowRoot);
     this.tickmarks = new Tickmarks(this, this.elements.tickmarks);
@@ -435,6 +444,14 @@ export class Timeline {
     }
   }
 
+  *getPoseCamRows(): Iterable<RowPoseCam> {
+    for (const cue of this.record.cues) {
+      if (cue.type === "dance") {
+        yield this.rowViewsByCue.get(cue) as RowPoseCam;
+      }
+    }
+  }
+
   updateRows() {
     for (const timeline of this.record.cues) {
       const rowView = ensureExists(
@@ -479,7 +496,7 @@ function createTimelineRow(cue: Cue, timeline: Timeline) {
     case "audio":
       return new RowAudio(cue, timeline);
     case "dance":
-      return new RowDance(cue, timeline);
+      return new RowPoseCam(cue, timeline);
     case "keyframe":
       return new RowKeyframe(cue, timeline);
     default:
@@ -596,6 +613,17 @@ class UndoHistory {
   undos: Array<UndoRedo> = [];
   redos: Array<UndoRedo> = [];
   savedAt?: UndoRedo;
+
+  constructor() {
+    // eslint-disable-next-line no-constant-condition
+    if (false) {
+      window.addEventListener("beforeunload", (event) => {
+        if (this.needsSaving()) {
+          event.preventDefault();
+        }
+      });
+    }
+  }
 
   undo() {
     const undoRedo = this.undos.pop();

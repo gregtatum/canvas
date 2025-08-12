@@ -28,6 +28,9 @@ export interface CueAudio {
 export interface CueDance {
   offset: number;
   type: "dance";
+  wsUrl: null | string;
+  poseSmoothing: UnitInterval;
+  speed: UnitInterval;
 }
 export interface CueKeyframe {
   offset: number;

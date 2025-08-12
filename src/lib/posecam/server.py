@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import base64
 import functools
@@ -5,6 +6,7 @@ import json
 import os
 import time
 from typing import Any, Optional, TypeVar, cast
+import logging
 import requests
 import websockets
 import mediapipe as mp
@@ -12,6 +14,10 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 import cv2
+
+logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
+
+logger = logging.getLogger("posecam")
 
 
 # https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker/index#models
@@ -109,15 +115,15 @@ def get_model(model_name: str) -> str:
     file_name = os.path.basename(url)
 
     if os.path.exists(file_name):
-        print(f"Using model: {model_name}")
+        logger.info(f"Using model: {model_name}")
     else:
-        print(f"Downloading {model_name} model...")
+        logger.info(f"Downloading {model_name} model...")
         response = requests.get(url, stream=True)
         response.raise_for_status()
         with open(file_name, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print(f"{model_name} model downloaded.")
+        logger.info(f"{model_name} model downloaded.")
 
     return file_name
 
@@ -132,14 +138,14 @@ class Timer:
         self.now = time.perf_counter()
         duration = self.now - before
         if self.log:
-            print(f"[perf] {name} {duration:.4f} sec")
+            logger.info(f"[perf] {name} {duration:.4f} sec")
 
 
-async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
+async def run_pose_loop(background_tasks: BackgroundTasks, camera_index: int) -> None:
     global is_pose_loop_running
     assert not is_pose_loop_running, "The pose loop should not already be running"
     is_pose_loop_running = True
-    print("Running pose loop")
+    logger.info("Running pose loop")
 
     # Set to True to debug timing.
     log_timer = False
@@ -154,11 +160,13 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
     timer.measure("Create pose landmarker")
 
     # https://docs.opencv.org/4.5.4/d8/dfe/classcv_1_1VideoCapture.html
-    video_capture = cv2.VideoCapture(1)
+    logger.info("Connecting to camera")
+    video_capture = cv2.VideoCapture(camera_index)
+
     width, height = get_camera_resolution(video_capture)
     backend_name = video_capture.getBackendName()
-    print("Video backend:", backend_name)
-    print("Original size:", width, height)
+    logger.info(f"Video backend: {backend_name}")
+    logger.info(f"Original size: {width}x{height}")
 
     if backend_name == "AVFOUNDATION":
         # macOS camera
@@ -166,7 +174,7 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
         video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         width, height = get_camera_resolution(video_capture)
-        print("Resized video:", width, height)
+        logger.info(f"Resized video: {width}x{height}")
 
     timer.measure("Camera created")
 
@@ -194,7 +202,7 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
 
         frame_and_image_results = await frame_and_image_future
         if not frame_and_image_results:
-            print("Could not retrieve a camera frame")
+            logger.info("Could not retrieve a camera frame")
             break
         frame, image = frame_and_image_results
         pose_detection_future = background_tasks.add(
@@ -230,7 +238,8 @@ async def run_pose_loop(background_tasks: BackgroundTasks) -> None:
                     timer.measure("Before send frame")
                     await messenger.send_frame(frame)
             except Exception as e:
-                print("Client send failed", e)
+                logger.info("Client send failed")
+                print(e)
                 remove_from_list(clients_watching_poses, messenger)
 
     # Make sure the last frame is captured before releasing everything.
@@ -260,8 +269,9 @@ def remove_from_list(list: list[T], item: T) -> None:
 
 
 class Server:
-    def __init__(self) -> None:
+    def __init__(self, camera_index: int) -> None:
         self.background_tasks = BackgroundTasks()
+        self.camera_index = camera_index
 
     async def client_connected(
         self, client: websockets.WebSocketServerProtocol, path: str
@@ -271,29 +281,29 @@ class Server:
         """
         messenger = Messenger(client)
         clients.append(messenger)
-        print(f"Client connected ({len(clients)})")
+        logger.info(f"Client connected ({len(clients)})")
         try:
             async for message in client:
                 data = None
                 try:
                     data = json.loads(message)
                 except Exception as json_exception:
-                    print("Error: JSON message failed to parse", json_exception)
+                    logger.info("Error: JSON message failed to parse", json_exception)
                     await messenger.send_error("JSON message failed to parse")
                 if not isinstance(data, dict) or "type" not in data:
-                    print("Error: JSON was malformed", data)
+                    logger.info("Error: JSON was malformed", data)
                 elif data:
                     await self.handle_message(messenger, data)
 
         except websockets.ConnectionClosed:
-            print(f"Client disconnected: {client.remote_address}")
+            logger.info(f"Client disconnected: {client.remote_address}")
 
         remove_from_list(clients, messenger)
         remove_from_list(clients_watching_poses, messenger)
-        print(f"Client removed ({len(clients)})")
+        logger.info(f"Client removed ({len(clients)})")
 
     async def handle_message(self, messenger: Messenger, data: dict[str, Any]):
-        print("Message received", data)
+        logger.info("Message received", data)
         match data["type"]:
             case "request-models":
                 await messenger.send_models()
@@ -309,7 +319,8 @@ class Server:
                     clients_watching_poses.append(messenger)
                 if not is_pose_loop_running:
                     self.background_tasks.add(
-                        run_pose_loop(self.background_tasks), name="run_pose_loop"
+                        run_pose_loop(self.background_tasks, self.camera_index),
+                        name="run_pose_loop",
                     )
             case "un-watch-poses":
                 remove_from_list(clients_watching_poses, messenger)
@@ -320,12 +331,22 @@ class Server:
 
 
 async def main():
-    server = Server()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--camera_index", type=int, help="The index to the OS's camera", default=0
+    )
+
+    args = parser.parse_args()
+
+    server = Server(args.camera_index)
     async with websockets.serve(
         functools.partial(server.client_connected), "0.0.0.0", ws_port
     ) as server:
-        print("WebSocket server listening on ws://0.0.0.0:8765")
-        print("connect via ws://dancecam1.local:8765, ws://localhost:8765 or similar")
+        logger.info("WebSocket server listening on ws://0.0.0.0:8765")
+        logger.info(
+            "connect via ws://dancecam1.local:8765, ws://localhost:8765 or similar"
+        )
         await asyncio.create_task(server.serve_forever())
 
 

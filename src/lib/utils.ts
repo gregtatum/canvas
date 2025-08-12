@@ -228,3 +228,20 @@ export function addStylesheet(
     });
   });
 }
+
+/**
+ * Helper function to convert a potential null Promise value into a Promise rejection.
+ */
+export function ensureNonNull<T>(
+  promise: Promise<T | null | undefined>
+): Promise<T> {
+  return promise.then((value) => {
+    if (value === undefined) {
+      return Promise.reject(new Error("The value was undefined"));
+    }
+    if (value === null) {
+      return Promise.reject(new Error("The value was null"));
+    }
+    return value;
+  });
+}

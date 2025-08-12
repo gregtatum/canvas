@@ -1,4 +1,4 @@
-import { type DanceDatabase } from "lib/posecam";
+import { PoseCam, type DanceDatabase } from "lib/posecam";
 import type { TimelineRecord } from "lib/timeline/types";
 import {
   addStylesheet,
@@ -37,14 +37,35 @@ export class Manager extends HTMLElement {
     this.#db = db;
   }
 
+  // You can't use web components constructors, but the DanceDatabase must be defined
+  // before creating one. Use the TimelineManager.create method to create an instance.
+  #poseCam?: PoseCam;
+
+  get poseCam() {
+    if (!this.#poseCam) {
+      throw new Error(
+        "The TimelineManager.create method must be used to construct a TimelineManager."
+      );
+    }
+    return this.#poseCam;
+  }
+  set poseCam(poseCam: PoseCam) {
+    this.#poseCam = poseCam;
+  }
+
   /**
    * The main entry into creating
    */
-  static create(db: DanceDatabase): Manager {
+  static async create(db: DanceDatabase): Promise<Manager> {
+    const poseCam = await PoseCam.create(
+      db,
+      LocationManager.getString("dance")
+    );
     const timelineManager: Manager = document.createElement(
       "timeline-manager"
     ) as any;
     timelineManager.db = db;
+    timelineManager.poseCam = poseCam;
 
     // List the timelines.
     db.listTimelines().then((timelines) =>
@@ -138,6 +159,7 @@ export class Manager extends HTMLElement {
         // The timeline needs to be created.
         this.timeline = new Timeline(
           this.db,
+          this.poseCam,
           this.timelineName,
           this.timelineRecord,
           this.closeTimeline,

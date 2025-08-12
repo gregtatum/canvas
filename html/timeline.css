@@ -73,7 +73,8 @@
     border-right: 1px solid var(--border-color-subtle);
     box-sizing: border-box;
     border-top: 1px solid var(--border-color-subtle);
-    padding: 8px;
+    padding: 6px;
+    gap: 6px;
     display: flex;
     align-items: center;
 
@@ -134,6 +135,7 @@
     border-top: 1px solid #000;
   }
 
+  /* Keep in sync with src/lib/timeline/components/Timeline.ts */
   --sidebar-width: 300px;
 }
 
@@ -289,5 +291,12 @@
   &._start {
     display: flex;
     gap: 5px;
+  }
+}
+
+.row-pose-cam {
+  input {
+    flex: 1;
+    width: 100%;
   }
 }

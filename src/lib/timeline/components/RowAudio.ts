@@ -1,6 +1,6 @@
 import type { AudioRecord, CueAudio } from "lib/timeline/types";
 import { Row, type Timeline } from "lib/timeline/components";
-import { appendHTML } from "lib/utils";
+import { appendHTML, ensureNonNull } from "lib/utils";
 
 export class RowAudio extends Row {
   cue: CueAudio;
@@ -239,24 +239,7 @@ export class RowAudio extends Row {
       this.handleFile(file);
     });
 
-    this.timeline.clickNoFocus(removeButton, () => {
-      if (confirm("Are you sure you want to delete that row?")) {
-        const oldCues = this.timeline.record.cues;
-        const newCues = this.timeline.record.cues.filter(
-          (timeline) => timeline !== this.cue
-        );
-        this.timeline.undos.apply(
-          () => {
-            this.timeline.record.cues = newCues;
-            this.timeline.reactive();
-          },
-          () => {
-            this.timeline.record.cues = oldCues;
-            this.timeline.reactive();
-          }
-        );
-      }
-    });
+    this.addRemoveButtonHandler(removeButton);
   }
 
   addGrabberHandlers() {
@@ -555,21 +538,6 @@ class AudioWaveform {
       ctx.fillRect(drawX, 0, 1, 3);
     }
   }
-}
-
-/**
- * Helper function to convert a potential null Promise value into a Promise rejection.
- */
-function ensureNonNull<T>(promise: Promise<T | null | undefined>): Promise<T> {
-  return promise.then((value) => {
-    if (value === undefined) {
-      return Promise.reject(new Error("The value was undefined"));
-    }
-    if (value === null) {
-      return Promise.reject(new Error("The value was null"));
-    }
-    return value;
-  });
 }
 
 interface SyncPromise<T> {

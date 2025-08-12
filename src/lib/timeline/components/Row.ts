@@ -17,4 +17,25 @@ export abstract class Row {
 
   update(): void {}
   drawTimeline() {}
+
+  addRemoveButtonHandler(removeButton: HTMLButtonElement) {
+    this.timeline.clickNoFocus(removeButton, () => {
+      if (confirm("Are you sure you want to delete that row?")) {
+        const oldCues = this.timeline.record.cues;
+        const newCues = this.timeline.record.cues.filter(
+          (timeline) => timeline !== this.cue
+        );
+        this.timeline.undos.apply(
+          () => {
+            this.timeline.record.cues = newCues;
+            this.timeline.reactive();
+          },
+          () => {
+            this.timeline.record.cues = oldCues;
+            this.timeline.reactive();
+          }
+        );
+      }
+    });
+  }
 }
